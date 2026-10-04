@@ -44,16 +44,15 @@ linux:
       arch: [x64]
   artifactName: ${name}-${version}-linux-${arch}.${ext}
 
-# Windows is out of scope for now. To add it: uncomment, and add windows-latest to the
-# release workflow's matrix.
-# win:
-#   target:
-#     - target: nsis
-#       arch: [x64]
-#   artifactName: ${name}-${version}-windows-${arch}.${ext}
-# nsis:
-#   oneClick: false
-#   allowToChangeInstallationDirectory: true
+# Unsigned for now: Windows shows a SmartScreen warning ("More info" > "Run anyway").
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${name}-${version}-windows-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 
 # GitHub Releases, as a draft to review before publishing (release workflow).
 publish:

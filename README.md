@@ -103,7 +103,7 @@ Versions follow [Semantic Versioning](https://semver.org) (`MAJOR.MINOR.PATCH`; 
 |---|---|
 | macOS | `.dmg` (Apple Silicon and Intel), plus `.zip` for future auto-updates |
 | Linux | `.AppImage` and `.deb` (x64) |
-| Windows | ready to enable (`win:` in `electron-builder.yml` and the workflow matrix) |
+| Windows | `.exe` installer (x64) |
 
 To publish a version:
 
@@ -121,7 +121,7 @@ To try a build without releasing: *Actions → Release → Run workflow*; the in
 
 Which server the released app talks to is set at build time from repository variables (*Settings → Secrets and variables → Actions → Variables*): `XMPP_DOMAIN` (e.g. `palique.es`) and `ACCOUNTS_URL` (e.g. `https://cuentas.palique.es`). Unset, the app uses `localhost` like in development.
 
-Not yet signed: macOS shows an "unidentified developer" warning (open it with right click → Open) until there's an Apple Developer account (signing and notarization also enable auto-updates on macOS). Linux needs no signing.
+Not signed (builds are for testing with people close by, not for distribution): macOS shows an "unidentified developer" warning (open it with right click → Open) and Windows a SmartScreen warning (*More info → Run anyway*). Signing would need an Apple Developer account (which also enables auto-updates on macOS) and a Windows code signing certificate. Linux needs no signing.
 
 ## Platforms
 

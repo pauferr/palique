@@ -23,9 +23,8 @@ jobs:
             platform: mac
           - os: ubuntu-latest
             platform: linux
-          # Windows, when it's time (also uncomment win: in electron-builder.yml):
-          # - os: windows-latest
-          #   platform: win
+          - os: windows-latest
+            platform: win
     runs-on: ${{ matrix.os }}
 
     steps:
