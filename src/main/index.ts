@@ -15,10 +15,12 @@ import {
   logout,
   onChange,
   onMessage,
+  onTyping,
   rejectRequest,
   removeContact,
   sendBuzz,
   sendMessage,
+  sendTyping,
   setPresence,
   snapshot,
   type ChatMessage,
@@ -205,6 +207,13 @@ app.whenReady().then(() => {
     setPresence(shows.includes(show) ? show : 'online', String(status))
   )
   onMessage(deliver)
+  // Typing only matters if the conversation is open; it never opens a window.
+  onTyping((contact, typing) =>
+    chats.get(contact)?.webContents.send('chat:typing', contact, typing)
+  )
+  ipcMain.handle('chat:typing', (_, contact: string, typing: boolean) =>
+    sendTyping(String(contact), Boolean(typing))
+  )
   ipcMain.handle('chat:open', (_, contact: string) => {
     openChat(String(contact), true)
   })

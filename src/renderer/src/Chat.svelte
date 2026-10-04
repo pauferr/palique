@@ -7,6 +7,8 @@
   let { jid }: { jid: string } = $props()
 
   const BUZZ_COOLDOWN = 5000
+  const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
+  const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
   const labels: Record<Contact['show'], string> = {
     online: 'Conectado',
     away: 'Ausente',
@@ -21,7 +23,11 @@
   let draft = $state('')
   let shaking = $state(false)
   let canBuzz = $state(true)
+  let theyType = $state(false)
   let list: HTMLElement
+  let composing = false
+  let idle: ReturnType<typeof setTimeout> | undefined
+  let theirTimeout: ReturnType<typeof setTimeout> | undefined
 
   function play(src: string): void {
     new Audio(src).play().catch(() => {})
@@ -36,6 +42,7 @@
   async function add(message: ChatMessage, alert: boolean): Promise<void> {
     if (messages.some((m) => m.id === message.id)) return
     messages.push(message)
+    if (!message.mine) theyType = false
     if (alert) {
       if (message.buzz) shake()
       if (!message.mine) play(message.buzz ? buzzSound : messageSound)
@@ -49,6 +56,13 @@
     const offMessage = window.api.onChatMessage((m) => {
       if (m.with === jid) add(m, true)
     })
+    const offTyping = window.api.onTyping((c, typing) => {
+      if (c !== jid) return
+      theyType = typing
+      clearTimeout(theirTimeout)
+      if (typing) theirTimeout = setTimeout(() => (theyType = false), TYPING_TIMEOUT)
+    })
+    window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     // The message that opened this window arrived before we were listening:
@@ -58,14 +72,36 @@
     })
     return () => {
       offMessage()
+      offTyping()
       offRoster()
     }
   })
+
+  function stopTyping(): void {
+    clearTimeout(idle)
+    if (!composing) return
+    composing = false
+    window.api.setTyping(jid, false)
+  }
+
+  // Tell the contact once when we start; "paused" after a quiet spell or an empty box.
+  function onInput(): void {
+    clearTimeout(idle)
+    if (!draft.trim()) return stopTyping()
+    if (!composing) {
+      composing = true
+      window.api.setTyping(jid, true)
+    }
+    idle = setTimeout(stopTyping, TYPING_IDLE)
+  }
 
   function send(): void {
     if (!draft.trim()) return
     window.api.sendMessage(jid, draft)
     draft = ''
+    // The message itself tells them we stopped typing.
+    clearTimeout(idle)
+    composing = false
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -117,6 +153,8 @@
     {/each}
   </ol>
 
+  <p class="typing" aria-live="polite">{theyType ? `${name} está escribiendo…` : ''}</p>
+
   <div class="compose">
     <button
       class="buzz"
@@ -128,6 +166,7 @@
     <textarea
       bind:value={draft}
       onkeydown={onKeydown}
+      oninput={onInput}
       maxlength="4000"
       rows="3"
       placeholder="Escribe un mensaje…"
@@ -144,7 +183,7 @@
 
   .chat {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto 1fr auto auto;
     height: 100vh;
     font-family: system-ui, sans-serif;
   }
@@ -199,6 +238,15 @@
 
   em {
     color: #b03a2e;
+  }
+
+  .typing {
+    min-height: 1.2em;
+    margin: 0;
+    padding: 0 0.75rem;
+    color: #888;
+    font-size: 0.85rem;
+    font-style: italic;
   }
 
   .compose {

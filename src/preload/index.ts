@@ -34,6 +34,14 @@ const api = {
   sendMessage: (contact: string, body: string): Promise<void> =>
     ipcRenderer.invoke('chat:send', contact, body),
   sendBuzz: (contact: string): Promise<void> => ipcRenderer.invoke('chat:buzz', contact),
+  setTyping: (contact: string, typing: boolean): Promise<void> =>
+    ipcRenderer.invoke('chat:typing', contact, typing),
+  onTyping: (callback: (contact: string, typing: boolean) => void): (() => void) => {
+    const listener = (_: unknown, contact: string, typing: boolean): void =>
+      callback(contact, typing)
+    ipcRenderer.on('chat:typing', listener)
+    return () => ipcRenderer.off('chat:typing', listener)
+  },
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
   exportHistory: (format: ExportFormat): Promise<ExportResult> =>
     ipcRenderer.invoke('history:export', format),
