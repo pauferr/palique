@@ -1,11 +1,19 @@
 import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
+import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import devCert from '../../server/certs/localhost.crt?raw'
+import { DOMAIN, login, logout } from './xmpp'
 
 // Native Wayland clients can't stay on top in every compositor (GNOME refuses),
 // which would break the full-screen wink overlay. XWayland handles it everywhere.
 if (process.platform === 'linux') app.commandLine.appendSwitch('ozone-platform', 'x11')
+
+// The local Prosody uses a dev-only self-signed cert: trust exactly that one, keep verification on.
+if (DOMAIN === 'localhost') {
+  tls.setDefaultCACertificates([...tls.getCACertificates('default'), devCert])
+}
 
 const preload = join(__dirname, '../preload/index.js')
 
@@ -73,6 +81,10 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('wink:play', (_, id: string) => showWink(id))
+  ipcMain.handle('auth:login', (_, username: string, password: string, register: boolean) =>
+    login(String(username), String(password), Boolean(register))
+  )
+  ipcMain.handle('auth:logout', () => logout())
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   createWindow()

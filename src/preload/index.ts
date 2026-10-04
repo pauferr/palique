@@ -1,8 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { AuthResult } from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
+  login: (username: string, password: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:login', username, password, false),
+  register: (username: string, password: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:login', username, password, true),
+  logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   playWink: (id: string): void => ipcRenderer.send('wink:play', id),
   winkDone: (): void => ipcRenderer.send('wink:done')
 }

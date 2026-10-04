@@ -32,7 +32,11 @@ docker compose logs -f  # follow server logs
 docker compose down     # stop (accounts persist in the prosody-data volume)
 ```
 
-TLS uses the image's self-signed certificate for `localhost`.
+TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the app trusts it only when connecting to `localhost`.
+
+```bash
+npm run check:auth      # registration/login check against the local server
+```
 
 ## Platforms
 
