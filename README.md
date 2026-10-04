@@ -10,6 +10,18 @@ A desktop instant messenger inspired by MSN Messenger and AIM. Sounds, buzzes, f
 - **Messaging:** XMPP
 - **Server:** [Prosody](https://prosody.im)
 
+## Development
+
+Requires Node 22+.
+
+```bash
+npm install
+npm run dev          # app with hot reload
+npm run build        # typecheck + build
+npm run build:mac    # package .dmg
+npm run build:linux  # package AppImage + .deb (use CI from macOS)
+```
+
 ## Platforms
 
 - Linux and macOS

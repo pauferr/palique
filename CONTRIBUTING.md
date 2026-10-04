@@ -29,7 +29,7 @@ type(scope): description
 
 ### Suggested scopes
 
-`chat`, `roster`, `presence`, `buzz`, `winks`, `auth`, `history`, `sound`, `theme`, `ui`, `xmpp`, `tauri`, `server`, `planning`
+`chat`, `roster`, `presence`, `buzz`, `winks`, `auth`, `history`, `sound`, `theme`, `ui`, `xmpp`, `electron`, `server`, `planning`
 
 New scopes can be added when needed; keep them short and lowercase.
 
@@ -39,7 +39,7 @@ New scopes can be added when needed; keep them short and lowercase.
 feat(buzz): shake chat window on incoming buzz
 fix(roster): keep contact order after reconnect
 docs(planning): add character cast
-build(tauri): update to latest minor version
+build(electron): update to latest minor version
 ```
 
 ### Breaking changes
