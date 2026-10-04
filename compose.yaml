@@ -12,5 +12,31 @@ services:
       - ./server/certs/localhost.key:/etc/prosody/certs/localhost.key:ro
       - prosody-data:/var/lib/prosody
 
+  # Account service: email verification, invites by email, password recovery.
+  cuentas:
+    build: ./server/cuentas
+    depends_on: [prosody, mailpit]
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # pages behind the links in its emails
+    environment:
+      XMPP_SERVICE: xmpp://prosody:5347
+      XMPP_DOMAIN: cuentas.localhost
+      XMPP_SECRET: dev-only-cuentas-secret # same as in server/prosody.cfg.lua
+      USER_DOMAIN: localhost
+      PUBLIC_URL: http://localhost:8080
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      DATA_DIR: /data
+    volumes:
+      - cuentas-data:/data
+
+  # Fake mailbox for development: every email the service sends lands here.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025" # web inbox: http://localhost:8025
+
 volumes:
   prosody-data:
+  cuentas-data:

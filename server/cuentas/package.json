@@ -1,0 +1,21 @@
+{
+  "name": "palique-cuentas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Palique account service: email verification, invites by email, password recovery",
+  "type": "module",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@xmpp/component": "^0.14.0",
+    "nodemailer": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "@types/nodemailer": "^7.0.0",
+    "@types/xmpp__component": "^0.14.0",
+    "typescript": "^5.9.3"
+  }
+}

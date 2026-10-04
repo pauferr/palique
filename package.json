@@ -29,7 +29,8 @@
     "check:emoticons": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-emoticons.ts",
     "check:invisible": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invisible.ts",
     "check:cooldown": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-cooldown.ts",
-    "check:invites": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invites.ts"
+    "check:invites": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invites.ts",
+    "check:email": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-email.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

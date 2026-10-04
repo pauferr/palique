@@ -33,7 +33,11 @@ import {
   acceptRequest,
   addContact,
   createInvite,
+  emailStatus,
   listInvites,
+  onEmail,
+  resendVerification,
+  setEmail,
   login,
   logout,
   onChange,
@@ -86,7 +90,7 @@ let quitting = false
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 360,
-    height: 620,
+    height: 680,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -329,16 +333,21 @@ app.whenReady().then(() => {
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
-  // `invite`: present when creating the account.
-  ipcMain.handle('auth:login', async (_, username: string, password: string, invite?: string) => {
+  // `signup`: present when creating the account (invite code, email, newsletter consent).
+  type Signup = { invite: string; email: string; newsletter: boolean }
+  ipcMain.handle('auth:login', async (_, username: string, password: string, signup?: Signup) => {
     // Sign in with the last status, so an invisible user is never briefly visible.
     const last = settings.get().show
     const show = shows.includes(last) ? last : 'online'
     const result = await login(String(username), String(password), {
-      invite: invite === undefined ? undefined : String(invite),
+      invite: signup ? String(signup.invite) : undefined,
       show
     })
     if (result.ok) account = result.jid
+    // The account exists now; if this fails, the contact list asks for the email again.
+    if (result.ok && signup) {
+      await setEmail(String(signup.email), Boolean(signup.newsletter)).catch(() => {})
+    }
     return result
   })
   ipcMain.handle('auth:logout', async () => {
@@ -353,6 +362,17 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
     announceArrivals(state)
   })
+  onEmail((email) => {
+    BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
+  })
+  ipcMain.handle('account:email', () => emailStatus())
+  ipcMain.handle('account:set-email', (_, address: string, newsletter: boolean) =>
+    setEmail(String(address), Boolean(newsletter)).then((email) => {
+      BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
+      return email
+    })
+  )
+  ipcMain.handle('account:resend', () => resendVerification())
   ipcMain.handle('invites:create', () => createInvite())
   ipcMain.handle('invites:list', () => listInvites())
   ipcMain.handle('roster:snapshot', () => snapshot())

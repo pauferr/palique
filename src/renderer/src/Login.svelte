@@ -17,6 +17,8 @@
   let password = $state('')
   let confirm = $state('')
   let invite = $state('')
+  let email = $state('')
+  let newsletter = $state(false)
   let error = $state('')
   let busy = $state(false)
 
@@ -31,7 +33,7 @@
     const user = username.trim().toLowerCase()
     const result =
       mode === 'register'
-        ? await window.api.register(user, password, invite)
+        ? await window.api.register(user, password, { invite, email: email.trim(), newsletter })
         : await window.api.login(user, password)
     busy = false
     if ('jid' in result) onlogin(result.jid)
@@ -45,7 +47,7 @@
   }
 </script>
 
-<div class="login">
+<div class="login" style:--overlap={mode === 'register' ? '36px' : '56px'}>
   <header>
     <h1>Palique</h1>
     <p>¿Echamos un palique?</p>
@@ -53,7 +55,7 @@
 
   <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
   <div class="frame">
-    <Avatar jid={username.trim() || 'palique'} show="online" size={96} />
+    <Avatar jid={username.trim() || 'palique'} show="online" size={mode === 'register' ? 56 : 96} />
   </div>
 
   <form onsubmit={submit}>
@@ -98,6 +100,17 @@
         Repite la contraseña
         <input type="password" bind:value={confirm} autocomplete="new-password" required />
       </label>
+      <label>
+        Correo electrónico
+        <input type="email" bind:value={email} autocomplete="email" required maxlength="254" />
+        <small
+          >Para recuperar tu contraseña si la olvidas. Te enviaremos un enlace para confirmarlo.</small
+        >
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={newsletter} />
+        Quiero recibir el boletín con las novedades de Palique (puedes darte de baja cuando quieras)
+      </label>
     {/if}
 
     {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -115,16 +128,17 @@
 </div>
 
 <style>
+  /* Grows (and scrolls) when the sign-up form is taller than the window. */
   .login {
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
   }
 
   header {
     align-self: stretch;
-    padding: 28px 16px 56px;
+    padding: 28px 16px var(--overlap, 56px);
     text-align: center;
     background: var(--header-bg);
     border-bottom: 1px solid var(--line);
@@ -145,7 +159,7 @@
 
   /* The picture frame overlaps the header, like the old sign-in screens. */
   .frame {
-    margin-top: -48px;
+    margin-top: calc(8px - var(--overlap, 56px));
     padding: 4px;
     border-radius: var(--radius-large);
     background: var(--window-bg);
@@ -162,6 +176,19 @@
     display: grid;
     gap: 2px;
     color: var(--text-strong);
+  }
+
+  label small {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .check {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    color: var(--text);
+    font-size: 12px;
   }
 
   .error {

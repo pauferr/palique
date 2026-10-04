@@ -13,6 +13,8 @@ const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from th
 
 const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
 const INVITES = 'urn:palique:invite:0' // server/modules/mod_palique_invites.lua
+const ACCOUNTS = 'urn:palique:cuentas:0' // account service, server/cuentas
+export const ACCOUNTS_JID = process.env['PALIQUE_ACCOUNTS_JID'] ?? `cuentas.${DOMAIN}`
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
@@ -79,6 +81,7 @@ let avatars = new Map<string, Avatar>() // by bare JID, ours included
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
+let emailListener: (email: EmailStatus) => void = () => {}
 
 // Best presence across the contact's connected devices.
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
@@ -107,6 +110,10 @@ export function onChange(callback: (snapshot: Snapshot) => void): void {
 }
 
 const emit = (): void => listener(snapshot())
+
+export function onEmail(callback: (email: EmailStatus) => void): void {
+  emailListener = callback
+}
 
 export function onTyping(callback: (contact: string, typing: boolean) => void): void {
   typingListener = callback
@@ -191,6 +198,12 @@ function handlePresence(stanza: Element): void {
 }
 
 function handleMessage(stanza: Element): void {
+  // The account service tells us when the email gets verified. Only it, exactly.
+  const email = stanza.getChild('email', ACCOUNTS)
+  if (email) {
+    if (stanza.attrs.from === ACCOUNTS_JID) emailListener(parseEmail(email))
+    return
+  }
   let message = stanza
   let mine = false
   const carbon = stanza.getChild('received', CARBONS) ?? stanza.getChild('sent', CARBONS)
@@ -602,5 +615,50 @@ export async function listInvites(): Promise<{ invites: Invite[]; max: number }>
   return {
     invites: (list?.getChildren('invite') ?? []).map(parseInvite),
     max: Number(list?.attrs.max ?? 0)
+  }
+}
+
+// --- email (account service) ---------------------------------------------------------
+
+export type EmailStatus = { address: string; verified: boolean; newsletter: boolean }
+
+function parseEmail(el: Element): EmailStatus {
+  return {
+    address: el.attrs.address ?? '',
+    verified: el.attrs.verified === 'true',
+    newsletter: el.attrs.newsletter === 'true'
+  }
+}
+
+function accountsIq(type: 'get' | 'set', child: Element): Promise<Element> {
+  return xmpp!.iqCaller.request(xml('iq', { type, to: ACCOUNTS_JID }, child))
+}
+
+// Sends a verification link to the address. Rejects with 'invalid' for a bad address.
+export async function setEmail(address: string, newsletter: boolean): Promise<EmailStatus> {
+  try {
+    const res = await accountsIq(
+      'set',
+      xml('email', { xmlns: ACCOUNTS, address, newsletter: String(newsletter) })
+    )
+    return parseEmail(res.getChild('email', ACCOUNTS)!)
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    throw new Error(condition === 'bad-request' ? 'invalid' : 'unknown')
+  }
+}
+
+export async function emailStatus(): Promise<EmailStatus> {
+  const res = await accountsIq('get', xml('email', { xmlns: ACCOUNTS }))
+  return parseEmail(res.getChild('email', ACCOUNTS)!)
+}
+
+// Another verification link; rejects with 'wait' if one was sent less than a minute ago.
+export async function resendVerification(): Promise<void> {
+  try {
+    await accountsIq('set', xml('resend', { xmlns: ACCOUNTS }))
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    throw new Error(condition === 'resource-constraint' ? 'wait' : 'unknown')
   }
 }

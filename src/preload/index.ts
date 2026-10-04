@@ -2,14 +2,26 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ExportFormat, ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
-import type { AuthResult, ChatMessage, Invite, OwnShow, Snapshot } from '../main/xmpp'
+import type { AuthResult, ChatMessage, EmailStatus, Invite, OwnShow, Snapshot } from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
   login: (username: string, password: string): Promise<AuthResult> =>
     ipcRenderer.invoke('auth:login', username, password),
-  register: (username: string, password: string, invite: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:login', username, password, invite),
+  register: (
+    username: string,
+    password: string,
+    signup: { invite: string; email: string; newsletter: boolean }
+  ): Promise<AuthResult> => ipcRenderer.invoke('auth:login', username, password, signup),
+  getEmail: (): Promise<EmailStatus> => ipcRenderer.invoke('account:email'),
+  setEmail: (address: string, newsletter: boolean): Promise<EmailStatus> =>
+    ipcRenderer.invoke('account:set-email', address, newsletter),
+  resendVerification: (): Promise<void> => ipcRenderer.invoke('account:resend'),
+  onEmail: (callback: (email: EmailStatus) => void): (() => void) => {
+    const listener = (_: unknown, email: EmailStatus): void => callback(email)
+    ipcRenderer.on('account:email', listener)
+    return () => ipcRenderer.off('account:email', listener)
+  },
   createInvite: (): Promise<Invite> => ipcRenderer.invoke('invites:create'),
   listInvites: (): Promise<{ invites: Invite[]; max: number }> =>
     ipcRenderer.invoke('invites:list'),

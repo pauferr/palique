@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Contact, Invite, OwnShow, Snapshot } from '../../main/xmpp'
+  import type { Contact, EmailStatus, Invite, OwnShow, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
@@ -38,6 +38,14 @@
 
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
+    window.api
+      .getEmail()
+      .then((value) => (email = value))
+      .catch(() => {})
+    const offEmail = window.api.onEmail((value) => {
+      email = value
+      emailNote = ''
+    })
     const offRoster = window.api.onRoster((value) => {
       roster = value
       // Someone may have just joined with one of our invites.
@@ -47,6 +55,7 @@
       new Audio(onlineSound).play().catch(() => {})
     })
     return () => {
+      offEmail()
       offRoster()
       offOnline()
     }
@@ -92,6 +101,30 @@
       await window.api.setAvatar(new Uint8Array(await png.arrayBuffer()))
     } catch {
       avatarError = 'No se ha podido usar esa imagen.'
+    }
+  }
+
+  // Email for password recovery: a notice until it's verified.
+  let email: EmailStatus | undefined = $state()
+  let newEmail = $state('')
+  let emailNote = $state('')
+
+  async function saveEmail(event: SubmitEvent): Promise<void> {
+    event.preventDefault()
+    emailNote = ''
+    try {
+      email = await window.api.setEmail(newEmail.trim(), email?.newsletter ?? false)
+    } catch {
+      emailNote = 'Esa dirección no parece válida.'
+    }
+  }
+
+  async function resend(): Promise<void> {
+    try {
+      await window.api.resendVerification()
+      emailNote = 'Enlace reenviado.'
+    } catch {
+      emailNote = 'Espera un minuto antes de pedir otro enlace.'
     }
   }
 
@@ -197,6 +230,27 @@
   {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
   {#if roster.show === 'invisible'}
     <p class="notice">Estás invisible: tus contactos te ven desconectado, pero puedes chatear.</p>
+  {/if}
+  {#if email && !email.address}
+    <form class="notice warning email" onsubmit={saveEmail}>
+      <span>Añade tu correo para poder recuperar la contraseña si la olvidas.</span>
+      <input
+        type="email"
+        bind:value={newEmail}
+        required
+        maxlength="254"
+        placeholder="tu@correo.com"
+        aria-label="Correo electrónico"
+      />
+      <button type="submit">Guardar</button>
+      {#if emailNote}<span>{emailNote}</span>{/if}
+    </form>
+  {:else if email && !email.verified}
+    <p class="notice warning" role="status">
+      Confirma tu correo: te enviamos un enlace a <strong>{email.address}</strong>.
+      <button class="link" onclick={resend}>Reenviar</button>
+      {#if emailNote}<span>{emailNote}</span>{/if}
+    </p>
   {/if}
   {#if !roster.connected}
     <p class="notice warning" role="status">Reconectando…</p>
@@ -363,6 +417,35 @@
 
   .notice.warning {
     background: var(--warning-bg);
+  }
+
+  .notice.email {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    align-items: center;
+  }
+
+  .notice.email span {
+    flex-basis: 100%;
+  }
+
+  .notice.email input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .link {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--text-strong);
+    text-decoration: underline;
+  }
+
+  .link:hover:not(:disabled) {
+    background: none;
   }
 
   .list {

@@ -60,4 +60,12 @@ http_interfaces = { "*" }
 
 pidfile = "/var/run/prosody/prosody.pid"
 
+-- Account service (server/cuentas) connects as an XMPP component (XEP-0114).
+component_ports = { 5347 }
+component_interfaces = { "*" }
+
 VirtualHost "localhost"
+
+-- Account service (server/cuentas).
+Component "cuentas.localhost"
+	component_secret = "dev-only-cuentas-secret" -- dev only; same as in compose.yaml
