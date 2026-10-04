@@ -10,7 +10,7 @@ import {
   nativeImage,
   screen
 } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -37,6 +37,7 @@ import {
   inviteByEmail,
   listInvites,
   onEmail,
+  requestPasswordReset,
   resendVerification,
   setEmail,
   login,
@@ -63,6 +64,49 @@ import {
 // One Palique per user: opening it again (e.g. from the app menu) shows the existing
 // window. That's also the way back on desktops without a tray (GNOME by default).
 if (!app.requestSingleInstanceLock()) app.exit(0)
+
+// palique:// links (password recovery emails). In development Electron itself is the
+// handler, so it needs the app's path to know what to open.
+if (process.defaultApp && process.argv[1]) {
+  app.setAsDefaultProtocolClient('palique', process.execPath, [resolve(process.argv[1])])
+} else {
+  app.setAsDefaultProtocolClient('palique')
+}
+
+type ResetLink = { username: string; token: string }
+let pendingReset: ResetLink | null = null
+
+// Only palique://recuperar?u=…&t=… with sane values; anything else is ignored.
+function parseResetLink(value: string | undefined): ResetLink | null {
+  if (!value?.startsWith('palique://')) return null
+  try {
+    const url = new URL(value)
+    const username = url.searchParams.get('u') ?? ''
+    const token = url.searchParams.get('t') ?? ''
+    if (url.hostname !== 'recuperar') return null
+    if (!/^[a-z0-9._-]{1,64}$/.test(username) || !/^[\w-]{8,64}$/.test(token)) return null
+    return { username, token }
+  } catch {
+    return null
+  }
+}
+
+// Opens the sign-in screen's "new password" form, filled in (never submitted by itself).
+function openResetLink(link: ResetLink | null): void {
+  if (!link) return
+  pendingReset = link
+  showMain()
+  mainWindow?.webContents.send('auth:reset-link', link)
+}
+
+// macOS delivers links as an event (possibly before the app is ready)…
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (app.isReady()) openResetLink(parseResetLink(url))
+  else pendingReset = parseResetLink(url)
+})
+// …Linux and Windows as an argument, at launch or to the already running instance.
+pendingReset ??= parseResetLink(process.argv.find((arg) => arg.startsWith('palique://')))
 
 // Native Wayland clients can't stay on top in every compositor (GNOME refuses),
 // which would break the full-screen wink overlay. XWayland handles it everywhere.
@@ -351,6 +395,18 @@ app.whenReady().then(() => {
     }
     return result
   })
+  ipcMain.handle('auth:forgot', (_, username: string) => requestPasswordReset(String(username)))
+  // Sets a new password with the emailed code, then signs in with it.
+  ipcMain.handle('auth:reset', async (_, username: string, token: string, password: string) => {
+    const result = await login(String(username), String(password), { invite: String(token) })
+    if (result.ok) {
+      account = result.jid
+      pendingReset = null
+    }
+    return result
+  })
+  // A link may have opened the app before the sign-in screen was listening.
+  ipcMain.handle('auth:pending-reset', () => pendingReset)
   ipcMain.handle('auth:logout', async () => {
     await logout()
     account = ''
@@ -466,7 +522,10 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
-  app.on('second-instance', showMain)
+  app.on('second-instance', (_, argv) => {
+    showMain()
+    openResetLink(parseResetLink(argv.find((arg) => arg.startsWith('palique://'))))
+  })
   // macOS: clicking the dock icon brings the contact list back.
   app.on('activate', showMain)
 })

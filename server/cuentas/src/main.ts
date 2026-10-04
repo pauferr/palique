@@ -150,6 +150,70 @@ xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
   return true
 })
 
+// --- password recovery -----------------------------------------------------------------
+
+// Asked over HTTP: the app is signed out, so there's no XMPP session to vouch for anyone.
+// The answer is always the same (it doesn't reveal whether the account or its email
+// exist) and requests are limited per username and per address.
+const RESET_GAP = 5 * 60_000 // per username
+const IP_WINDOW = 15 * 60_000
+const IP_MAX = 10
+const lastReset = new Map<string, number>()
+const ipRequests = new Map<string, { since: number; count: number }>()
+
+function allowReset(username: string, ip: string): boolean {
+  const now = Date.now()
+  const seen = ipRequests.get(ip)
+  const window = seen && now - seen.since < IP_WINDOW ? seen : { since: now, count: 0 }
+  window.count++
+  ipRequests.set(ip, window)
+  if (window.count > IP_MAX) return false
+  if (now - (lastReset.get(username) ?? 0) < RESET_GAP) return false
+  lastReset.set(username, now)
+  return true
+}
+
+async function sendReset(username: string): Promise<void> {
+  const account = db.account(`${username}@${USER_DOMAIN}`)
+  if (!account?.verified) return
+  const res = await xmpp.iqCaller.request(
+    xml('iq', { type: 'set', to: USER_DOMAIN }, xml('reset', { xmlns: INVITES, for: username }))
+  )
+  const token = res.getChild('reset', INVITES)!.attrs.token
+  await send({
+    to: account.email,
+    subject: 'Recupera tu contraseña de Palique',
+    paragraphs: [
+      `Has pedido cambiar la contraseña de tu cuenta «${username}».`,
+      'Pulsa el botón para abrir Palique y elegir una nueva. Si el botón no funciona, abre Palique, pulsa «¿Olvidaste tu contraseña?» y luego «Ya tengo un código», y pega este código:',
+      token
+    ],
+    link: {
+      href: `palique://recuperar?u=${encodeURIComponent(username)}&t=${encodeURIComponent(token)}`,
+      label: 'Abrir Palique y elegir contraseña'
+    },
+    footer:
+      'El código caduca en una hora y solo sirve una vez. Si no lo has pedido tú, ignora este correo: tu contraseña no cambia.'
+  })
+}
+
+function readJson(req: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+      if (body.length > 2048) req.destroy()
+    })
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(body))
+      } catch {
+        resolve({})
+      }
+    })
+  })
+}
+
 // --- website for the email links -----------------------------------------------------
 
 function page(title: string, message: string): string {
@@ -161,8 +225,19 @@ function page(title: string, message: string): string {
 </main></body></html>`
 }
 
-createServer((req, res) => {
+createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', PUBLIC_URL)
+  if (req.method === 'POST' && url.pathname === '/recuperar') {
+    const username = String((await readJson(req)).username ?? '')
+      .trim()
+      .toLowerCase()
+    const ip = req.socket.remoteAddress ?? ''
+    if (/^[a-z0-9._-]{1,64}$/.test(username) && allowReset(username, ip)) {
+      sendReset(username).catch((e) => console.error('reset', e.message))
+    }
+    res.writeHead(202, { 'content-type': 'application/json' })
+    return res.end('{"ok":true}')
+  }
   const reply = (code: number, title: string, message: string): void => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
     res.end(page(title, message))
@@ -183,4 +258,14 @@ createServer((req, res) => {
   reply(404, 'Página no encontrada', 'Aquí no hay nada.')
 }).listen(Number(env('HTTP_PORT', '8080')), () => console.log('http ready'))
 
-await xmpp.start()
+// Prosody may not be up yet (or restarting): keep trying instead of crashing. Later
+// disconnects are handled by the library's own reconnect.
+for (;;) {
+  try {
+    await xmpp.start()
+    break
+  } catch (e) {
+    console.error('waiting for prosody:', (e as Error).message)
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+}

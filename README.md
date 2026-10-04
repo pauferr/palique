@@ -46,6 +46,10 @@ Services in development:
 - Account service ([server/cuentas](server/cuentas)): email verification and invites by email; its pages at http://localhost:8080.
 - Mailpit: every email the account service sends lands in a fake inbox at http://localhost:8025 (nothing is really sent).
 
+Password recovery emails open the app through `palique://` links. In development on macOS those links don't reach the dev app (macOS ties them to the generic Electron binary); paste the code from the email instead, or test with a packaged build (`npm run build:unpack`). On Linux and Windows the dev app receives them.
+
+The account service limits recovery requests (one per username every 5 minutes, ten per address every 15 minutes, in memory). If repeated testing hits the limit, restart it with `docker compose restart cuentas`.
+
 TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the app trusts it only when connecting to `localhost`.
 
 ```bash
@@ -56,6 +60,7 @@ npm run check:avatar    # publish and fetch avatars
 npm run check:invites   # invite-only registration and per-user limit
 npm run check:email     # email verification through the account service and Mailpit
 npm run check:invite-email # invites by email (no leaks about registered addresses)
+npm run check:reset     # password recovery (request, email, new password)
 npm run check:invisible # invisible status (needs the server module)
 npm run check:history   # local sqlite history (no server needed)
 npm run check:export    # history export formats and html escaping

@@ -5,6 +5,8 @@
 -- and the inviter become mutual contacts. Admins have no limit.
 -- Trusted components (the account service, for invites by email) can do the same on a
 -- user's behalf by sending the iq to the host with for='username'. Same limit.
+-- They can also get a password reset code: iq set <reset for='username'/> (valid 1 hour,
+-- single use; the app re-registers the same username with it, see mod_invites).
 
 local st = require "prosody.util.stanza";
 local datetime = require "prosody.util.datetime";
@@ -112,5 +114,26 @@ module:hook("iq-set/host/" .. xmlns .. ":invite", function (event)
 		return true;
 	end
 	origin.send(st.reply(stanza):add_child(invite_tag(invite)));
+	return true;
+end);
+
+module:hook("iq-set/host/" .. xmlns .. ":reset", function (event)
+	local username = for_user(event);
+	if username == nil then return; end
+	local origin, stanza = event.origin, event.stanza;
+	if not username then
+		origin.send(st.error_reply(stanza, "cancel", "item-not-found"));
+		return true;
+	end
+	local invite = invites.create_account_reset(username, 3600);
+	if not invite then
+		origin.send(st.error_reply(stanza, "wait", "internal-server-error"));
+		return true;
+	end
+	origin.send(st.reply(stanza):tag("reset", {
+		xmlns = xmlns;
+		token = invite.token;
+		expires = datetime.datetime(invite.expires);
+	}));
 	return true;
 end);

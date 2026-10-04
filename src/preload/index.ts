@@ -13,6 +13,16 @@ const api = {
     password: string,
     signup: { invite: string; email: string; newsletter: boolean }
   ): Promise<AuthResult> => ipcRenderer.invoke('auth:login', username, password, signup),
+  forgotPassword: (username: string): Promise<void> => ipcRenderer.invoke('auth:forgot', username),
+  resetPassword: (username: string, token: string, password: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:reset', username, token, password),
+  pendingReset: (): Promise<{ username: string; token: string } | null> =>
+    ipcRenderer.invoke('auth:pending-reset'),
+  onResetLink: (callback: (link: { username: string; token: string }) => void): (() => void) => {
+    const listener = (_: unknown, link: { username: string; token: string }): void => callback(link)
+    ipcRenderer.on('auth:reset-link', listener)
+    return () => ipcRenderer.off('auth:reset-link', listener)
+  },
   getEmail: (): Promise<EmailStatus> => ipcRenderer.invoke('account:email'),
   setEmail: (address: string, newsletter: boolean): Promise<EmailStatus> =>
     ipcRenderer.invoke('account:set-email', address, newsletter),

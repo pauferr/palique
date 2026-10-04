@@ -679,3 +679,17 @@ export async function inviteByEmail(address: string): Promise<void> {
     )
   }
 }
+
+// --- password recovery (signed out, so over HTTP to the account service) --------------
+
+const ACCOUNTS_URL = process.env['PALIQUE_ACCOUNTS_URL'] ?? 'http://localhost:8080'
+
+// The service answers the same whether or not the account exists or has an email.
+export async function requestPasswordReset(username: string): Promise<void> {
+  const res = await fetch(`${ACCOUNTS_URL}/recuperar`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: username.trim().toLowerCase() })
+  })
+  if (!res.ok) throw new Error('unreachable')
+}
