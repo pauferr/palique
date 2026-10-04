@@ -359,7 +359,11 @@ function showWink(id: string): void {
     webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  // skipTransformProcessType: otherwise macOS briefly turns Palique into a background app
+  // to show the overlay over full-screen spaces, which hides the dock icon and sends every
+  // other Palique window behind other apps. (So the wink may not show over another app's
+  // native full-screen space on macOS.)
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   win.setIgnoreMouseEvents(true)
   win.once('ready-to-show', () => win.showInactive())
   loadRenderer(win, `wink=${encodeURIComponent(id)}`)
