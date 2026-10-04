@@ -38,6 +38,7 @@ TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the
 npm run check:auth      # registration/login check against the local server
 npm run check:roster    # contacts + presence check (uses a second test client)
 npm run check:chat      # messages, buzz, carbons and stranger filtering
+npm run check:avatar    # publish and fetch avatars
 npm run check:history   # local sqlite history (no server needed)
 npm run check:export    # history export formats and html escaping
 npm run check:settings  # app preferences file

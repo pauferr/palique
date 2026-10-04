@@ -113,6 +113,13 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Una sola instancia por usuario: abrir Palique otra vez muestra la ventana existente. Es la forma de volver en escritorios sin bandeja (GNOME por defecto).
 - Notificaciones de escritorio: mensaje, zumbido o guiño cuando la conversación no está en primer plano (al pulsarla se abre el chat) y "X se ha conectado" con su sonido. No se muestran en estado Ocupado, ni para los avisos que llegan en bloque al iniciar sesión o para mensajes offline.
 
+### Avatares
+- XEP-0084: la imagen se publica en el PEP del usuario (solo la ven sus contactos). Al cambiarla se reenvía la presencia, y Prosody (`mod_vcard_legacy`) añade el hash para que los contactos la descarguen al momento.
+- Se elige pulsando tu avatar en la lista de contactos; la app la recorta al centro y la reduce a 96×96 PNG.
+- Solo se aceptan PNG, JPEG, GIF o WebP de hasta 100 KB (vienen de la red).
+- El marco del avatar muestra el estado (verde, amarillo, rojo, gris), como en MSN.
+- Avatar por defecto provisional: inicial sobre un color sacado del nombre. Los personajes del elenco lo sustituirán cuando estén ilustrados.
+
 ### Registro y autenticación
 
 **Decidido: registro desde la propia app con usuario y contraseña.**

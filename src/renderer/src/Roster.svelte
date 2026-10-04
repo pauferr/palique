@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import type { Contact, Show, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
+  import Avatar from './Avatar.svelte'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -12,7 +13,9 @@
     offline: 'Desconectado'
   }
 
-  let roster: Snapshot = $state({ connected: true, contacts: [], requests: [] })
+  let roster: Snapshot = $state({ connected: true, contacts: [], requests: [], avatar: '' })
+  let picker: HTMLInputElement
+  let avatarError = $state('')
   let show: Show = $state('online')
   let status = $state('')
   let address = $state('')
@@ -43,6 +46,36 @@
     window.api.setPresence(show, status)
   }
 
+  // Center-crop the chosen picture to a 96×96 PNG before publishing it.
+  async function chooseAvatar(): Promise<void> {
+    const file = picker.files?.[0]
+    picker.value = ''
+    if (!file) return
+    avatarError = ''
+    try {
+      const image = await createImageBitmap(file)
+      const side = Math.min(image.width, image.height)
+      const canvas = new OffscreenCanvas(96, 96)
+      canvas
+        .getContext('2d')!
+        .drawImage(
+          image,
+          (image.width - side) / 2,
+          (image.height - side) / 2,
+          side,
+          side,
+          0,
+          0,
+          96,
+          96
+        )
+      const png = await canvas.convertToBlob({ type: 'image/png' })
+      await window.api.setAvatar(new Uint8Array(await png.arrayBuffer()))
+    } catch {
+      avatarError = 'No se ha podido usar esa imagen.'
+    }
+  }
+
   async function add(event: SubmitEvent): Promise<void> {
     event.preventDefault()
     await window.api.addContact(address)
@@ -58,6 +91,16 @@
 
 <section>
   <header>
+    <button class="me" onclick={() => picker.click()} title="Cambiar tu imagen">
+      <Avatar {jid} url={roster.avatar} {show} size={56} />
+    </button>
+    <input
+      bind:this={picker}
+      type="file"
+      accept="image/png,image/jpeg,image/gif,image/webp"
+      onchange={chooseAvatar}
+      hidden
+    />
     <strong>{name(jid)}</strong>
     <select bind:value={show} onchange={updatePresence} aria-label="Estado">
       <option value="online">Conectado</option>
@@ -72,6 +115,7 @@
       aria-label="Mensaje personal"
     />
   </header>
+  {#if avatarError}<p class="error" role="alert">{avatarError}</p>{/if}
 
   {#if !roster.connected}
     <p class="banner" role="status">Reconectando…</p>
@@ -88,7 +132,9 @@
   <ul>
     {#each contacts as contact (contact.jid)}
       <li>
-        <span class="dot {contact.show}" title={labels[contact.show]}></span>
+        <span title={labels[contact.show]}>
+          <Avatar jid={contact.jid} url={contact.avatar} show={contact.show} size={36} />
+        </span>
         <span class="who">
           <button class="name" onclick={() => window.api.openChat(contact.jid)}>
             {name(contact.jid)}
@@ -128,13 +174,26 @@
 
   header {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.5rem;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.25rem 0.5rem;
     align-items: center;
   }
 
+  .me {
+    grid-row: span 2;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
   header input {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
+  }
+
+  .error {
+    margin: 0;
+    color: #c0392b;
   }
 
   .banner {
@@ -177,28 +236,6 @@
 
   .empty {
     color: #666;
-  }
-
-  .dot {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
-  }
-
-  .online {
-    background: #2ecc71;
-  }
-
-  .away {
-    background: #f1c40f;
-  }
-
-  .dnd {
-    background: #e74c3c;
-  }
-
-  .offline {
-    background: #bbb;
   }
 
   .name {

@@ -21,6 +21,7 @@ import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
 import { openSettings, type SettingsStore } from './settings'
 import {
+  AVATAR_MAX_BYTES,
   DOMAIN,
   acceptRequest,
   addContact,
@@ -37,6 +38,7 @@ import {
   sendMessage,
   sendTyping,
   sendWink,
+  setAvatar,
   setPresence,
   snapshot,
   type ChatMessage,
@@ -330,6 +332,14 @@ app.whenReady().then(() => {
     const message = await sendWink(String(contact), wink)
     deliver(message)
     playWink(message)
+  })
+  // The renderer resizes the picture to a small PNG; still check it here.
+  ipcMain.handle('avatar:set', (_, png: unknown) => {
+    const isPng =
+      png instanceof Uint8Array &&
+      png.length <= AVATAR_MAX_BYTES &&
+      Buffer.from(png.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    return isPng ? setAvatar(png) : undefined
   })
   ipcMain.handle('settings:get', () => settings.get())
   ipcMain.handle('settings:set', (_, patch: { winks?: unknown }) =>

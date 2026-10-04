@@ -3,6 +3,7 @@
   import type { ChatMessage, Contact } from '../../main/xmpp'
   import buzzSound from './assets/sounds/buzz.ogg'
   import messageSound from './assets/sounds/message.ogg'
+  import Avatar from './Avatar.svelte'
   import { winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
@@ -146,7 +147,7 @@
 
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
   <header>
-    <span class="dot {contact?.show ?? 'offline'}"></span>
+    <Avatar {jid} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div>
       <strong>{name}</strong>
       <small>{contact?.status || labels[contact?.show ?? 'offline']}</small>
@@ -338,28 +339,6 @@
   textarea {
     resize: none;
     font: inherit;
-  }
-
-  .dot {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
-  }
-
-  .online {
-    background: #2ecc71;
-  }
-
-  .away {
-    background: #f1c40f;
-  }
-
-  .dnd {
-    background: #e74c3c;
-  }
-
-  .offline {
-    background: #bbb;
   }
 
   .shaking {

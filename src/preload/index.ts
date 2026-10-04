@@ -53,6 +53,7 @@ const api = {
     ipcRenderer.invoke('history:export', format),
   sendWink: (contact: string, wink: string): Promise<void> =>
     ipcRenderer.invoke('chat:wink', contact, wink),
+  setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke('settings:set', patch),
