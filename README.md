@@ -22,6 +22,18 @@ npm run build:mac    # package .dmg
 npm run build:linux  # package AppImage + .deb (use CI from macOS)
 ```
 
+### Local XMPP server
+
+Prosody runs in Docker (any engine works; OrbStack on macOS). Config lives in [server/prosody.cfg.lua](server/prosody.cfg.lua).
+
+```bash
+docker compose up -d    # XMPP on localhost:5222, domain "localhost"
+docker compose logs -f  # follow server logs
+docker compose down     # stop (accounts persist in the prosody-data volume)
+```
+
+TLS uses the image's self-signed certificate for `localhost`.
+
 ## Platforms
 
 - Linux and macOS

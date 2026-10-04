@@ -1,0 +1,12 @@
+services:
+  prosody:
+    image: prosodyim/prosody:13.0
+    ports:
+      - "5222:5222" # XMPP client connections
+      - "5280:5280" # HTTP / WebSocket
+    volumes:
+      - ./server/prosody.cfg.lua:/etc/prosody/prosody.cfg.lua:ro
+      - prosody-data:/var/lib/prosody
+
+volumes:
+  prosody-data:
