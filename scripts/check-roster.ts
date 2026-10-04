@@ -113,6 +113,8 @@ C.on('stanza', (st) => {
   if (st.is('presence') && st.attrs.type) cGot.push(st.attrs.type)
 })
 await C.start()
+// Like a real client: roster first, or Prosody won't deliver the answer to C.
+await C.iqCaller.request(xml('iq', { type: 'get' }, xml('query', { xmlns: 'jabber:iq:roster' })))
 await C.send(xml('presence'))
 await C.send(xml('presence', { to: `${a}@localhost`, type: 'subscribe' }))
 await until((s) => s.requests.includes(`${c}@localhost`), 'request from C')
