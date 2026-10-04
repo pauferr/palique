@@ -67,6 +67,7 @@ jobs:
           name: palique-${{ matrix.platform }}
           path: |
             dist/*.dmg
+            dist/*.zip
             dist/*.AppImage
             dist/*.deb
             dist/*.exe
