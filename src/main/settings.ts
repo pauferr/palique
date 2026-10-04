@@ -2,12 +2,16 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
 
+export const THEMES = ['xp', 'win98'] as const
+export type Theme = (typeof THEMES)[number]
+
 export type Settings = {
+  theme: Theme
   winks: boolean // play winks full screen
   show: OwnShow // last status, used at the next sign-in (like MSN)
 }
 
-const DEFAULTS: Settings = { winks: true, show: 'online' }
+const DEFAULTS: Settings = { theme: 'xp', winks: true, show: 'online' }
 
 export type SettingsStore = {
   get(): Settings

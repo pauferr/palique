@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { ExportFormat } from '../../main/export'
+  import type { Theme } from '../../main/settings'
 
   const results = {
     saved: 'Historial exportado.',
@@ -12,9 +13,13 @@
   let busy = $state(false)
   let message = $state('')
   let winks = $state(true)
+  let theme: Theme = $state('xp')
 
   onMount(() => {
-    window.api.getSettings().then((s) => (winks = s.winks))
+    window.api.getSettings().then((s) => {
+      winks = s.winks
+      theme = s.theme
+    })
   })
 
   async function exportHistory(): Promise<void> {
@@ -36,6 +41,28 @@
 </header>
 
 <main>
+  <fieldset class="group">
+    <legend>Tema</legend>
+    <div class="formats" role="radiogroup" aria-label="Tema">
+      <label>
+        <input
+          type="radio"
+          bind:group={theme}
+          value="xp"
+          onchange={() => window.api.setSettings({ theme })}
+        /> Caramelo (azul y brillante)
+      </label>
+      <label>
+        <input
+          type="radio"
+          bind:group={theme}
+          value="win98"
+          onchange={() => window.api.setSettings({ theme })}
+        /> Clásico (gris y biselado)
+      </label>
+    </div>
+  </fieldset>
+
   <fieldset class="group">
     <legend>Guiños</legend>
     <label>
@@ -92,9 +119,9 @@
     gap: 8px;
     margin: 0;
     padding: 6px 12px 12px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: var(--list-bg);
+    border: var(--group-border);
+    border-radius: var(--group-radius);
+    background: var(--group-bg);
   }
 
   legend {

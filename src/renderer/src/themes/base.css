@@ -1,0 +1,54 @@
+/* Shared look built only from theme variables (see xp.css, win98.css). */
+body {
+  margin: 0;
+  background: var(--window-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-size);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 3px 12px;
+  border: 1px solid;
+  border-width: var(--button-border-width);
+  border-color: var(--button-border-color);
+  border-radius: var(--button-radius);
+  background: var(--button-bg);
+  box-shadow: var(--button-shadow);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--button-bg-hover);
+}
+
+button:active:not(:disabled) {
+  border-color: var(--button-border-color-active);
+  box-shadow: var(--button-shadow-active);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input:not([type='checkbox'], [type='radio']),
+select,
+textarea {
+  padding: 3px 5px;
+  border: 1px solid;
+  border-width: var(--field-border-width);
+  border-color: var(--field-border-color);
+  border-radius: var(--radius);
+  background: var(--list-bg);
+  box-shadow: var(--field-shadow);
+}

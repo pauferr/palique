@@ -38,7 +38,7 @@
     /* A white ring keeps the status frame visible whatever the picture's color. */
     padding: 2px;
     border: 3px solid;
-    border-radius: 8px;
+    border-radius: var(--avatar-radius);
     background: #fff;
     color: #fff;
     font-weight: bold;
@@ -53,7 +53,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    border-radius: 4px;
+    border-radius: calc(var(--avatar-radius) / 2);
     background: var(--color);
   }
 

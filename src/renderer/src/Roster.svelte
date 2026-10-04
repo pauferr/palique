@@ -230,7 +230,8 @@
     padding: 0;
     background: none;
     border: none;
-    border-radius: 8px;
+    box-shadow: none;
+    border-radius: var(--avatar-radius);
   }
 
   .identity {
@@ -254,6 +255,7 @@
   .line select {
     padding: 0;
     border: none;
+    box-shadow: none;
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
@@ -262,6 +264,7 @@
   /* Reads as text until you click it, like MSN's personal message. */
   .personal {
     border-color: transparent;
+    box-shadow: none;
     background: transparent;
     color: var(--text-muted);
     font-style: italic;
@@ -269,8 +272,9 @@
 
   .personal:hover,
   .personal:focus {
-    border-color: var(--field-border);
+    border-color: var(--field-border-color);
     background: var(--list-bg);
+    box-shadow: var(--field-shadow);
   }
 
   .notice {
@@ -287,12 +291,16 @@
   }
 
   .notice.warning {
-    background: #fdecc8;
+    background: var(--warning-bg);
   }
 
   .list {
     flex: 1;
+    margin: var(--panel-margin);
     overflow-y: auto;
+    border: solid var(--panel-border-width);
+    border-color: var(--panel-border-color);
+    box-shadow: var(--panel-shadow);
     background: var(--list-bg);
   }
 
@@ -301,7 +309,7 @@
     gap: 6px;
     align-items: center;
     padding: 6px 10px;
-    background: #fff8dc;
+    background: var(--request-bg);
     border-bottom: 1px solid var(--line);
   }
 
@@ -330,7 +338,7 @@
   }
 
   li:hover {
-    background: #e8f0fd;
+    background: var(--row-hover-bg);
   }
 
   .name {
@@ -340,6 +348,7 @@
     padding: 0;
     background: none;
     border: none;
+    box-shadow: none;
     color: var(--text);
     text-align: left;
     text-overflow: ellipsis;
@@ -360,6 +369,7 @@
     padding: 0 4px;
     background: none;
     border: none;
+    box-shadow: none;
     color: var(--text-muted);
     visibility: hidden;
   }

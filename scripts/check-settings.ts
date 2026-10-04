@@ -8,19 +8,23 @@ import { openSettings } from '../src/main/settings.ts'
 const dir = mkdtempSync(join(tmpdir(), 'palique-'))
 const file = join(dir, 'settings.json')
 
-assert.deepEqual(openSettings(file).get(), { winks: true, show: 'online' }, 'defaults on first run')
+assert.deepEqual(
+  openSettings(file).get(),
+  { theme: 'xp', winks: true, show: 'online' },
+  'defaults on first run'
+)
 openSettings(file).set({ winks: false })
 openSettings(file).set({ show: 'invisible' })
 assert.deepEqual(
   openSettings(file).get(),
-  { winks: false, show: 'invisible' },
+  { theme: 'xp', winks: false, show: 'invisible' },
   'persists across restarts'
 )
 
 writeFileSync(file, '{ broken')
 assert.deepEqual(
   openSettings(file).get(),
-  { winks: true, show: 'online' },
+  { theme: 'xp', winks: true, show: 'online' },
   'corrupt file falls back to defaults'
 )
 

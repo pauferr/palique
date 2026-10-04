@@ -17,7 +17,10 @@
 {/if}
 
 <style>
-  :global(html, body) {
+  /* All component CSS ships in one bundle loaded by every window, so scope this to the
+     overlay (html.overlay is set in main.ts) or every window would turn see-through. */
+  :global(html.overlay),
+  :global(html.overlay body) {
     margin: 0;
     background: transparent;
     overflow: hidden;

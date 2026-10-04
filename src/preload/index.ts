@@ -55,6 +55,11 @@ const api = {
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
+  onSettings: (callback: (settings: Settings) => void): (() => void) => {
+    const listener = (_: unknown, settings: Settings): void => callback(settings)
+    ipcRenderer.on('settings:changed', listener)
+    return () => ipcRenderer.off('settings:changed', listener)
+  },
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke('settings:set', patch),
   winkDone: (): void => ipcRenderer.send('wink:done')

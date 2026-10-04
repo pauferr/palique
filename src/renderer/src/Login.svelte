@@ -133,7 +133,7 @@
   .frame {
     margin-top: -48px;
     padding: 4px;
-    border-radius: 12px;
+    border-radius: var(--radius-large);
     background: var(--window-bg);
   }
 
@@ -171,6 +171,7 @@
     padding: 0;
     background: none;
     border: none;
+    box-shadow: none;
     color: var(--text-strong);
     text-decoration: underline;
   }

@@ -284,7 +284,10 @@
 
   ol {
     flex: 1;
-    margin: 0;
+    margin: var(--panel-margin);
+    border: solid var(--panel-border-width);
+    border-color: var(--panel-border-color);
+    box-shadow: var(--panel-shadow);
     padding: 8px 12px;
     overflow-y: auto;
     list-style: none;
@@ -359,9 +362,11 @@
 
   /* <details> pickers styled like the toolbar buttons. */
   summary {
-    border: 1px solid var(--button-border);
+    border: solid var(--button-border-width);
+    border-color: var(--button-border-color);
     border-radius: var(--button-radius);
     background: var(--button-bg);
+    box-shadow: var(--button-shadow);
     color: var(--text-strong);
     list-style: none;
     cursor: pointer;
@@ -386,8 +391,8 @@
     padding: 6px;
     list-style: none;
     background: var(--list-bg);
-    border: 1px solid var(--field-border);
-    box-shadow: 2px 2px 6px rgb(0 0 0 / 20%);
+    border: 1px solid var(--line);
+    box-shadow: var(--popup-shadow);
   }
 
   .picker li {
@@ -402,7 +407,8 @@
     padding: 1px 3px;
     background: none;
     border: 1px solid transparent;
-    border-radius: 3px;
+    box-shadow: none;
+    border-radius: var(--radius);
     font-size: 18px;
   }
 

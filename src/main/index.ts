@@ -19,7 +19,7 @@ import devCert from '../../server/certs/localhost.crt?raw'
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
-import { openSettings, type SettingsStore } from './settings'
+import { THEMES, openSettings, type Settings, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
   DOMAIN,
@@ -215,7 +215,7 @@ function openOptions(): void {
   }
   options = new BrowserWindow({
     width: 420,
-    height: 600,
+    height: 720,
     show: false,
     resizable: false,
     autoHideMenuBar: true,
@@ -353,9 +353,18 @@ app.whenReady().then(() => {
     return isPng ? setAvatar(png) : undefined
   })
   ipcMain.handle('settings:get', () => settings.get())
-  ipcMain.handle('settings:set', (_, patch: { winks?: unknown }) =>
-    typeof patch?.winks === 'boolean' ? settings.set({ winks: patch.winks }) : settings.get()
-  )
+  // Only known keys with valid values; every window hears about the change (e.g. the theme).
+  ipcMain.handle('settings:set', (_, patch: { winks?: unknown; theme?: unknown }) => {
+    const valid: Partial<Settings> = {}
+    if (typeof patch?.winks === 'boolean') valid.winks = patch.winks
+    if (THEMES.includes(patch?.theme as Settings['theme']))
+      valid.theme = patch.theme as Settings['theme']
+    const current = settings.set(valid)
+    BrowserWindow.getAllWindows().forEach((win) =>
+      win.webContents.send('settings:changed', current)
+    )
+    return current
+  })
   // Typing only matters if the conversation is open; it never opens a window.
   onTyping((contact, typing) =>
     chats.get(contact)?.webContents.send('chat:typing', contact, typing)

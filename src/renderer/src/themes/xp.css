@@ -1,6 +1,5 @@
-/* Theme "XP": glossy blues and candy buttons, inspired by early-2000s messengers.
-   Components only use these variables, so other themes can redefine them.
-   ponytail: single theme for now; scope under [data-theme='…'] when the second one lands. */
+/* Theme "XP" (default): glossy blues and candy buttons, inspired by early-2000s messengers.
+   Plain :root so it also applies before a theme is picked. */
 @import '@fontsource/noto-sans/latin-400.css';
 @import '@fontsource/noto-sans/latin-400-italic.css';
 @import '@fontsource/noto-sans/latin-700.css';
@@ -19,12 +18,37 @@
   --header-bg: linear-gradient(#e3edfd, #c3d7f7);
   --bar-bg: #eaf0fb;
   --line: #c6d5ee;
-  --field-border: #7f9db9;
+  --row-hover-bg: #e8f0fd;
+  --warning-bg: #fdecc8;
+  --request-bg: #fff8dc;
+
+  --radius: 2px;
+  --radius-large: 12px;
+  --avatar-radius: 8px;
 
   --button-bg: linear-gradient(#ffffff, #c4dbf8);
   --button-bg-hover: linear-gradient(#ffffff, #a9cbf7);
-  --button-border: #6d93d1;
+  --button-border-width: 1px;
+  --button-border-color: #6d93d1;
+  --button-border-color-active: #4a74b8;
   --button-radius: 11px;
+  --button-shadow: none;
+  --button-shadow-active: inset 0 1px 2px rgb(0 0 0 / 15%);
+
+  --field-border-width: 1px;
+  --field-border-color: #7f9db9;
+  --field-shadow: none;
+
+  /* Lists and transcripts sit flush in the window. */
+  --panel-border-width: 0;
+  --panel-border-color: transparent;
+  --panel-shadow: none;
+  --panel-margin: 0;
+
+  --group-border: 1px solid #c6d5ee;
+  --group-radius: 4px;
+  --group-bg: #ffffff;
+  --popup-shadow: 2px 2px 6px rgb(0 0 0 / 20%);
 
   /* Default avatars: each user always gets the same one of these. */
   --avatar-0: #ff6b9d;
@@ -40,47 +64,4 @@
   --status-away: #f3a51a;
   --status-dnd: #e0453a;
   --status-offline: #b5b5b5;
-}
-
-body {
-  margin: 0;
-  background: var(--window-bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: var(--font-size);
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
-
-button {
-  padding: 3px 12px;
-  border: 1px solid var(--button-border);
-  border-radius: var(--button-radius);
-  background: var(--button-bg);
-  color: var(--text-strong);
-  cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-  background: var(--button-bg-hover);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-input:not([type='checkbox'], [type='radio']),
-select,
-textarea {
-  padding: 3px 5px;
-  border: 1px solid var(--field-border);
-  border-radius: 2px;
-  background: var(--list-bg);
 }

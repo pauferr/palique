@@ -1,16 +1,27 @@
 import { mount } from 'svelte'
 
 import './themes/xp.css'
+import './themes/win98.css'
+import './themes/base.css'
 
 import App from './App.svelte'
 import Chat from './Chat.svelte'
 import Options from './Options.svelte'
 import Wink from './Wink.svelte'
 
+// Every window follows the theme chosen in Options, live.
+const applyTheme = ({ theme }: { theme: string }): void => {
+  document.documentElement.dataset.theme = theme
+}
+window.api.getSettings().then(applyTheme)
+window.api.onSettings(applyTheme)
+
 const target = document.getElementById('app')!
 const params = new URLSearchParams(location.hash.slice(1))
 const wink = params.get('wink')
 const chat = params.get('chat')
+
+if (wink) document.documentElement.classList.add('overlay')
 
 const app = wink
   ? mount(Wink, { target, props: { id: wink } })
