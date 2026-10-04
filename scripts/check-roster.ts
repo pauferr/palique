@@ -93,6 +93,41 @@ s = await until(
 )
 assert.deepEqual(s.requests, [])
 
+// Nobody gets in without consent: C asks, can't message meanwhile, and A rejects.
+const c = `rosterc${id}`
+const received: A.ChatMessage[] = []
+A.onMessage((m) => received.push(m))
+await A.logout()
+assert.equal((await A.login(c, pass, { invite: adminInvite() })).ok, true)
+await A.logout()
+await A.login(a, pass)
+const C = client({
+  service: 'xmpp://localhost:5222',
+  domain: 'localhost',
+  username: c,
+  password: pass
+})
+const cGot: string[] = []
+C.on('error', () => {})
+C.on('stanza', (st) => {
+  if (st.is('presence') && st.attrs.type) cGot.push(st.attrs.type)
+})
+await C.start()
+await C.send(xml('presence'))
+await C.send(xml('presence', { to: `${a}@localhost`, type: 'subscribe' }))
+await until((s) => s.requests.includes(`${c}@localhost`), 'request from C')
+await C.send(
+  xml('message', { to: `${a}@localhost`, type: 'chat', id: 'c1' }, xml('body', {}, 'hola'))
+)
+await new Promise((r) => setTimeout(r, 800))
+assert.equal(received.length, 0, 'no messages before accepting')
+assert.ok(!A.snapshot().contacts.some((x) => x.jid === `${c}@localhost`))
+await A.rejectRequest(`${c}@localhost`)
+await new Promise((r) => setTimeout(r, 800))
+assert.ok(cGot.includes('unsubscribed'), 'C is told')
+assert.deepEqual(A.snapshot().requests, [])
+await C.stop()
+
 await B.stop()
 await A.logout()
 console.log('roster check passed')
