@@ -228,14 +228,17 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 
 - Referencias: MSN Messenger, AIM, interfaces de Windows 98/XP.
 - Principio: minimalista pero entrañable. Nostalgia sin caer en copia literal.
-- **Temas seleccionables por el usuario ("sabores").** Candidatos:
-  - XP / MSN 7: glossy, azules intensos, botones tipo caramelo.
-  - Win98 / AIM clásico: grises, biseles 3D, tipografía pixelada.
-  - Frutiger Aero: translúcido, verdes agua, burbujas, cielos.
-  - Moderno limpio con guiños retro.
+- **Temas seleccionables por el usuario ("sabores"):**
+  - **XP / MSN 7 (tema por defecto del MVP):** glossy, azules intensos, botones tipo caramelo. Hecho en `src/renderer/src/themes/xp.css`.
+  - Win98 / AIM clásico: grises, biseles 3D, tipografía pixelada. Hoja de ruta.
+  - Frutiger Aero: translúcido, verdes agua, burbujas, cielos. Hoja de ruta.
+  - Descartado: moderno limpio con guiños retro.
+- Tipografía: **Noto Sans** (OFL), incluida en la app (alfabeto latino; normal, cursiva y negrita). Las fuentes de Windows (Tahoma, Segoe UI) son de Microsoft y no se pueden distribuir.
+- Avatares por defecto: inicial sobre una paleta fija de 8 colores vivos definida por el tema; cada usuario siempre tiene el mismo color. Un borde blanco separa la imagen del marco de estado.
+- Las ventanas usan el marco del sistema operativo; imitar la barra de título de XP queda descartado por ahora (coste alto y distinto por sistema).
 - Arquitectura de temas desde el MVP: variables CSS (design tokens) + hoja de estilos por tema. Los temas pueden cambiar también forma (biseles, radios, sombras), no solo colores.
 - Idea: cada tema con su propio pack de sonidos.
-- Alcance: el MVP sale con 1 tema por defecto (máximo 2); el resto en la hoja de ruta.
+- Alcance: el MVP sale con 1 tema (XP); Win98 y Aero en la hoja de ruta.
 - Limitación técnica: el desenfoque real de lo que hay detrás de la ventana (Frutiger Aero) no está disponible de forma general en Linux; se simula con translucidez sobre fondo propio.
 - **Personajes: elenco de varios personajes propios, sin mascota única.**
   - Estilo de referencia: caricatura de finales de los 90 (línea gruesa y temblorosa, bocas enormes, proporciones exageradas, colores planos).
@@ -264,7 +267,7 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 | Rulo | Gato callejero del barrio. Para guiños y pantallas vacías. | Cascabel roto, oreja mordida. |
 
   - Pendiente: validar el elenco, número de avatares iniciales y encargo de ilustraciones.
-- Pendiente: tema por defecto, paleta de colores, tipografías, iconografía, avatares, sonidos, tono de los textos de la interfaz.
+- Pendiente: iconografía, sonidos definitivos y tono de los textos de la interfaz.
 
 ## 9. Próximos pasos
 

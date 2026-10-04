@@ -10,13 +10,13 @@
   }
 </script>
 
-<main>
-  {#if jid}
-    <Roster {jid} onlogout={logout} />
-  {:else}
+{#if jid}
+  <Roster {jid} onlogout={logout} />
+{:else}
+  <main>
     <Login onlogin={(value) => (jid = value)} />
-  {/if}
-</main>
+  </main>
+{/if}
 
 <style>
   main {
@@ -24,6 +24,5 @@
     place-content: center;
     justify-items: center;
     min-height: 100vh;
-    font-family: system-ui, sans-serif;
   }
 </style>

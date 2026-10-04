@@ -163,8 +163,8 @@
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
   <header>
     <Avatar {jid} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
-    <div>
-      <strong>{name}</strong>
+    <div class="to">
+      <span>Para: <strong>{name}</strong></span>
       <small
         >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
             contact?.show ?? 'offline'
@@ -188,7 +188,7 @@
           >
         {:else}
           <span class="meta"
-            >{message.mine ? 'Tú dices' : `${name} dice`} ({time(message.at)}):</span
+            >{message.mine ? 'Tú dices' : `${name} dice`}: <time>{time(message.at)}</time></span
           >
           <p><Emoticons text={message.body} /></p>
         {/if}
@@ -199,14 +199,7 @@
   <p class="typing" aria-live="polite">{theyType ? `${name} está escribiendo…` : ''}</p>
 
   <div class="compose">
-    <div class="actions">
-      <button
-        class="buzz"
-        onclick={buzz}
-        disabled={!canBuzz}
-        title="Enviar un zumbido"
-        aria-label="Enviar un zumbido">📳</button
-      >
+    <div class="toolbar">
       <details class="picker" bind:open={emoticonsOpen}>
         <summary title="Emoticonos" aria-label="Emoticonos">🙂</summary>
         <ul class="emoticons">
@@ -225,7 +218,7 @@
         <summary
           class:disabled={!canWink}
           title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
-          aria-label="Enviar un guiño">😉</summary
+          >😉 Guiño</summary
         >
         <ul>
           {#each Object.keys(winks) as id (id)}
@@ -233,129 +226,168 @@
           {/each}
         </ul>
       </details>
+      <button
+        onclick={buzz}
+        disabled={!canBuzz}
+        title={canBuzz ? 'Enviar un zumbido' : 'Espera un poco para enviar otro zumbido'}
+        >📳 Zumbido</button
+      >
     </div>
-    <textarea
-      bind:this={input}
-      bind:value={draft}
-      onkeydown={onKeydown}
-      oninput={onInput}
-      maxlength="4000"
-      rows="3"
-      placeholder="Escribe un mensaje…"
-      aria-label="Mensaje"
-    ></textarea>
-    <button onclick={send} disabled={!draft.trim()}>Enviar</button>
+    <div class="write">
+      <textarea
+        bind:this={input}
+        bind:value={draft}
+        onkeydown={onKeydown}
+        oninput={onInput}
+        maxlength="4000"
+        rows="3"
+        placeholder="Escribe un mensaje…"
+        aria-label="Mensaje"
+      ></textarea>
+      <button class="send" onclick={send} disabled={!draft.trim()}>Enviar</button>
+    </div>
   </div>
 </div>
 
 <style>
-  :global(body) {
-    margin: 0;
-  }
-
   .chat {
-    display: grid;
-    grid-template-rows: auto 1fr auto auto;
+    display: flex;
+    flex-direction: column;
     height: 100vh;
-    font-family: system-ui, sans-serif;
   }
 
   header {
     display: flex;
-    gap: 0.5rem;
+    gap: 10px;
     align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid #ddd;
+    padding: 8px 10px;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--line);
   }
 
-  header div {
+  .to {
     display: grid;
+    min-width: 0;
+  }
+
+  .to strong {
+    color: var(--text-strong);
   }
 
   small {
-    color: #666;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   ol {
+    flex: 1;
     margin: 0;
-    padding: 0.5rem 0.75rem;
+    padding: 8px 12px;
     overflow-y: auto;
     list-style: none;
+    background: var(--list-bg);
   }
 
   li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 8px;
   }
 
   .notice {
-    color: #999;
-    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-size: 11px;
     text-align: center;
   }
 
   .meta {
-    color: #666;
-    font-size: 0.85rem;
+    color: var(--text-muted);
   }
 
   .mine .meta {
-    color: #2c6fbb;
+    color: var(--text-strong);
+  }
+
+  time {
+    font-size: 11px;
+    opacity: 0.8;
   }
 
   p {
-    margin: 0.1rem 0 0 0.75rem;
+    margin: 2px 0 0 12px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   em {
-    color: #b03a2e;
+    color: var(--text-error);
   }
 
   .typing {
-    min-height: 1.2em;
+    min-height: 1.4em;
     margin: 0;
-    padding: 0 0.75rem;
-    color: #888;
-    font-size: 0.85rem;
+    padding: 2px 12px;
+    color: var(--text-muted);
+    font-size: 12px;
     font-style: italic;
+    background: var(--list-bg);
   }
 
-  .actions {
+  .compose {
     display: grid;
-    gap: 0.25rem;
-    align-content: start;
+    gap: 6px;
+    padding: 6px 10px 10px;
+    background: var(--bar-bg);
+    border-top: 1px solid var(--line);
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 4px;
+  }
+
+  .toolbar button,
+  summary {
+    padding: 1px 8px;
+    font-size: 12px;
   }
 
   .picker {
     position: relative;
   }
 
+  /* <details> pickers styled like the toolbar buttons. */
   summary {
-    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--button-border);
+    border-radius: var(--button-radius);
+    background: var(--button-bg);
+    color: var(--text-strong);
     list-style: none;
     cursor: pointer;
-    border: 1px solid #aaa;
-    border-radius: 3px;
-    text-align: center;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
   }
 
   summary.disabled {
-    opacity: 0.4;
+    opacity: 0.5;
   }
 
   .picker ul {
     position: absolute;
-    bottom: 100%;
+    bottom: calc(100% + 4px);
     left: 0;
+    z-index: 1;
     display: grid;
-    gap: 0.25rem;
-    margin: 0 0 0.25rem;
-    padding: 0.4rem;
+    gap: 4px;
+    margin: 0;
+    padding: 6px;
     list-style: none;
-    background: #fff;
-    border: 1px solid #ccc;
-    box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+    background: var(--list-bg);
+    border: 1px solid var(--field-border);
+    box-shadow: 2px 2px 6px rgb(0 0 0 / 20%);
   }
 
   .picker li {
@@ -367,24 +399,31 @@
   }
 
   .emoticons button {
-    padding: 0.1rem 0.2rem;
+    padding: 1px 3px;
     background: none;
-    border: none;
-    font-size: 1.3rem;
-    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 18px;
   }
 
-  .compose {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-top: 1px solid #ddd;
+  .emoticons button:hover:not(:disabled) {
+    background: var(--bar-bg);
+    border-color: var(--line);
+  }
+
+  .write {
+    display: flex;
+    gap: 6px;
   }
 
   textarea {
+    flex: 1;
     resize: none;
-    font: inherit;
+  }
+
+  .send {
+    align-self: stretch;
+    font-weight: bold;
   }
 
   .shaking {

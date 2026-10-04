@@ -1,5 +1,7 @@
 import { mount } from 'svelte'
 
+import './themes/xp.css'
+
 import App from './App.svelte'
 import Chat from './Chat.svelte'
 import Options from './Options.svelte'

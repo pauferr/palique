@@ -1,0 +1,86 @@
+/* Theme "XP": glossy blues and candy buttons, inspired by early-2000s messengers.
+   Components only use these variables, so other themes can redefine them.
+   ponytail: single theme for now; scope under [data-theme='…'] when the second one lands. */
+@import '@fontsource/noto-sans/latin-400.css';
+@import '@fontsource/noto-sans/latin-400-italic.css';
+@import '@fontsource/noto-sans/latin-700.css';
+
+:root {
+  --font: 'Noto Sans', sans-serif;
+  --font-size: 13px;
+
+  --text: #1b2a4a;
+  --text-strong: #0b3c9e;
+  --text-muted: #5b6f94;
+  --text-error: #b03a2e;
+
+  --window-bg: #f3f6fc;
+  --list-bg: #ffffff;
+  --header-bg: linear-gradient(#e3edfd, #c3d7f7);
+  --bar-bg: #eaf0fb;
+  --line: #c6d5ee;
+  --field-border: #7f9db9;
+
+  --button-bg: linear-gradient(#ffffff, #c4dbf8);
+  --button-bg-hover: linear-gradient(#ffffff, #a9cbf7);
+  --button-border: #6d93d1;
+  --button-radius: 11px;
+
+  /* Default avatars: each user always gets the same one of these. */
+  --avatar-0: #ff6b9d;
+  --avatar-1: #ffa62b;
+  --avatar-2: #ffd23f;
+  --avatar-3: #3ec46d;
+  --avatar-4: #2ec4d6;
+  --avatar-5: #3a86ff;
+  --avatar-6: #8e5cf7;
+  --avatar-7: #f2545b;
+
+  --status-online: #3bb54a;
+  --status-away: #f3a51a;
+  --status-dnd: #e0453a;
+  --status-offline: #b5b5b5;
+}
+
+body {
+  margin: 0;
+  background: var(--window-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-size);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 3px 12px;
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  background: var(--button-bg);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--button-bg-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input:not([type='checkbox'], [type='radio']),
+select,
+textarea {
+  padding: 3px 5px;
+  border: 1px solid var(--field-border);
+  border-radius: 2px;
+  background: var(--list-bg);
+}
