@@ -16,6 +16,7 @@ tls.setDefaultCACertificates([
 const id = Date.now()
 const [a, b, stranger] = ['chata', 'chatb', 'chatx'].map((name) => `${name}${id}`)
 const pass = 'check-password'
+const CHATSTATES = 'http://jabber.org/protocol/chatstates'
 const at = (user: string): string => `${user}@localhost`
 
 for (const user of [a, b, stranger]) {
@@ -66,6 +67,8 @@ function until<T>(get: () => T | undefined, label: string): Promise<T> {
 
 const received: A.ChatMessage[] = []
 A.onMessage((m) => received.push(m))
+const typing: string[] = []
+A.onTyping((contact, on) => typing.push(`${contact}:${on}`))
 
 const B = await start(b)
 assert.equal((await A.login(a, pass)).ok, true)
@@ -79,6 +82,28 @@ const toB = await until(
   'B gets it'
 )
 assert.equal(toB.attrs.type, 'chat')
+assert.ok(toB.getChild('active', CHATSTATES), 'messages carry the active chat state')
+
+// Typing, both ways. B: composing → paused, then composing → message.
+const state = (name: string): Element =>
+  xml('message', { to: at(a), type: 'chat' }, xml(name, { xmlns: CHATSTATES }))
+await B.xmpp.send(state('composing'))
+await B.xmpp.send(state('paused'))
+await B.xmpp.send(state('composing'))
+await B.xmpp.send(
+  xml(
+    'message',
+    { to: at(a), type: 'chat', id: 'm0' },
+    xml('body', {}, 'ya'),
+    xml('active', { xmlns: CHATSTATES })
+  )
+)
+await until(() => received.find((m) => m.id === 'm0'), 'message after typing')
+assert.deepEqual(typing, [`${at(b)}:true`, `${at(b)}:false`, `${at(b)}:true`, `${at(b)}:false`])
+await A.sendTyping(at(b), true)
+await until(() => B.inbox.find((m) => m.getChild('composing', CHATSTATES)), 'B sees composing')
+await A.sendTyping(at(b), false)
+await until(() => B.inbox.find((m) => m.getChild('paused', CHATSTATES)), 'B sees paused')
 
 // B → A, text and buzz
 await B.xmpp.send(
@@ -113,6 +138,13 @@ await phone.xmpp.send(
 const copy = await until(() => received.find((m) => m.id === 'c1'), 'carbon')
 assert.equal(copy.mine, true)
 assert.equal(copy.with, at(b))
+// Our own typing on the phone isn't shown as the contact typing.
+const typedBefore = typing.length
+await phone.xmpp.send(
+  xml('message', { to: at(b), type: 'chat' }, xml('composing', { xmlns: CHATSTATES }))
+)
+await new Promise((r) => setTimeout(r, 500))
+assert.equal(typing.length, typedBefore)
 
 // A stranger (not a contact) can't message A.
 const X = await start(stranger)

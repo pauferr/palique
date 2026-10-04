@@ -8,6 +8,7 @@ const SERVICE = process.env['PALIQUE_XMPP_SERVICE'] ?? `xmpp://${DOMAIN}:5222`
 const ROSTER = 'jabber:iq:roster'
 const ATTENTION = 'urn:xmpp:attention:0' // buzz (XEP-0224)
 const CARBONS = 'urn:xmpp:carbons:2' // copies from our other devices (XEP-0280)
+const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0085)
 
 export type AuthError =
   | 'conflict' // username taken
@@ -53,6 +54,7 @@ let requests = new Set<string>()
 let own: Presence = { show: 'online', status: '' }
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
+let typingListener: (contact: string, typing: boolean) => void = () => {}
 
 // Best presence across the contact's connected devices.
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
@@ -70,6 +72,10 @@ export function onChange(callback: (snapshot: Snapshot) => void): void {
 }
 
 const emit = (): void => listener(snapshot())
+
+export function onTyping(callback: (contact: string, typing: boolean) => void): void {
+  typingListener = callback
+}
 
 export function onMessage(callback: (message: ChatMessage) => void): void {
   messageListener = callback
@@ -164,6 +170,11 @@ function handleMessage(stanza: Element): void {
 
   const buzz = Boolean(message.getChild('attention', ATTENTION))
   const body = message.getChildText('body') ?? ''
+  // Our own typing on other devices doesn't matter. Any other chat state, or the
+  // message itself, means they stopped typing.
+  const state = message.getChildElements().find((el) => el.attrs.xmlns === CHATSTATES)?.name
+  if (!mine && (state || body || buzz))
+    typingListener(bare, state === 'composing' && !body && !buzz)
   if (!buzz && !body) return
   // Offline messages carry the time they were sent.
   const stamp = message.getChild('delay', 'urn:xmpp:delay')?.attrs.stamp
@@ -362,7 +373,12 @@ async function sendStanza(to: string, buzz: boolean, body: string): Promise<Chat
   const id = randomUUID()
   const stanza = buzz
     ? xml('message', { to, id, type: 'headline' }, xml('attention', { xmlns: ATTENTION }))
-    : xml('message', { to, id, type: 'chat' }, xml('body', {}, body))
+    : xml(
+        'message',
+        { to, id, type: 'chat' },
+        xml('body', {}, body),
+        xml('active', { xmlns: CHATSTATES })
+      )
   await send(stanza)
   return { id, with: to, mine: true, body, buzz, at: Date.now() }
 }
@@ -373,4 +389,9 @@ export function sendMessage(to: string, body: string): Promise<ChatMessage> {
 
 export function sendBuzz(to: string): Promise<ChatMessage> {
   return sendStanza(to, true, '')
+}
+
+export function sendTyping(to: string, typing: boolean): Promise<void> {
+  const state = typing ? 'composing' : 'paused'
+  return send(xml('message', { to, type: 'chat' }, xml(state, { xmlns: CHATSTATES })))
 }
