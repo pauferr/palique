@@ -160,6 +160,12 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Sin código de invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401). El cliente envía el código antes de registrarse (`<preauth xmlns="urn:xmpp:pars:0">`).
 - Cualquier usuario puede invitar desde la app ("Invitar a un amigo"), con límite: 5 invitaciones activas por usuario, que caducan a la semana. El límite lo aplica el servidor con un módulo propio (`server/modules/`), no la app.
 - Quien entra con una invitación queda añadido automáticamente como contacto de quien le invitó, en los dos sentidos.
+- La invitación se comparte copiando el código o **enviándola por correo** desde la app (lo envía el servicio de cuentas). Para no delatar quién tiene cuenta ni generar spam, quien invita siempre ve "Invitación enviada", y:
+  - Si la dirección ya pertenece a una cuenta (correo verificado), no se envía nada ni se gasta invitación.
+  - Una dirección recibe como mucho una invitación por semana, aunque la pidan personas distintas.
+  - Cada correo de invitación lleva "No quiero recibir más invitaciones"; esas direcciones no vuelven a recibir ninguna.
+  - El límite de invitaciones se comprueba antes que la dirección, para que el aviso de límite tampoco revele nada.
+- Añadir por nombre de usuario a quien ya tiene cuenta sigue funcionando igual; las invitaciones son solo para quien aún no la tiene. Las solicitudes de amistad siempre se aceptan o rechazan; la única excepción es la invitación usada (ambos han dado su consentimiento).
 
 **Correo electrónico:**
 - Obligatorio al registrarse y verificado con un enlace. Mientras no esté verificado, la app funciona con un aviso fijo ("Verifica tu correo", con opción de reenviar) y no se puede recuperar la contraseña.
