@@ -107,6 +107,7 @@
 
   <footer>
     <button onclick={() => window.api.playWink('demo')}>Probar guiño</button>
+    <button onclick={() => window.api.openOptions()}>Opciones</button>
     <button onclick={onlogout}>Cerrar sesión</button>
   </footer>
 </section>

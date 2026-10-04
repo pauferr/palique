@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { ExportFormat, ExportResult } from '../main/export'
 import type { AuthResult, ChatMessage, Show, Snapshot } from '../main/xmpp'
 
 // Custom APIs for renderer
@@ -33,6 +34,9 @@ const api = {
   sendMessage: (contact: string, body: string): Promise<void> =>
     ipcRenderer.invoke('chat:send', contact, body),
   sendBuzz: (contact: string): Promise<void> => ipcRenderer.invoke('chat:buzz', contact),
+  openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
+  exportHistory: (format: ExportFormat): Promise<ExportResult> =>
+    ipcRenderer.invoke('history:export', format),
   playWink: (id: string): void => ipcRenderer.send('wink:play', id),
   winkDone: (): void => ipcRenderer.send('wink:done')
 }

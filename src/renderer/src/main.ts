@@ -2,6 +2,7 @@ import { mount } from 'svelte'
 
 import App from './App.svelte'
 import Chat from './Chat.svelte'
+import Options from './Options.svelte'
 import Wink from './Wink.svelte'
 
 const target = document.getElementById('app')!
@@ -13,6 +14,8 @@ const app = wink
   ? mount(Wink, { target, props: { id: wink } })
   : chat
     ? mount(Chat, { target, props: { jid: chat } })
-    : mount(App, { target })
+    : params.has('options')
+      ? mount(Options, { target })
+      : mount(App, { target })
 
 export default app

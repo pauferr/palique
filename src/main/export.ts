@@ -3,6 +3,7 @@ import type { ChatMessage } from './xmpp'
 
 export const FORMATS = ['html', 'txt', 'json'] as const
 export type ExportFormat = (typeof FORMATS)[number]
+export type ExportResult = 'saved' | 'canceled' | 'empty'
 
 const name = (jid: string): string => jid.split('@')[0]
 

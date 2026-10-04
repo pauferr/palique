@@ -1,9 +1,11 @@
-import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, shell, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import { join } from 'path'
+import { writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
+import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
 import {
   DOMAIN,
@@ -98,6 +100,41 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
   return win
 }
 
+let options: BrowserWindow | null = null
+
+function openOptions(): void {
+  if (options) {
+    options.focus()
+    return
+  }
+  options = new BrowserWindow({
+    width: 420,
+    height: 480,
+    show: false,
+    resizable: false,
+    autoHideMenuBar: true,
+    title: 'Opciones',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false }
+  })
+  options.on('closed', () => (options = null))
+  options.once('ready-to-show', () => options?.show())
+  loadRenderer(options, 'options')
+}
+
+async function exportChats(win: BrowserWindow | null, format: ExportFormat): Promise<ExportResult> {
+  const messages = account ? history.all(account) : []
+  if (!messages.length) return 'empty'
+  const day = new Date().toISOString().slice(0, 10)
+  const save = { defaultPath: `palique-historial-${day}.${format}` }
+  const { canceled, filePath } = win
+    ? await dialog.showSaveDialog(win, save)
+    : await dialog.showSaveDialog(save)
+  if (canceled || !filePath) return 'canceled'
+  await writeFile(filePath, exportHistory(format, account, messages), 'utf8')
+  return 'saved'
+}
+
 // Incoming messages open the conversation without stealing focus, and flash it
 // (taskbar on Linux, dock bounce on macOS).
 function deliver(message: ChatMessage): void {
@@ -151,6 +188,7 @@ app.whenReady().then(() => {
     await logout()
     account = ''
     chats.forEach((win) => win.close())
+    options?.close()
   })
 
   // Every window gets the full contact list on each change.
@@ -179,6 +217,13 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('chat:buzz', async (_, contact: string) =>
     deliver(await sendBuzz(String(contact)))
+  )
+  ipcMain.handle('options:open', () => openOptions())
+  ipcMain.handle('history:export', (event, format: ExportFormat) =>
+    exportChats(
+      BrowserWindow.fromWebContents(event.sender),
+      FORMATS.includes(format) ? format : 'html'
+    )
   )
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
