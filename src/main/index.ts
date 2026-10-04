@@ -40,6 +40,7 @@ import {
   requestPasswordReset,
   resendVerification,
   setEmail,
+  setNewsletter,
   login,
   logout,
   onChange,
@@ -430,6 +431,12 @@ app.whenReady().then(() => {
     })
   )
   ipcMain.handle('account:resend', () => resendVerification())
+  ipcMain.handle('account:newsletter', (_, subscribe: boolean) =>
+    setNewsletter(Boolean(subscribe)).then((email) => {
+      BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
+      return email
+    })
+  )
   ipcMain.handle('invites:create', () => createInvite())
   ipcMain.handle('invites:email', (_, address: string) => inviteByEmail(String(address)))
   ipcMain.handle('invites:list', () => listInvites())

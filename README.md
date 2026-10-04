@@ -61,6 +61,7 @@ npm run check:invites   # invite-only registration and per-user limit
 npm run check:email     # email verification through the account service and Mailpit
 npm run check:invite-email # invites by email (no leaks about registered addresses)
 npm run check:reset     # password recovery (request, email, new password)
+npm run check:newsletter # newsletter choice, Brevo client and unsubscribe webhook
 npm run check:invisible # invisible status (needs the server module)
 npm run check:history   # local sqlite history (no server needed)
 npm run check:export    # history export formats and html escaping
@@ -69,6 +70,30 @@ npm run check:presence  # "came online" detection
 npm run check:emoticons # emoticon shortcuts
 npm run check:cooldown  # anti-spam rate limiter
 ```
+
+### Newsletter (Brevo)
+
+Newsletter choices are stored by the account service; only verified addresses are synced to a Brevo contact list. Without Brevo settings it runs fine and just doesn't sync. To connect it:
+
+1. In Brevo, create a contact list (note its ID) and an API key (*SMTP & API → API keys*).
+2. Create a `.env` file next to `compose.yaml` (it's git-ignored):
+
+   ```bash
+   BREVO_API_KEY=xkeysib-…
+   BREVO_LIST_ID=3
+   BREVO_WEBHOOK_TOKEN=a-long-random-string
+   ```
+
+3. Recreate the service and sync everyone who already opted in:
+
+   ```bash
+   docker compose up -d cuentas
+   docker compose exec cuentas node --disable-warning=ExperimentalWarning src/sync-brevo.ts
+   ```
+
+4. Once the service has a public URL (production), add a Brevo webhook for *unsubscribed*, *hard bounce* and *spam* events pointing to `https://<service>/brevo?token=<BREVO_WEBHOOK_TOKEN>`, so unsubscribing from a newsletter's own link also unticks it in Palique.
+
+In production the service also sends its emails through Brevo's SMTP relay (`SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_USER`/`SMTP_PASS` from *SMTP & API → SMTP*).
 
 ## Platforms
 

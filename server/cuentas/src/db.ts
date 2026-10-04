@@ -35,6 +35,13 @@ export function openDb(file: string) {
     );
     CREATE TABLE IF NOT EXISTS invite_optout (email TEXT PRIMARY KEY);
   `)
+  // Added later: when the newsletter choice was made (proof of consent).
+  const columns = (db.prepare('PRAGMA table_info(accounts)').all() as { name: string }[]).map(
+    (c) => c.name
+  )
+  if (!columns.includes('newsletter_at')) {
+    db.exec('ALTER TABLE accounts ADD COLUMN newsletter_at INTEGER')
+  }
 
   const toAccount = (row: AccountRow): Account => ({
     jid: row.jid,
@@ -55,16 +62,21 @@ export function openDb(file: string) {
     setEmail(jid: string, email: string, newsletter: boolean): string {
       const current = get(jid)
       if (current && current.email === email && current.verified === 1) {
-        db.prepare('UPDATE accounts SET newsletter = ? WHERE jid = ?').run(Number(newsletter), jid)
+        db.prepare('UPDATE accounts SET newsletter = ?, newsletter_at = ? WHERE jid = ?').run(
+          Number(newsletter),
+          Date.now(),
+          jid
+        )
         return ''
       }
       const t = token()
       db.prepare(
-        `INSERT INTO accounts (jid, email, verified, newsletter, token, token_sent_at)
-         VALUES (?, ?, 0, ?, ?, ?)
+        `INSERT INTO accounts (jid, email, verified, newsletter, token, token_sent_at, newsletter_at)
+         VALUES (?, ?, 0, ?, ?, ?, ?)
          ON CONFLICT (jid) DO UPDATE SET email = excluded.email, verified = 0,
-           newsletter = excluded.newsletter, token = excluded.token, token_sent_at = excluded.token_sent_at`
-      ).run(jid, email, Number(newsletter), t, Date.now())
+           newsletter = excluded.newsletter, token = excluded.token,
+           token_sent_at = excluded.token_sent_at, newsletter_at = excluded.newsletter_at`
+      ).run(jid, email, Number(newsletter), t, Date.now(), Date.now())
       return t
     },
 
@@ -88,6 +100,35 @@ export function openDb(file: string) {
       if (!row) return undefined
       db.prepare('UPDATE accounts SET verified = 1, token = NULL WHERE jid = ?').run(row.jid)
       return { ...toAccount(row), verified: true }
+    },
+
+    // The user's choice; undefined if they have no email on file.
+    setNewsletter(jid: string, newsletter: boolean): Account | undefined {
+      if (!get(jid)) return undefined
+      db.prepare('UPDATE accounts SET newsletter = ?, newsletter_at = ? WHERE jid = ?').run(
+        Number(newsletter),
+        Date.now(),
+        jid
+      )
+      return toAccount(get(jid)!)
+    },
+
+    // Unsubscribed through Brevo: every account using that address.
+    unsubscribeEmail(email: string): Account[] {
+      const rows = db
+        .prepare('SELECT * FROM accounts WHERE email = ? AND newsletter = 1')
+        .all(email) as AccountRow[]
+      db.prepare('UPDATE accounts SET newsletter = 0, newsletter_at = ? WHERE email = ?').run(
+        Date.now(),
+        email
+      )
+      return rows.map((row) => ({ ...toAccount(row), newsletter: false }))
+    },
+
+    verifiedAccounts(): Account[] {
+      return (db.prepare('SELECT * FROM accounts WHERE verified = 1').all() as AccountRow[]).map(
+        toAccount
+      )
     },
 
     isRegistered(email: string): boolean {

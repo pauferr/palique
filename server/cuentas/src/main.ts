@@ -1,9 +1,11 @@
 // Palique account service: an XMPP component (so the server vouches for who's asking)
 // plus a small website for the links in its emails.
+import { timingSafeEqual } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
 import { component, xml } from '@xmpp/component'
-import { openDb } from './db.ts'
+import { brevo } from './brevo.ts'
+import { openDb, type Account } from './db.ts'
 import { mailer } from './mail.ts'
 
 const env = (name: string, fallback?: string): string => {
@@ -25,6 +27,24 @@ const send = mailer({
   user: process.env['SMTP_USER'],
   pass: process.env['SMTP_PASS']
 })
+
+// Newsletter list (Brevo). Prepared but optional: without these it just doesn't sync.
+const newsletter = brevo({
+  apiKey: process.env['BREVO_API_KEY'],
+  listId: Number(process.env['BREVO_LIST_ID']) || undefined,
+  baseUrl: process.env['BREVO_API_URL']
+})
+if (!newsletter) console.log('brevo not configured: newsletter choices are stored, not synced')
+
+// Only verified addresses go to the list (the verification link doubles as the opt-in
+// confirmation). Failures are logged; sync-brevo.ts can catch up.
+function syncNewsletter(account: Account | undefined): void {
+  if (!newsletter || !account?.verified) return
+  const action = account.newsletter
+    ? newsletter.subscribe(account.email)
+    : newsletter.unsubscribe(account.email)
+  action.catch((e) => console.error('brevo', e.message))
+}
 
 const xmpp = component({
   service: env('XMPP_SERVICE'),
@@ -86,8 +106,28 @@ xmpp.iqCallee.set(NS, 'email', async (ctx) => {
     .trim()
     .toLowerCase()
   if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
+  const before = db.account(jid)
   const token = db.setEmail(jid, address, request.attrs.newsletter === 'true')
-  if (token) await sendVerification(address, token)
+  if (token) {
+    // A new address: the old one leaves the list until the new one is verified.
+    if (before?.verified && before.newsletter && newsletter) {
+      newsletter.unsubscribe(before.email).catch((e) => console.error('brevo', e.message))
+    }
+    await sendVerification(address, token)
+  } else {
+    syncNewsletter(db.account(jid))
+  }
+  return status(jid)
+})
+
+// <newsletter subscribe='true|false'/>: the user's choice, any time (Options).
+xmpp.iqCallee.set(NS, 'newsletter', (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid) return stanzaError('forbidden')
+  const wanted = ctx.stanza.getChild('newsletter', NS)!.attrs.subscribe === 'true'
+  const account = db.setNewsletter(jid, wanted)
+  if (!account) return stanzaError('item-not-found', 'no email on file')
+  syncNewsletter(account)
   return status(jid)
 })
 
@@ -216,6 +256,21 @@ function readJson(req: import('node:http').IncomingMessage): Promise<Record<stri
 
 // --- website for the email links -----------------------------------------------------
 
+const pushStatus = (jid: string): void => {
+  xmpp.send(xml('message', { to: jid }, status(jid))).catch(() => {})
+}
+
+// Brevo's webhook (configure it with ?token=BREVO_WEBHOOK_TOKEN): someone left the list
+// from a newsletter's own link, or the address bounced or complained. Mirror it here.
+const WEBHOOK_TOKEN = process.env['BREVO_WEBHOOK_TOKEN'] ?? ''
+const LEAVE_EVENTS = new Set(['unsubscribed', 'spam', 'hard_bounce', 'hardBounce', 'blocked'])
+
+function sameSecret(given: string): boolean {
+  const a = Buffer.from(given)
+  const b = Buffer.from(WEBHOOK_TOKEN)
+  return WEBHOOK_TOKEN !== '' && a.length === b.length && timingSafeEqual(a, b)
+}
+
 function page(title: string, message: string): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Palique</title></head>
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#eaf0fb;font-family:'Noto Sans',Verdana,sans-serif;color:#1b2a4a">
@@ -227,6 +282,21 @@ function page(title: string, message: string): string {
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', PUBLIC_URL)
+  if (req.method === 'POST' && url.pathname === '/brevo') {
+    if (!sameSecret(url.searchParams.get('token') ?? '')) {
+      res.writeHead(403)
+      return res.end()
+    }
+    const event = await readJson(req)
+    const email = String(event.email ?? '')
+      .trim()
+      .toLowerCase()
+    if (LEAVE_EVENTS.has(String(event.event)) && email) {
+      for (const account of db.unsubscribeEmail(email)) pushStatus(account.jid)
+    }
+    res.writeHead(200)
+    return res.end()
+  }
   if (req.method === 'POST' && url.pathname === '/recuperar') {
     const username = String((await readJson(req)).username ?? '')
       .trim()
@@ -245,8 +315,9 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/verificar') {
     const account = db.verify(url.searchParams.get('t') ?? '')
     if (!account) return reply(404, 'Enlace no válido', 'Este enlace ya se usó o no existe.')
+    syncNewsletter(account)
     // Let the app know right away (it also asks on every sign-in).
-    xmpp.send(xml('message', { to: account.jid }, status(account.jid))).catch(() => {})
+    pushStatus(account.jid)
     return reply(200, 'Correo confirmado', 'Gracias. Ya puedes volver a Palique.')
   }
   if (req.method === 'GET' && url.pathname === '/no-invitaciones') {

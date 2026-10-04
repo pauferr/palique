@@ -693,3 +693,17 @@ export async function requestPasswordReset(username: string): Promise<void> {
   })
   if (!res.ok) throw new Error('unreachable')
 }
+
+// The newsletter choice, any time. Rejects with 'no-email' if there's no address on file.
+export async function setNewsletter(subscribe: boolean): Promise<EmailStatus> {
+  try {
+    const res = await accountsIq(
+      'set',
+      xml('newsletter', { xmlns: ACCOUNTS, subscribe: String(subscribe) })
+    )
+    return parseEmail(res.getChild('email', ACCOUNTS)!)
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    throw new Error(condition === 'item-not-found' ? 'no-email' : 'unknown')
+  }
+}

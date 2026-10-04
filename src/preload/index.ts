@@ -27,6 +27,8 @@ const api = {
   setEmail: (address: string, newsletter: boolean): Promise<EmailStatus> =>
     ipcRenderer.invoke('account:set-email', address, newsletter),
   resendVerification: (): Promise<void> => ipcRenderer.invoke('account:resend'),
+  setNewsletter: (subscribe: boolean): Promise<EmailStatus> =>
+    ipcRenderer.invoke('account:newsletter', subscribe),
   onEmail: (callback: (email: EmailStatus) => void): (() => void) => {
     const listener = (_: unknown, email: EmailStatus): void => callback(email)
     ipcRenderer.on('account:email', listener)

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import type { ExportFormat } from '../../main/export'
   import type { Theme } from '../../main/settings'
+  import type { EmailStatus } from '../../main/xmpp'
 
   const results = {
     saved: 'Historial exportado.',
@@ -15,11 +16,31 @@
   let winks = $state(true)
   let theme: Theme = $state('xp')
 
+  // Newsletter: stored with the account service, synced to Brevo once the email is verified.
+  let email: EmailStatus | undefined = $state()
+  let newsletterNote = $state('')
+
+  async function toggleNewsletter(event: Event): Promise<void> {
+    const box = event.currentTarget as HTMLInputElement
+    newsletterNote = ''
+    try {
+      email = await window.api.setNewsletter(box.checked)
+    } catch {
+      box.checked = !box.checked
+      newsletterNote = 'No se ha podido guardar. Inténtalo de nuevo.'
+    }
+  }
+
   onMount(() => {
     window.api.getSettings().then((s) => {
       winks = s.winks
       theme = s.theme
     })
+    window.api
+      .getEmail()
+      .then((value) => (email = value))
+      .catch(() => {})
+    return window.api.onEmail((value) => (email = value))
   })
 
   async function exportHistory(): Promise<void> {
@@ -82,6 +103,30 @@
       Mostrar los guiños a pantalla completa
     </label>
     <p class="hint">Desactivados, los guiños solo aparecen como texto en la conversación.</p>
+  </fieldset>
+
+  <fieldset class="group">
+    <legend>Boletín</legend>
+    <label>
+      <input
+        type="checkbox"
+        checked={email?.newsletter ?? false}
+        disabled={!email?.address}
+        onchange={toggleNewsletter}
+      />
+      Recibir el boletín con las novedades de Palique
+    </label>
+    <p class="hint">
+      {#if !email?.address}
+        Añade tu correo desde la lista de contactos para poder recibirlo.
+      {:else if !email.verified}
+        Lo recibirás en {email.address} en cuanto confirmes ese correo.
+      {:else}
+        Se envía a {email.address} cuando hay versión nueva o alguna noticia. Puedes darte de baja aquí
+        o desde el enlace de cada boletín.
+      {/if}
+    </p>
+    {#if newsletterNote}<p class="hint" role="alert">{newsletterNote}</p>{/if}
   </fieldset>
 
   <fieldset class="group">

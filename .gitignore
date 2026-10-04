@@ -4,3 +4,6 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Local secrets (e.g. BREVO_API_KEY for docker compose)
+.env
