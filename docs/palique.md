@@ -173,7 +173,11 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Lo gestiona un servicio propio, el **servicio de cuentas** (`server/cuentas/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
   - Se conecta a Prosody como componente XMPP (XEP-0114). La app le envía el correo a través de la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría asociar su correo a una cuenta ajena y robarla con la recuperación).
   - Envía los correos de verificación y de recuperación.
-  - Recuperación de contraseña: desde la pantalla de inicio de sesión se pide un enlace; el correo abre una página web del servicio (con la estética de Palique) para escribir la nueva contraseña, que se cambia en Prosody con los comandos de administración estándar (XEP-0133).
+  - Recuperación de contraseña, sin páginas web (por ahora):
+    - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" pide el usuario. La app lo envía al servicio por HTTP (con la sesión cerrada no hay conexión XMPP autenticada). El servicio responde siempre lo mismo, para no revelar si la cuenta existe o tiene correo, y limita las peticiones.
+    - Si la cuenta tiene el correo verificado, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y lo envía por correo.
+    - El correo trae un botón que abre Palique (`palique://recuperar?…`, registrado como protocolo de la app) y también el código escrito, porque algunos programas de correo no dejan pulsar enlaces que no sean web.
+    - La app usa el código igual que una invitación (XEP-0401) para poner la nueva contraseña. No hace falta una cuenta de administrador.
 - Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
 
 **Boletín de novedades:**
