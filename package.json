@@ -18,7 +18,8 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-    "check:auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-auth.ts"
+    "check:auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-auth.ts",
+    "check:roster": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-roster.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
