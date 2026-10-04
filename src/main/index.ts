@@ -150,7 +150,7 @@ function notifyMessage(message: ChatMessage): void {
 }
 
 // "lolo se ha conectado", except for the burst of presences right after we sign in.
-let previous: Snapshot = { connected: false, contacts: [], requests: [] }
+let previous: Snapshot = { connected: false, contacts: [], requests: [], avatar: '' }
 let connectedAt = 0
 
 function announceArrivals(state: Snapshot): void {

@@ -8,9 +8,15 @@ const contact = (jid: string, show: Contact['show']): Contact => ({
   show,
   status: '',
   subscription: 'both',
-  pending: false
+  pending: false,
+  avatar: ''
 })
-const snap = (...contacts: Contact[]): Snapshot => ({ connected: true, contacts, requests: [] })
+const snap = (...contacts: Contact[]): Snapshot => ({
+  connected: true,
+  contacts,
+  requests: [],
+  avatar: ''
+})
 
 const before = snap(
   contact('lolo', 'offline'),

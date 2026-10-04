@@ -1,5 +1,5 @@
 // The only module that knows about the XMPP library. One connection for the whole app.
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 
@@ -10,6 +10,12 @@ const ATTENTION = 'urn:xmpp:attention:0' // buzz (XEP-0224)
 const CARBONS = 'urn:xmpp:carbons:2' // copies from our other devices (XEP-0280)
 const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0085)
 const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
+
+const PUBSUB = 'http://jabber.org/protocol/pubsub'
+const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
+const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
+const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+export const AVATAR_MAX_BYTES = 100_000
 
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
@@ -32,12 +38,14 @@ export type Contact = {
   status: string // personal message
   subscription: 'none' | 'to' | 'from' | 'both'
   pending: boolean // we asked to see their presence, waiting for approval
+  avatar: string // data: URL, '' for the default avatar
 }
 
 export type Snapshot = {
   connected: boolean
   contacts: Contact[]
   requests: string[] // people asking to add us
+  avatar: string // our own avatar, data: URL or ''
 }
 
 export type ChatMessage = {
@@ -51,13 +59,17 @@ export type ChatMessage = {
 }
 
 type Presence = { show: Show; status: string }
-type RosterEntry = Omit<Contact, 'show' | 'status'> & { resources: Map<string, Presence> }
+type RosterEntry = Omit<Contact, 'show' | 'status' | 'avatar'> & {
+  resources: Map<string, Presence>
+}
+type Avatar = { hash: string; url: string }
 
 let xmpp: Client | null = null
 let me = ''
 let roster = new Map<string, RosterEntry>()
 let requests = new Set<string>()
 let own: Presence = { show: 'online', status: '' }
+let avatars = new Map<string, Avatar>() // by bare JID, ours included
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
@@ -68,9 +80,19 @@ const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
 export function snapshot(): Snapshot {
   const contacts = [...roster.values()].map(({ resources, ...entry }): Contact => {
     const best = [...resources.values()].sort((a, b) => RANK[a.show] - RANK[b.show])[0]
-    return { ...entry, show: best?.show ?? 'offline', status: best?.status ?? '' }
+    return {
+      ...entry,
+      show: best?.show ?? 'offline',
+      status: best?.status ?? '',
+      avatar: avatars.get(entry.jid)?.url ?? ''
+    }
   })
-  return { connected: xmpp?.status === 'online', contacts, requests: [...requests] }
+  return {
+    connected: xmpp?.status === 'online',
+    contacts,
+    requests: [...requests],
+    avatar: avatars.get(me)?.url ?? ''
+  }
 }
 
 export function onChange(callback: (snapshot: Snapshot) => void): void {
@@ -125,6 +147,14 @@ function handlePresence(stanza: Element): void {
   const bare = from.bare().toString()
   if (bare === me) return
   const entry = roster.get(bare)
+
+  // The server adds the avatar's hash to presence (XEP-0153 style): fetch it when it changes.
+  const photo = stanza.getChild('x', 'vcard-temp:x:update')?.getChild('photo')
+  if (entry && photo && !stanza.attrs.type) {
+    const hash = photo.text()
+    if (!hash) avatars.delete(bare)
+    else if (avatars.get(bare)?.hash !== hash) loadAvatar(bare).then(emit, () => {})
+  }
 
   switch (stanza.attrs.type) {
     case undefined:
@@ -196,6 +226,36 @@ function handleMessage(stanza: Element): void {
     wink,
     at: stamp ? Date.parse(stamp) : Date.now()
   })
+}
+
+function pubsubItems(owner: string | undefined, node: string, itemId?: string): Promise<Element> {
+  const items = itemId
+    ? xml('items', { node }, xml('item', { id: itemId }))
+    : xml('items', { node, max_items: '1' })
+  return xmpp!.iqCaller.request(
+    xml('iq', { type: 'get', to: owner }, xml('pubsub', { xmlns: PUBSUB }, items))
+  )
+}
+
+// Latest avatar of `owner` (our own when it's us), checked: it comes from the network.
+async function loadAvatar(owner: string): Promise<void> {
+  const to = owner === me ? undefined : owner
+  const meta = await pubsubItems(to, AVATAR_METADATA)
+  const info = meta.getChild('pubsub')?.getChild('items')?.getChild('item')
+  const details = info?.getChild('metadata', AVATAR_METADATA)?.getChild('info')
+  if (!info || !details) {
+    avatars.delete(owner)
+    return
+  }
+  const type = details.attrs.type
+  const hash = info.attrs.id
+  if (!AVATAR_TYPES.includes(type) || Number(details.attrs.bytes) > AVATAR_MAX_BYTES) return
+  const data = await pubsubItems(to, AVATAR_DATA, hash)
+  const base64 =
+    data.getChild('pubsub')?.getChild('items')?.getChild('item')?.getChildText('data') ?? ''
+  const bytes = Buffer.from(base64, 'base64')
+  if (!bytes.length || bytes.length > AVATAR_MAX_BYTES) return
+  avatars.set(owner, { hash, url: `data:${type};base64,${bytes.toString('base64')}` })
 }
 
 async function loadRoster(): Promise<void> {
@@ -295,6 +355,7 @@ export async function login(
       )
       .then(() => send(presenceStanza()))
       .catch(() => {})
+    loadAvatar(me).then(emit, () => {})
   })
   // Contacts' presence is only valid while connected.
   entity.on('status', (status) => {
@@ -322,6 +383,7 @@ export async function logout(): Promise<void> {
   roster = new Map()
   requests = new Set()
   own = { show: 'online', status: '' }
+  avatars = new Map()
   if (!entity) return
   entity.reconnect.stop()
   await entity.stop().catch(() => {})
@@ -424,3 +486,35 @@ export function sendTyping(to: string, typing: boolean): Promise<void> {
 
 // Used to mute notifications while busy.
 export const ownShow = (): Show => own.show
+
+// Publish a PNG as our avatar, then re-send presence so the server tells our contacts
+// the new hash right away.
+export async function setAvatar(png: Uint8Array): Promise<void> {
+  if (!xmpp) return
+  const bytes = Buffer.from(png)
+  const hash = createHash('sha1').update(bytes).digest('hex')
+  const publish = (node: string, payload: Element): Promise<Element> =>
+    xmpp!.iqCaller.request(
+      xml(
+        'iq',
+        { type: 'set' },
+        xml(
+          'pubsub',
+          { xmlns: PUBSUB },
+          xml('publish', { node }, xml('item', { id: hash }, payload))
+        )
+      )
+    )
+  await publish(AVATAR_DATA, xml('data', { xmlns: AVATAR_DATA }, bytes.toString('base64')))
+  await publish(
+    AVATAR_METADATA,
+    xml(
+      'metadata',
+      { xmlns: AVATAR_METADATA },
+      xml('info', { id: hash, bytes: String(bytes.length), type: 'image/png' })
+    )
+  )
+  avatars.set(me, { hash, url: `data:image/png;base64,${bytes.toString('base64')}` })
+  await send(presenceStanza())
+  emit()
+}
