@@ -82,8 +82,13 @@
     setTimeout(() => (canBuzz = true), BUZZ_COOLDOWN)
   }
 
-  const time = (at: number): string =>
-    new Date(at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+  // "13:32" today, "3 oct, 13:32" on other days.
+  function time(at: number): string {
+    const date = new Date(at)
+    const clock = date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+    if (date.toDateString() === new Date().toDateString()) return clock
+    return `${date.toLocaleDateString('es', { day: 'numeric', month: 'short' })}, ${clock}`
+  }
 </script>
 
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
@@ -96,6 +101,7 @@
   </header>
 
   <ol bind:this={list} aria-live="polite">
+    <li class="notice">Esta conversación solo se guarda en este equipo.</li>
     {#each messages as message (message.id)}
       <li class:mine={message.mine}>
         {#if message.buzz}
@@ -168,6 +174,12 @@
 
   li {
     margin-bottom: 0.5rem;
+  }
+
+  .notice {
+    color: #999;
+    font-size: 0.8rem;
+    text-align: center;
   }
 
   .meta {

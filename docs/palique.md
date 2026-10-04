@@ -20,7 +20,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Electron lleva Chromium en ambos sistemas: la UI y la lógica se comportan igual en macOS y Linux.
 - Requiere validación específica en Linux: funciones de ventana (transparencia, siempre encima, clics pasantes), bandeja del sistema (GNOME no la tiene por defecto) y notificaciones.
 - Pruebas en Linux: en el equipo Linux propio cuando esté disponible; mientras tanto, opcionalmente, VM con UTM (Ubuntu/Fedora con Wayland). La VM sirve para funcionalidad, no para medir rendimiento.
-- Compilación de binarios Linux: GitHub Actions (más fiable que compilar para Linux desde macOS, sobre todo con módulos nativos como better-sqlite3).
+- Compilación de binarios Linux: GitHub Actions (más fiable que compilar para Linux desde macOS).
 - La distribución (en cualquier plataforma) queda fuera de alcance por ahora; el foco es solo el desarrollo. Nota para cuando toque: distribuir en macOS requiere firma y notarización (cuenta de Apple Developer de pago).
 
 ## 2. Stack
@@ -120,7 +120,8 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 - En el servidor (lo que XMPP ya guarda por defecto): cuenta, lista de contactos, perfil (avatar, nombre, mensaje personal) y mensajes offline hasta que se entregan.
 - En el servidor NO se archivan conversaciones: `mod_mam` desactivado en Prosody. Argumento de privacidad comunicable al usuario.
-- En local: historial de chats (SQLite) y preferencias de la app (sonidos, tema, opciones de guiños).
+- En local: historial de chats (SQLite con el módulo `node:sqlite` que trae Electron, sin módulos nativos que recompilar; archivo `history.sqlite` en la carpeta de datos de la app) y preferencias de la app (sonidos, tema, opciones de guiños).
+- Cada conversación carga sus últimos 200 mensajes. Si varias personas usan Palique en el mismo equipo, cada cuenta tiene su propio historial.
 - Asumido: si el usuario formatea o cambia de equipo, pierde el historial. Son conversaciones casuales.
 - Aviso al usuario: en primer arranque o en la sección de historial de Opciones, indicar que el historial solo vive en este equipo.
   - Nota: en Linux, desinstalar un paquete normalmente no borra los datos de usuario (`~/.local/share`), así que el riesgo real es formatear o cambiar de equipo, no desinstalar.

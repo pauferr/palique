@@ -4,6 +4,7 @@ import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
+import { openHistory, type History } from './history'
 import {
   DOMAIN,
   acceptRequest,
@@ -64,10 +65,10 @@ function createWindow(): void {
   loadRenderer(mainWindow)
 }
 
-// One window per conversation, like MSN. Messages live in memory for the session
-// (ponytail: local SQLite history is its own MVP step).
+// One window per conversation, like MSN.
 const chats = new Map<string, BrowserWindow>()
-const logs = new Map<string, ChatMessage[]>()
+let history: History
+let account = '' // bare JID of the signed-in user
 
 function openChat(contact: string, focus: boolean): BrowserWindow {
   const existing = chats.get(contact)
@@ -100,7 +101,7 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
 // Incoming messages open the conversation without stealing focus, and flash it
 // (taskbar on Linux, dock bounce on macOS).
 function deliver(message: ChatMessage): void {
-  logs.set(message.with, [...(logs.get(message.with) ?? []), message])
+  if (account) history.save(account, message)
   const win = openChat(message.with, false)
   win.webContents.send('chat:message', message)
   if (!message.mine && !win.isFocused()) win.flashFrame(true)
@@ -139,13 +140,17 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('wink:play', (_, id: string) => showWink(id))
-  ipcMain.handle('auth:login', (_, username: string, password: string, register: boolean) =>
-    login(String(username), String(password), Boolean(register))
-  )
+  history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
+
+  ipcMain.handle('auth:login', async (_, username: string, password: string, register: boolean) => {
+    const result = await login(String(username), String(password), Boolean(register))
+    if (result.ok) account = result.jid
+    return result
+  })
   ipcMain.handle('auth:logout', async () => {
     await logout()
+    account = ''
     chats.forEach((win) => win.close())
-    logs.clear()
   })
 
   // Every window gets the full contact list on each change.
@@ -165,7 +170,9 @@ app.whenReady().then(() => {
   ipcMain.handle('chat:open', (_, contact: string) => {
     openChat(String(contact), true)
   })
-  ipcMain.handle('chat:history', (_, contact: string) => logs.get(String(contact)) ?? [])
+  ipcMain.handle('chat:history', (_, contact: string) =>
+    account ? history.load(account, String(contact)) : []
+  )
   ipcMain.handle('chat:send', async (_, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)
     if (text) deliver(await sendMessage(String(contact), text))
