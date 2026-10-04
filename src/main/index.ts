@@ -4,7 +4,19 @@ import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
-import { DOMAIN, login, logout } from './xmpp'
+import {
+  DOMAIN,
+  acceptRequest,
+  addContact,
+  login,
+  logout,
+  onChange,
+  rejectRequest,
+  removeContact,
+  setPresence,
+  snapshot,
+  type Show
+} from './xmpp'
 
 // Native Wayland clients can't stay on top in every compositor (GNOME refuses),
 // which would break the full-screen wink overlay. XWayland handles it everywhere.
@@ -85,6 +97,20 @@ app.whenReady().then(() => {
     login(String(username), String(password), Boolean(register))
   )
   ipcMain.handle('auth:logout', () => logout())
+
+  // Every window gets the full contact list on each change.
+  onChange((state) => {
+    BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
+  })
+  const shows: Show[] = ['online', 'away', 'dnd']
+  ipcMain.handle('roster:snapshot', () => snapshot())
+  ipcMain.handle('roster:add', (_, address: string) => addContact(String(address)))
+  ipcMain.handle('roster:accept', (_, jid: string) => acceptRequest(String(jid)))
+  ipcMain.handle('roster:reject', (_, jid: string) => rejectRequest(String(jid)))
+  ipcMain.handle('roster:remove', (_, jid: string) => removeContact(String(jid)))
+  ipcMain.handle('presence:set', (_, show: Show, status: string) =>
+    setPresence(shows.includes(show) ? show : 'online', String(status))
+  )
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   createWindow()

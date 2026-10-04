@@ -46,7 +46,7 @@ let listener: (snapshot: Snapshot) => void = () => {}
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
 
 export function snapshot(): Snapshot {
-  const contacts = [...roster.values()].map(({ resources, ...entry }) => {
+  const contacts = [...roster.values()].map(({ resources, ...entry }): Contact => {
     const best = [...resources.values()].sort((a, b) => RANK[a.show] - RANK[b.show])[0]
     return { ...entry, show: best?.show ?? 'offline', status: best?.status ?? '' }
   })

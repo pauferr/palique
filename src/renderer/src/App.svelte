@@ -1,5 +1,6 @@
 <script lang="ts">
   import Login from './Login.svelte'
+  import Roster from './Roster.svelte'
 
   let jid = $state('')
 
@@ -11,10 +12,7 @@
 
 <main>
   {#if jid}
-    <h1>Palique</h1>
-    <p>Conectado como <strong>{jid}</strong></p>
-    <button onclick={() => window.api.playWink('demo')}>Probar guiño</button>
-    <button onclick={logout}>Cerrar sesión</button>
+    <Roster {jid} onlogout={logout} />
   {:else}
     <Login onlogin={(value) => (jid = value)} />
   {/if}
@@ -25,8 +23,7 @@
     display: grid;
     place-content: center;
     justify-items: center;
-    gap: 1rem;
-    height: 100vh;
+    min-height: 100vh;
     font-family: system-ui, sans-serif;
   }
 </style>

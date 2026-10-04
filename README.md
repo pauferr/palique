@@ -36,6 +36,7 @@ TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the
 
 ```bash
 npm run check:auth      # registration/login check against the local server
+npm run check:roster    # contacts + presence check (uses a second test client)
 ```
 
 ## Platforms
