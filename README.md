@@ -45,6 +45,7 @@ npm run check:export    # history export formats and html escaping
 npm run check:settings  # app preferences file
 npm run check:presence  # "came online" detection
 npm run check:emoticons # emoticon shortcuts
+npm run check:cooldown  # anti-spam rate limiter
 ```
 
 ## Platforms

@@ -30,16 +30,20 @@ const api = {
   setPresence: (show: OwnShow, status: string): Promise<void> =>
     ipcRenderer.invoke('presence:set', show, status),
   openChat: (contact: string): Promise<void> => ipcRenderer.invoke('chat:open', contact),
+  // Tell the main process this chat window is listening for live messages.
+  chatReady: (contact: string): void => ipcRenderer.send('chat:ready', contact),
   getChatHistory: (contact: string): Promise<ChatMessage[]> =>
     ipcRenderer.invoke('chat:history', contact),
-  onChatMessage: (callback: (message: ChatMessage) => void): (() => void) => {
-    const listener = (_: unknown, message: ChatMessage): void => callback(message)
+  onChatMessage: (callback: (message: ChatMessage, quiet: boolean) => void): (() => void) => {
+    const listener = (_: unknown, message: ChatMessage, quiet: boolean): void =>
+      callback(message, quiet)
     ipcRenderer.on('chat:message', listener)
     return () => ipcRenderer.off('chat:message', listener)
   },
   sendMessage: (contact: string, body: string): Promise<void> =>
     ipcRenderer.invoke('chat:send', contact, body),
-  sendBuzz: (contact: string): Promise<void> => ipcRenderer.invoke('chat:buzz', contact),
+  // Resolve to the ms until the next one is allowed.
+  sendBuzz: (contact: string): Promise<number> => ipcRenderer.invoke('chat:buzz', contact),
   setTyping: (contact: string, typing: boolean): Promise<void> =>
     ipcRenderer.invoke('chat:typing', contact, typing),
   onTyping: (callback: (contact: string, typing: boolean) => void): (() => void) => {
@@ -51,7 +55,7 @@ const api = {
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
   exportHistory: (format: ExportFormat): Promise<ExportResult> =>
     ipcRenderer.invoke('history:export', format),
-  sendWink: (contact: string, wink: string): Promise<void> =>
+  sendWink: (contact: string, wink: string): Promise<number> =>
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),

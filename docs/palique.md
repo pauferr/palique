@@ -88,7 +88,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 ### Zumbidos
 - Sonido + sacudida del contenido **dentro** de la ventana (funciona en cualquier entorno).
 - Refuerzo con `flashFrame` de Electron: parpadeo en la barra de tareas (Linux) y rebote del icono en el dock (macOS).
-- Límite de envío: un zumbido cada 5 segundos por conversación.
+- Límite por contacto (ver "Antispam"): un zumbido cada 10 segundos, al enviar y al recibir.
 - Opcional a futuro: en X11, mover la ventana real como en el MSN original.
 - Decisión: no se considera un problema que en Wayland la ventana no se desplace.
 
@@ -105,8 +105,24 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Catálogo provisional del MVP: `burbuja`, `rebote` y `ola` (formas de colores generadas por síntesis, hasta tener los definitivos).
 - Protecciones obligatorias desde el MVP:
   - Opción para desactivar los guiños a pantalla completa (Opciones → Guiños). Desactivados, solo aparecen como texto en la conversación.
-  - Límite de frecuencia por contacto: como mucho un guiño a pantalla completa cada 20 segundos; el emisor tiene la misma espera.
+  - Límite por contacto (ver "Antispam"): un guiño cada 30 segundos, al enviar y al recibir.
   - Los guiños recibidos con retraso (mensajes offline) solo aparecen como texto.
+
+### Antispam
+Límites por contacto, aplicados en el proceso principal (no se saltan cerrando la ventana ni desde la consola), en `src/main/cooldown.ts`:
+
+| Qué | Límite | Al pasarse |
+|-----|--------|-----------|
+| Guiños enviados y recibidos | 1 cada 30 s | Al enviar, el botón espera lo que falta. Al recibir, se descarta del todo (ni efecto ni texto). |
+| Zumbidos enviados y recibidos | 1 cada 10 s | Igual que los guiños. |
+| Notificaciones de mensajes | 1 cada 10 s | Los mensajes se ven todos; solo se ahorra la notificación. |
+| Sonido de mensaje | 1 cada 1,5 s por conversación | Una ráfaga suena una vez. |
+| "X se ha conectado" (notificación y sonido) | 1 cada 60 s | Conectarse y desconectarse en bucle se anuncia una vez. |
+
+- El límite al recibir protege también de otros clientes XMPP, que no tienen ninguna espera.
+- Zumbidos y guiños guardados por el servidor mientras estabas desconectado llegan sin efectos ni notificación, y con el mismo límite (una ráfaga se queda en uno).
+- Todos los dispositivos de un contacto cuentan como uno. Los desconocidos no pueden escribir y las copias de mensajes propios (carbons) solo se aceptan de tu cuenta.
+- Fuera del cliente: el spam de solicitudes desde muchas cuentas falsas se frena en el servidor (medidas contra el registro masivo, pendientes para producción).
 
 ### Bandeja y notificaciones
 - Icono en la bandeja con menú (Abrir Palique / Salir). Cerrar la lista de contactos no cierra la app: sigue conectada y avisando.

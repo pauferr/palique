@@ -10,8 +10,6 @@
 
   let { jid }: { jid: string } = $props()
 
-  const BUZZ_COOLDOWN = 5000
-  const WINK_COOLDOWN = 20000 // matches the receiver's per-contact limit
   const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
   const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
   const labels: Record<Contact['show'], string> = {
@@ -38,7 +36,15 @@
   let idle: ReturnType<typeof setTimeout> | undefined
   let theirTimeout: ReturnType<typeof setTimeout> | undefined
 
+  // A burst of messages chimes once, not once per message.
+  const CHIME_GAP = 1500
+  let lastChime = 0
+
   function play(src: string): void {
+    if (src === messageSound) {
+      if (Date.now() - lastChime < CHIME_GAP) return
+      lastChime = Date.now()
+    }
     new Audio(src).play().catch(() => {})
   }
 
@@ -68,9 +74,11 @@
 
   onMount(() => {
     document.title = name
-    const offMessage = window.api.onChatMessage((m) => {
-      if (m.with === jid) add(m, true)
+    // Quiet ones (over the contact's buzz limit) show up without shaking or sound.
+    const offMessage = window.api.onChatMessage((m, quiet) => {
+      if (m.with === jid) add(m, !quiet)
     })
+    window.api.chatReady(jid)
     const offTyping = window.api.onTyping((c, typing) => {
       if (c !== jid) return
       theyType = typing
@@ -80,10 +88,13 @@
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
-    // The message that opened this window arrived before we were listening:
-    // treat it as live if it's only a few seconds old.
-    window.api.getChatHistory(jid).then((history) => {
-      history.forEach((m, i) => add(m, i === history.length - 1 && Date.now() - m.at < 5000))
+    // History never triggers effects; live messages (even the one that opened this window)
+    // come through onChatMessage. Keep them after the history, without duplicates.
+    window.api.getChatHistory(jid).then(async (history) => {
+      const known = new Set(history.map((m) => m.id))
+      messages = [...history, ...messages.filter((m) => !known.has(m.id))]
+      await tick()
+      list.scrollTop = list.scrollHeight
     })
     return () => {
       offMessage()
@@ -127,10 +138,10 @@
     }
   }
 
-  function buzz(): void {
-    window.api.sendBuzz(jid)
+  // The main process enforces the limits and says how long until the next one.
+  async function buzz(): Promise<void> {
     canBuzz = false
-    setTimeout(() => (canBuzz = true), BUZZ_COOLDOWN)
+    setTimeout(() => (canBuzz = true), await window.api.sendBuzz(jid))
   }
 
   // Insert the shortcut where the cursor is, like typing it.
@@ -144,11 +155,10 @@
     onInput()
   }
 
-  function wink(id: string): void {
+  async function wink(id: string): Promise<void> {
     pickerOpen = false
-    window.api.sendWink(jid, id)
     canWink = false
-    setTimeout(() => (canWink = true), WINK_COOLDOWN)
+    setTimeout(() => (canWink = true), await window.api.sendWink(jid, id))
   }
 
   // "13:32" today, "3 oct, 13:32" on other days.

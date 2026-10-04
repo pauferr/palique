@@ -16,6 +16,13 @@ import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
+import {
+  ARRIVAL_INTERVAL,
+  BUZZ_INTERVAL,
+  NOTIFY_INTERVAL,
+  WINK_INTERVAL,
+  cooldown
+} from './cooldown'
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
@@ -160,11 +167,14 @@ let previous: Snapshot = {
   show: 'online'
 }
 let connectedAt = 0
+const arrivals = cooldown(ARRIVAL_INTERVAL)
 
 function announceArrivals(state: Snapshot): void {
   if (state.connected && !previous.connected) connectedAt = Date.now()
   if (Date.now() - connectedAt > 5000) {
     for (const jid of cameOnline(previous, state)) {
+      // Someone flapping online/offline gets announced once a minute at most.
+      if (arrivals.take(jid)) continue
       mainWindow?.webContents.send('contact:online', jid)
       notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
     }
@@ -174,6 +184,7 @@ function announceArrivals(state: Snapshot): void {
 
 // One window per conversation, like MSN.
 const chats = new Map<string, BrowserWindow>()
+const pending = new Map<string, [ChatMessage, boolean][]>()
 let history: History
 let settings: SettingsStore
 let account = '' // bare JID of the signed-in user
@@ -199,7 +210,13 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
     webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
   })
   chats.set(contact, win)
-  win.on('closed', () => chats.delete(contact))
+  // Live messages for a window that isn't listening yet wait here until it says so
+  // ('chat:ready'), so it gets them (and whether they're quiet) as live events.
+  pending.set(contact, [])
+  win.on('closed', () => {
+    chats.delete(contact)
+    pending.delete(contact)
+  })
   win.on('focus', () => win.flashFrame(false))
   win.once('ready-to-show', () => (focus ? win.show() : win.showInactive()))
   loadRenderer(win, `chat=${encodeURIComponent(contact)}`)
@@ -243,28 +260,35 @@ async function exportChats(win: BrowserWindow | null, format: ExportFormat): Pro
 
 // Incoming messages open the conversation without stealing focus, and flash it
 // (taskbar on Linux, dock bounce on macOS).
-function deliver(message: ChatMessage): void {
+// `quiet`: show it in the conversation without shaking, sounds, flashing or toasts.
+function deliver(message: ChatMessage, quiet = false): void {
   if (account) history.save(account, message)
   const win = openChat(message.with, false)
-  win.webContents.send('chat:message', message)
-  if (message.mine || win.isFocused()) return
+  const queue = pending.get(message.with)
+  if (queue) queue.push([message, quiet])
+  else win.webContents.send('chat:message', message, quiet)
+  if (message.mine || quiet || win.isFocused()) return
   win.flashFrame(true)
   // Offline messages arriving at sign-in already open their windows; no toast storm.
-  if (Date.now() - message.at < 60_000) notifyMessage(message)
+  // A burst of messages from one contact gets one toast.
+  if (!isLate(message) && !notified.take(message.with)) notifyMessage(message)
 }
 
-// Protections: winks can be turned off, and each contact gets at most one
-// full-screen wink per interval. Old ones (offline delivery) only show as text.
-const WINK_INTERVAL = 20_000
-const lastWink = new Map<string, number>()
+// Anti-spam. Buzzes and winks are limited per contact both ways: we can't send more
+// often, and other clients (which may have no limit) can't flood us. Received ones over
+// the limit are dropped entirely: a buzz or wink without its effect is just noise.
+const sentWinks = cooldown(WINK_INTERVAL)
+const sentBuzzes = cooldown(BUZZ_INTERVAL)
+const gotWinks = cooldown(WINK_INTERVAL)
+const gotBuzzes = cooldown(BUZZ_INTERVAL)
+const notified = cooldown(NOTIFY_INTERVAL)
+
+// Stored by the server while we were offline (or just old): no effects, no toasts.
+const isLate = (message: ChatMessage): boolean =>
+  Boolean(message.delayed) || Date.now() - message.at > 60_000
 
 function playWink(message: ChatMessage): void {
-  if (!settings.get().winks || Date.now() - message.at > 60_000) return
-  if (!message.mine) {
-    if (Date.now() - (lastWink.get(message.with) ?? 0) < WINK_INTERVAL) return
-    lastWink.set(message.with, Date.now())
-  }
-  showWink(message.wink)
+  if (settings.get().winks && !isLate(message)) showWink(message.wink)
 }
 
 // Transparent, click-through window over the whole primary display.
@@ -334,15 +358,21 @@ app.whenReady().then(() => {
     settings.set({ show: valid })
   })
   onMessage((message) => {
-    deliver(message)
+    const effect = !message.mine && (message.buzz || message.wink)
+    if (effect && (message.buzz ? gotBuzzes : gotWinks).take(message.with)) return
+    deliver(message, message.buzz && isLate(message))
     // Our own winks sent from another device aren't replayed here.
     if (message.wink && !message.mine) playWink(message)
   })
+  // Both return the ms until the next one is allowed (refused if that's not 0 yet).
   ipcMain.handle('chat:wink', async (_, contact: string, wink: string) => {
-    if (!isWinkId(wink)) return
+    if (!isWinkId(wink)) return 0
+    const wait = sentWinks.take(String(contact))
+    if (wait) return wait
     const message = await sendWink(String(contact), wink)
     deliver(message)
     playWink(message)
+    return WINK_INTERVAL
   })
   // The renderer resizes the picture to a small PNG; still check it here.
   ipcMain.handle('avatar:set', (_, png: unknown) => {
@@ -375,6 +405,13 @@ app.whenReady().then(() => {
   ipcMain.handle('chat:open', (_, contact: string) => {
     openChat(String(contact), true)
   })
+  ipcMain.on('chat:ready', (_, contact: string) => {
+    const win = chats.get(String(contact))
+    pending.get(String(contact))?.forEach(([message, quiet]) => {
+      win?.webContents.send('chat:message', message, quiet)
+    })
+    pending.delete(String(contact))
+  })
   ipcMain.handle('chat:history', (_, contact: string) =>
     account ? history.load(account, String(contact)) : []
   )
@@ -382,9 +419,12 @@ app.whenReady().then(() => {
     const text = String(body).trim().slice(0, 4000)
     if (text) deliver(await sendMessage(String(contact), text))
   })
-  ipcMain.handle('chat:buzz', async (_, contact: string) =>
+  ipcMain.handle('chat:buzz', async (_, contact: string) => {
+    const wait = sentBuzzes.take(String(contact))
+    if (wait) return wait
     deliver(await sendBuzz(String(contact)))
-  )
+    return BUZZ_INTERVAL
+  })
   ipcMain.handle('options:open', () => openOptions())
   ipcMain.handle('history:export', (event, format: ExportFormat) =>
     exportChats(

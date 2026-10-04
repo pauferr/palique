@@ -59,6 +59,7 @@ export type ChatMessage = {
   buzz: boolean
   wink: string // catalog id, '' when not a wink
   at: number // ms timestamp
+  delayed?: boolean // stored by the server while we were offline (not saved in history)
 }
 
 type Presence = { show: Show; status: string }
@@ -228,7 +229,8 @@ function handleMessage(stanza: Element): void {
     body,
     buzz,
     wink,
-    at: stamp ? Date.parse(stamp) : Date.now()
+    at: stamp ? Date.parse(stamp) : Date.now(),
+    ...(stamp ? { delayed: true } : {})
   })
 }
 
