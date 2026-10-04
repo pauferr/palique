@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Contact, Show, Snapshot } from '../../main/xmpp'
+  import type { Contact, OwnShow, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
@@ -14,10 +14,16 @@
     offline: 'Desconectado'
   }
 
-  let roster: Snapshot = $state({ connected: true, contacts: [], requests: [], avatar: '' })
+  let roster: Snapshot = $state({
+    connected: true,
+    contacts: [],
+    requests: [],
+    avatar: '',
+    show: 'online'
+  })
   let picker: HTMLInputElement
   let avatarError = $state('')
-  let show: Show = $state('online')
+  let presenceError = $state('')
   let status = $state('')
   let address = $state('')
 
@@ -43,8 +49,17 @@
     }
   })
 
-  function updatePresence(): void {
-    window.api.setPresence(show, status)
+  let statusSelect: HTMLSelectElement
+
+  // The select shows the real status from the snapshot; if the change fails, put it back.
+  async function updatePresence(show: OwnShow): Promise<void> {
+    presenceError = ''
+    try {
+      await window.api.setPresence(show, status)
+    } catch {
+      presenceError = 'No se ha podido cambiar el estado.'
+      statusSelect.value = roster.show
+    }
   }
 
   // Center-crop the chosen picture to a 96×96 PNG before publishing it.
@@ -93,7 +108,12 @@
 <section>
   <header>
     <button class="me" onclick={() => picker.click()} title="Cambiar tu imagen">
-      <Avatar {jid} url={roster.avatar} {show} size={56} />
+      <Avatar
+        {jid}
+        url={roster.avatar}
+        show={roster.show === 'invisible' ? 'offline' : roster.show}
+        size={56}
+      />
     </button>
     <input
       bind:this={picker}
@@ -103,20 +123,30 @@
       hidden
     />
     <strong>{name(jid)}</strong>
-    <select bind:value={show} onchange={updatePresence} aria-label="Estado">
+    <select
+      bind:this={statusSelect}
+      value={roster.show}
+      onchange={(e) => updatePresence(e.currentTarget.value as OwnShow)}
+      aria-label="Estado"
+    >
       <option value="online">Conectado</option>
       <option value="away">Ausente</option>
       <option value="dnd">Ocupado</option>
+      <option value="invisible">Invisible</option>
     </select>
     <input
       bind:value={status}
-      onchange={updatePresence}
+      onchange={() => updatePresence(roster.show)}
       maxlength="140"
       placeholder="Escribe un mensaje personal"
       aria-label="Mensaje personal"
     />
   </header>
   {#if avatarError}<p class="error" role="alert">{avatarError}</p>{/if}
+  {#if presenceError}<p class="error" role="alert">{presenceError}</p>{/if}
+  {#if roster.show === 'invisible'}
+    <p class="hint">Estás invisible: tus contactos te ven desconectado, pero puedes chatear.</p>
+  {/if}
 
   {#if !roster.connected}
     <p class="banner" role="status">Reconectando…</p>
@@ -195,6 +225,12 @@
   .error {
     margin: 0;
     color: #c0392b;
+  }
+
+  .hint {
+    margin: 0;
+    color: #777;
+    font-size: 0.85rem;
   }
 
   .banner {

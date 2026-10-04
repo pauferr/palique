@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ExportFormat, ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
-import type { AuthResult, ChatMessage, Show, Snapshot } from '../main/xmpp'
+import type { AuthResult, ChatMessage, OwnShow, Snapshot } from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
@@ -27,7 +27,7 @@ const api = {
   acceptRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:accept', jid),
   rejectRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:reject', jid),
   removeContact: (jid: string): Promise<void> => ipcRenderer.invoke('roster:remove', jid),
-  setPresence: (show: Show, status: string): Promise<void> =>
+  setPresence: (show: OwnShow, status: string): Promise<void> =>
     ipcRenderer.invoke('presence:set', show, status),
   openChat: (contact: string): Promise<void> => ipcRenderer.invoke('chat:open', contact),
   getChatHistory: (contact: string): Promise<ChatMessage[]> =>

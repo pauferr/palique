@@ -113,6 +113,13 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Una sola instancia por usuario: abrir Palique otra vez muestra la ventana existente. Es la forma de volver en escritorios sin bandeja (GNOME por defecto).
 - Notificaciones de escritorio: mensaje, zumbido o guiño cuando la conversación no está en primer plano (al pulsarla se abre el chat) y "X se ha conectado" con su sonido. No se muestran en estado Ocupado, ni para los avisos que llegan en bloque al iniciar sesión o para mensajes offline.
 
+### Estado Invisible
+- Prosody no trae invisibilidad de serie (y `mod_privacy_lists` está obsoleto), así que Palique incluye un módulo propio: `server/modules/mod_palique_invisible.lua`, una versión mínima de XEP-0186 (Invisible Command).
+- Invisible, la sesión sigue disponible para el servidor (recibes mensajes y ves a tus contactos), pero ninguna presencia "disponible" tuya llega a nadie: ni anuncios ni respuestas cuando alguien pregunta. Al pasar a invisible, tus contactos te ven desconectarte.
+- La app recuerda tu último estado e inicia sesión con él, así que entrando invisible nunca apareces conectado ni un instante.
+- Limitación: mientras eres invisible no se envía tampoco presencia dirigida. Y si escribes a alguien, sabrá que estás ahí (igual que en MSN).
+- Un servidor XMPP sin este módulo rechaza el estado: la app avisa y no cambia de estado.
+
 ### Emoticonos
 - Atajos clásicos de MSN (`:)`, `:D`, `;)`, `:P`, `:(`, `(L)`, `(Y)`, `(H)`, `(F)`…), sin distinguir mayúsculas, mostrados como emoji en mensajes y mensajes personales.
 - Solo cambia cómo se pinta: el texto enviado no se modifica, así que otros clientes XMPP siguen viendo `:)`.
