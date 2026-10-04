@@ -21,7 +21,8 @@
     "check:auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-auth.ts",
     "check:roster": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-roster.ts",
     "check:chat": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-chat.ts",
-    "check:history": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-history.ts"
+    "check:history": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-history.ts",
+    "check:export": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-export.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

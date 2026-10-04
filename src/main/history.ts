@@ -8,6 +8,7 @@ const LIMIT = 200
 export type History = {
   save(account: string, message: ChatMessage): void
   load(account: string, contact: string): ChatMessage[]
+  all(account: string): ChatMessage[] // every conversation, by contact then time
 }
 
 type Row = { id: string; contact: string; mine: number; body: string; buzz: number; at: number }
@@ -38,19 +39,27 @@ export function openHistory(file: string): History {
      ) ORDER BY at, seq`
   )
 
+  const everything = db.prepare(
+    'SELECT id, contact, mine, body, buzz, at FROM messages WHERE account = ? ORDER BY contact, at, rowid'
+  )
+  const toMessage = (row: Row): ChatMessage => ({
+    id: row.id,
+    with: row.contact,
+    mine: row.mine === 1,
+    body: row.body,
+    buzz: row.buzz === 1,
+    at: row.at
+  })
+
   return {
     save(account, m) {
       insert.run(account, m.with, m.id, Number(m.mine), m.body, Number(m.buzz), m.at)
     },
     load(account, contact) {
-      return (latest.all(account, contact, LIMIT) as Row[]).map((row) => ({
-        id: row.id,
-        with: row.contact,
-        mine: row.mine === 1,
-        body: row.body,
-        buzz: row.buzz === 1,
-        at: row.at
-      }))
+      return (latest.all(account, contact, LIMIT) as Row[]).map(toMessage)
+    },
+    all(account) {
+      return (everything.all(account) as Row[]).map(toMessage)
     }
   }
 }
