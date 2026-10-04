@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { Contact, Show, Snapshot } from '../../main/xmpp'
+  import onlineSound from './assets/sounds/online.ogg'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -28,7 +29,14 @@
 
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
-    return window.api.onRoster((value) => (roster = value))
+    const offRoster = window.api.onRoster((value) => (roster = value))
+    const offOnline = window.api.onContactOnline(() => {
+      new Audio(onlineSound).play().catch(() => {})
+    })
+    return () => {
+      offRoster()
+      offOnline()
+    }
   })
 
   function updatePresence(): void {

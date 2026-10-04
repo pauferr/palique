@@ -108,6 +108,11 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
   - Límite de frecuencia por contacto: como mucho un guiño a pantalla completa cada 20 segundos; el emisor tiene la misma espera.
   - Los guiños recibidos con retraso (mensajes offline) solo aparecen como texto.
 
+### Bandeja y notificaciones
+- Icono en la bandeja con menú (Abrir Palique / Salir). Cerrar la lista de contactos no cierra la app: sigue conectada y avisando.
+- Una sola instancia por usuario: abrir Palique otra vez muestra la ventana existente. Es la forma de volver en escritorios sin bandeja (GNOME por defecto).
+- Notificaciones de escritorio: mensaje, zumbido o guiño cuando la conversación no está en primer plano (al pulsarla se abre el chat) y "X se ha conectado" con su sonido. No se muestran en estado Ocupado, ni para los avisos que llegan en bloque al iniciar sesión o para mensajes offline.
+
 ### Registro y autenticación
 
 **Decidido: registro desde la propia app con usuario y contraseña.**

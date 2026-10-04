@@ -18,6 +18,11 @@ const api = {
     ipcRenderer.on('roster:changed', listener)
     return () => ipcRenderer.off('roster:changed', listener)
   },
+  onContactOnline: (callback: (jid: string) => void): (() => void) => {
+    const listener = (_: unknown, jid: string): void => callback(jid)
+    ipcRenderer.on('contact:online', listener)
+    return () => ipcRenderer.off('contact:online', listener)
+  },
   addContact: (address: string): Promise<void> => ipcRenderer.invoke('roster:add', address),
   acceptRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:accept', jid),
   rejectRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:reject', jid),

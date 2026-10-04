@@ -421,3 +421,6 @@ export function sendTyping(to: string, typing: boolean): Promise<void> {
   const state = typing ? 'composing' : 'paused'
   return send(xml('message', { to, type: 'chat' }, xml(state, { xmlns: CHATSTATES })))
 }
+
+// Used to mute notifications while busy.
+export const ownShow = (): Show => own.show

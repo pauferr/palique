@@ -1,4 +1,15 @@
-import { app, shell, BrowserWindow, dialog, ipcMain, screen } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  Menu,
+  Notification,
+  Tray,
+  dialog,
+  ipcMain,
+  nativeImage,
+  screen
+} from 'electron'
 import { join } from 'path'
 import { writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
@@ -7,6 +18,7 @@ import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
+import { cameOnline } from './presence'
 import { openSettings, type SettingsStore } from './settings'
 import {
   DOMAIN,
@@ -18,6 +30,7 @@ import {
   onMessage,
   onTyping,
   isWinkId,
+  ownShow,
   rejectRequest,
   removeContact,
   sendBuzz,
@@ -27,8 +40,13 @@ import {
   setPresence,
   snapshot,
   type ChatMessage,
-  type Show
+  type Show,
+  type Snapshot
 } from './xmpp'
+
+// One Palique per user: opening it again (e.g. from the app menu) shows the existing
+// window. That's also the way back on desktops without a tray (GNOME by default).
+if (!app.requestSingleInstanceLock()) app.exit(0)
 
 // Native Wayland clients can't stay on top in every compositor (GNOME refuses),
 // which would break the full-screen wink overlay. XWayland handles it everywhere.
@@ -50,19 +68,28 @@ function loadRenderer(win: BrowserWindow, hash = ''): void {
   }
 }
 
+let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let quitting = false
+
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 360,
     height: 620,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: { preload, sandbox: false }
+    webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  // Closing the contact list keeps Palique running (tray, notifications), like MSN.
+  mainWindow.on('close', (event) => {
+    if (quitting) return
+    event.preventDefault()
+    mainWindow?.hide()
   })
+  mainWindow.on('closed', () => (mainWindow = null))
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -70,6 +97,71 @@ function createWindow(): void {
   })
 
   loadRenderer(mainWindow)
+}
+
+function showMain(): void {
+  if (!mainWindow) return createWindow()
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function createTray(): void {
+  const size = process.platform === 'darwin' ? 16 : 22
+  tray = new Tray(nativeImage.createFromPath(icon).resize({ width: size, height: size }))
+  tray.setToolTip('Palique')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Abrir Palique', click: showMain },
+      { type: 'separator' },
+      { label: 'Salir', click: () => app.quit() }
+    ])
+  )
+  tray.on('click', showMain)
+}
+
+// Desktop notifications. Silent: the app plays its own sounds. Muted while busy.
+// Kept referenced until closed, or the click handler can be garbage-collected.
+const notifications = new Set<Notification>()
+
+function notify(title: string, body: string, onClick: () => void): void {
+  if (!Notification.isSupported() || ownShow() === 'dnd') return
+  const notification = new Notification({ title, body, silent: true })
+  notifications.add(notification)
+  notification.on('click', () => {
+    onClick()
+    notifications.delete(notification)
+  })
+  notification.on('close', () => notifications.delete(notification))
+  notification.show()
+}
+
+const contactName = (jid: string): string => jid.split('@')[0]
+
+function notifyMessage(message: ChatMessage): void {
+  const body = message.buzz
+    ? '¡Te ha enviado un zumbido!'
+    : message.wink
+      ? 'Te ha enviado un guiño'
+      : message.body.length > 120
+        ? `${message.body.slice(0, 120)}…`
+        : message.body
+  notify(contactName(message.with), body, () => openChat(message.with, true))
+}
+
+// "lolo se ha conectado", except for the burst of presences right after we sign in.
+let previous: Snapshot = { connected: false, contacts: [], requests: [] }
+let connectedAt = 0
+
+function announceArrivals(state: Snapshot): void {
+  if (state.connected && !previous.connected) connectedAt = Date.now()
+  if (Date.now() - connectedAt > 5000) {
+    for (const jid of cameOnline(previous, state)) {
+      mainWindow?.webContents.send('contact:online', jid)
+      notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
+    }
+  }
+  previous = state
 }
 
 // One window per conversation, like MSN.
@@ -147,7 +239,10 @@ function deliver(message: ChatMessage): void {
   if (account) history.save(account, message)
   const win = openChat(message.with, false)
   win.webContents.send('chat:message', message)
-  if (!message.mine && !win.isFocused()) win.flashFrame(true)
+  if (message.mine || win.isFocused()) return
+  win.flashFrame(true)
+  // Offline messages arriving at sign-in already open their windows; no toast storm.
+  if (Date.now() - message.at < 60_000) notifyMessage(message)
 }
 
 // Protections: winks can be turned off, and each contact gets at most one
@@ -214,6 +309,7 @@ app.whenReady().then(() => {
   // Every window gets the full contact list on each change.
   onChange((state) => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
+    announceArrivals(state)
   })
   const shows: Show[] = ['online', 'away', 'dnd']
   ipcMain.handle('roster:snapshot', () => snapshot())
@@ -269,13 +365,13 @@ app.whenReady().then(() => {
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   createWindow()
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  createTray()
+  app.on('second-instance', showMain)
+  // macOS: clicking the dock icon brings the contact list back.
+  app.on('activate', showMain)
 })
+
+app.on('before-quit', () => (quitting = true))
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
