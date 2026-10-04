@@ -21,7 +21,9 @@ modules_enabled = {
 	"vcard_legacy";
 	"offline";       -- store messages until delivered
 	"blocklist";
-	"smacks";        -- stream management: survive flaky connections
+	-- No "smacks" (stream management): @xmpp/client 0.14 emits "online" before enabling it,
+	-- miscounts acks on stanzas sent meanwhile and Prosody drops the session.
+	-- Plain reconnects already reload roster + presence; revisit if the library fixes it.
 
 	-- Optional; the Electron client connects over TCP 5222
 	"websocket";
