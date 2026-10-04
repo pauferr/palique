@@ -241,7 +241,7 @@
         <summary
           class:disabled={!canWink}
           title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
-          >😉 Guiño</summary
+          >🎬 Guiño</summary
         >
         <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
         <div class="popup">
@@ -278,7 +278,7 @@
         onclick={buzz}
         disabled={!canBuzz}
         title={canBuzz ? 'Enviar un zumbido' : 'Espera un poco para enviar otro zumbido'}
-        >📳 Zumbido</button
+        >🫨 Zumbido</button
       >
     </div>
     <div class="write">
