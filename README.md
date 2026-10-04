@@ -123,6 +123,10 @@ Which server the released app talks to is set at build time from repository vari
 
 Not signed (builds are for testing with people close by, not for distribution): macOS shows an "unidentified developer" warning (open it with right click → Open) and Windows a SmartScreen warning (*More info → Run anyway*). Signing would need an Apple Developer account (which also enables auto-updates on macOS) and a Windows code signing certificate. Linux needs no signing.
 
+## Production server
+
+The server side (Prosody, account service, Caddy for HTTPS) runs with Docker from [deploy/](deploy/). Step-by-step guide for a free test server on Oracle Cloud with DuckDNS and Brevo: [docs/despliegue.md](docs/despliegue.md) (Spanish).
+
 ## Platforms
 
 - Linux and macOS

@@ -237,6 +237,16 @@ async function sendReset(username: string): Promise<void> {
   })
 }
 
+// Behind a reverse proxy (production: Caddy) every request comes from the proxy, which
+// passes the real client in X-Forwarded-For. Take the last entry: the one the proxy added
+// (earlier ones could be made up by the client).
+const TRUST_PROXY = process.env['TRUST_PROXY'] === 'true'
+function clientIp(req: import('node:http').IncomingMessage): string {
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '')
+  const last = forwarded.split(',').at(-1)?.trim()
+  return (TRUST_PROXY && last) || req.socket.remoteAddress || ''
+}
+
 function readJson(req: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     let body = ''
@@ -301,7 +311,7 @@ createServer(async (req, res) => {
     const username = String((await readJson(req)).username ?? '')
       .trim()
       .toLowerCase()
-    const ip = req.socket.remoteAddress ?? ''
+    const ip = clientIp(req)
     if (/^[a-z0-9._-]{1,64}$/.test(username) && allowReset(username, ip)) {
       sendReset(username).catch((e) => console.error('reset', e.message))
     }

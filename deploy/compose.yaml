@@ -1,0 +1,63 @@
+# Palique server for PRODUCTION. Run from deploy/ with a filled-in .env (see .env.example
+# and docs/despliegue.md). Development uses ../compose.yaml.
+name: palique
+
+services:
+  prosody:
+    image: prosodyim/prosody:13.0
+    restart: unless-stopped
+    ports:
+      - "5222:5222" # XMPP clients (the app)
+    environment:
+      PALIQUE_DOMAIN: ${PALIQUE_DOMAIN:?set PALIQUE_DOMAIN in .env}
+      CUENTAS_SECRET: ${CUENTAS_SECRET:?run setup.sh first}
+    volumes:
+      - ./prosody.cfg.lua:/etc/prosody/prosody.cfg.lua:ro
+      - ../server/modules:/etc/prosody/palique-modules:ro
+      - ./certs:/etc/prosody/certs:ro
+      - prosody-data:/var/lib/prosody
+
+  cuentas:
+    build: ../server/cuentas
+    restart: unless-stopped
+    depends_on: [prosody]
+    environment:
+      XMPP_SERVICE: xmpp://prosody:5347
+      XMPP_DOMAIN: cuentas.${PALIQUE_DOMAIN}
+      XMPP_SECRET: ${CUENTAS_SECRET}
+      USER_DOMAIN: ${PALIQUE_DOMAIN}
+      PUBLIC_URL: https://${PALIQUE_DOMAIN}
+      TRUST_PROXY: "true" # behind Caddy: real client IPs for rate limits
+      SMTP_HOST: ${SMTP_HOST:-smtp-relay.brevo.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:?set SMTP_USER in .env}
+      SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in .env}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_LIST_ID: ${BREVO_LIST_ID:-}
+      BREVO_WEBHOOK_TOKEN: ${BREVO_WEBHOOK_TOKEN:-}
+      DATA_DIR: /data
+    volumes:
+      - cuentas-data:/data
+
+  # HTTPS in front of the account service; gets and renews the Let's Encrypt certificate.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [cuentas]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PALIQUE_DOMAIN: ${PALIQUE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  prosody-data:
+  cuentas-data:
+  caddy-data:
+  caddy-config:

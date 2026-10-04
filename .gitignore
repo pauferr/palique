@@ -7,3 +7,6 @@ out
 
 # Local secrets (e.g. BREVO_API_KEY for docker compose)
 .env
+deploy/.env
+deploy/certs/
+deploy/certs.log

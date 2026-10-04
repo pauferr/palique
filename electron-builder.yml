@@ -6,7 +6,7 @@ files:
   - '!**/.vscode/*'
   - '!src/*'
   # Server, checks and docs stay out of the app (server/ holds the dev TLS key).
-  - '!{server,scripts,docs,dist,.github}/**'
+  - '!{server,deploy,scripts,docs,dist,.github}/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!svelte.config.mjs'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,CONTRIBUTING.md,compose.yaml}'
