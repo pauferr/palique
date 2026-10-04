@@ -10,36 +10,39 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 | Prioridad | Plataforma | Notas |
 |-----------|------------|-------|
-| Alta | Linux | Objetivo inicial. Contemplar X11 y Wayland. |
+| Alta | Linux | Contemplar X11 y Wayland. |
+| Alta | macOS | Entorno de desarrollo principal. |
 | Baja | Windows | Futuro, no prioritario. |
-| Baja | macOS | Futuro, no prioritario. |
 
 ### Entorno de desarrollo
 
-- Desarrollo principal en **macOS** (por comodidad). Linux sigue siendo la plataforma objetivo del MVP.
-- macOS (WKWebView) y Linux (WebKitGTK) comparten motor WebKit: la mayor parte de la UI y la lógica se comportará igual.
-- Requiere validación específica en Linux: funciones de ventana (transparencia, siempre encima, pantalla completa, clics pasantes), bandeja del sistema (GNOME no la tiene por defecto), rendimiento de animaciones en WebKitGTK, audio (GStreamer) y notificaciones.
+- Desarrollo principal en **macOS**.
+- Electron lleva Chromium en ambos sistemas: la UI y la lógica se comportan igual en macOS y Linux.
+- Requiere validación específica en Linux: funciones de ventana (transparencia, siempre encima, clics pasantes), bandeja del sistema (GNOME no la tiene por defecto) y notificaciones.
 - Pruebas en Linux: en el equipo Linux propio cuando esté disponible; mientras tanto, opcionalmente, VM con UTM (Ubuntu/Fedora con Wayland). La VM sirve para funcionalidad, no para medir rendimiento.
-- Compilación de binarios Linux: GitHub Actions (no es práctico compilar para Linux desde macOS).
+- Compilación de binarios Linux: GitHub Actions (más fiable que compilar para Linux desde macOS, sobre todo con módulos nativos como better-sqlite3).
 - La distribución (en cualquier plataforma) queda fuera de alcance por ahora; el foco es solo el desarrollo. Nota para cuando toque: distribuir en macOS requiere firma y notarización (cuenta de Apple Developer de pago).
 
 ## 2. Stack
 
-**Decidido: Tauri 2**
+**Decidido: Electron**
 
-- Backend: Rust.
-- Frontend: **Svelte** con TypeScript. Poco código, buen rendimiento y transiciones/animaciones integradas, adecuado para una UI muy personalizada. Si se usa SvelteKit, configurarlo como SPA estática (`adapter-static`, SSR desactivado), que es lo que requiere Tauri. Descartados: React (más verboso), Solid (comunidad más pequeña), JS/TS sin framework (no escala con la UI).
-- En Linux usa WebKitGTK como motor de renderizado.
+- Proceso principal: Node con TypeScript (ventanas, bandeja, conexión XMPP, SQLite).
+- Frontend: **Svelte** con TypeScript, compilado con Vite (plantilla electron-vite). Poco código, buen rendimiento y transiciones/animaciones integradas, adecuado para una UI muy personalizada. Sin SvelteKit: no hace falta enrutado de servidor. Descartados: React (más verboso), Solid (comunidad más pequeña), JS/TS sin framework (no escala con la UI).
+- Comunicación entre ventanas y proceso principal: IPC mediante preload + `contextBridge` (con `contextIsolation` activado).
+- Empaquetado: electron-builder (AppImage/deb en Linux, dmg en macOS).
 
 **Motivos de la elección**
 
+- Todo el proyecto en TypeScript: perfil de desarrollo web, sin necesidad de aprender Rust.
+- Mismo motor (Chromium) en Linux y macOS: lo que funciona en el Mac funciona igual en Linux. Sin dependencias como GStreamer para el audio.
 - La estética retro (biseles, sprites, fuentes pixeladas, emoticonos animados) se resuelve mejor con CSS y canvas que con widgets nativos.
-- Binarios ligeros (pocos MB frente a 100+ de Electron).
-- Multiplataforma con el mismo código cuando toque dar el salto a Windows/macOS.
+- APIs maduras para lo que pide Palique: ventanas transparentes, siempre encima y con clics pasantes, bandeja, notificaciones, `flashFrame`.
+- Coste asumido: binarios de ~100 MB y más RAM. Aceptable para una app de chat.
 
 **Alternativas descartadas**
 
-- Electron: más sencillo y predecible, pero pesado en disco y RAM.
+- Tauri 2: binarios ligeros, pero todo lo que sale de la webview se hace en Rust, y el motor cambia según el sistema (WebKitGTK en Linux, WKWebView en macOS) justo en las funciones más delicadas (transparencia, superposición, audio).
 - Flutter: UI personalizable, ecosistema de escritorio menos maduro.
 - Qt/QML: rendimiento nativo, curva de aprendizaje mayor.
 - GTK4/libadwaita: estética opuesta a la buscada y atado a Linux.
@@ -48,15 +51,16 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 **Decidido: XMPP**
 
-- Servidor: **Prosody** (libre, en Lua, ligero, configuración en un único archivo, WebSocket mediante `mod_websocket`). Sin desarrollo propio de backend, solo configuración. Descartado ejabberd: pensado para millones de usuarios, más pesado y complejo de administrar. Si algún día Prosody se queda corto, se puede migrar sin tocar el cliente.
+- Servidor: **Prosody** (libre, en Lua, ligero, configuración en un único archivo). Sin desarrollo propio de backend, solo configuración. Descartado ejabberd: pensado para millones de usuarios, más pesado y complejo de administrar. Si algún día Prosody se queda corto, se puede migrar sin tocar el cliente.
 - Cubre de serie: cuentas, lista de contactos (roster), presencia, mensajes offline, historial.
 - Zumbido: XEP-0224 *Attention*.
 - Animaciones a pantalla completa y demás funciones exclusivas: extensiones propias de Palique, que solo interpretarán clientes Palique.
 - Interoperabilidad: los usuarios pueden hablar con otros clientes XMPP (sin funciones exclusivas).
-- Lógica XMPP: **en el frontend (JS) para el MVP**, con xmpp.js o StanzaJS (más maduras que tokio-xmpp en Rust).
+- Lógica XMPP: **en el proceso principal (Node)**, con xmpp.js.
+  - Una única conexión para toda la app; las ventanas (lista de contactos, cada chat) no conectan por su cuenta: reciben eventos y envían acciones por IPC.
   - Encapsulada en un módulo propio con interfaz clara; el resto de la app no conoce la librería subyacente.
-  - Plan de migración: si la conexión en la webview da problemas, mover ese módulo al backend Rust sin tocar la UI.
-  - Requisito: desde la webview no hay sockets TCP, así que la conexión va por WebSocket (RFC 7395). El servidor debe tener WebSocket habilitado.
+  - Desde Node hay sockets TCP, así que se usa la conexión XMPP estándar (puerto 5222 con STARTTLS). WebSocket en Prosody no es necesario, aunque puede quedar habilitado.
+  - Mismo usuario en varios equipos: Message Carbons (XEP-0280) para que cada mensaje llegue a todos sus clientes conectados.
 
 **Seguridad**
 
@@ -79,19 +83,17 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 ### Notificaciones con sonido
 - Sonidos propios para mensaje entrante, contacto conectado, zumbido, etc.
-- Requisito en Linux: plugins de GStreamer para el audio en WebKitGTK.
 
 ### Zumbidos
 - Sonido + sacudida del contenido **dentro** de la ventana (funciona en cualquier entorno).
-- Refuerzo con `request_user_attention` de Tauri (resalta la app en la barra de tareas/dock; compatible con Wayland).
+- Refuerzo con `flashFrame` (Linux) y `app.dock.bounce` (macOS) de Electron: resaltan la app en la barra de tareas/dock.
 - Opcional a futuro: en X11, mover la ventana real como en el MSN original.
 - Decisión: no se considera un problema que en Wayland la ventana no se desplace.
 
 ### Animaciones a pantalla completa
-- Ventana transparente, siempre encima y que deje pasar los clics.
-- X11: sin complicaciones.
-- Wayland: depende del compositor. Funciona con layer-shell (KDE, Sway y similares), no en GNOME.
-- Hay que validar transparencias en WebKitGTK.
+- Ventana transparente, siempre encima y que deje pasar los clics (`transparent`, `alwaysOnTop`, `setIgnoreMouseEvents`).
+- macOS y X11: sin complicaciones.
+- Wayland: los clientes Wayland nativos no pueden ponerse siempre encima en todos los compositores (GNOME no lo permite). Solución: arrancar Electron en XWayland (`--ozone-platform=x11`), donde la superposición funciona también en GNOME. Hay que validarlo pronto.
 - Nombre en la app: "guiños" (como en MSN).
 - **Transmisión: catálogo predefinido.** Las animaciones vienen incluidas en la app; el mensaje solo lleva un identificador (p. ej. `tarta-cumple`). Mensaje ligero, reproducción instantánea y contenido controlado.
 - Diseño extensible: el formato del mensaje debe permitir añadir packs descargables en el futuro sin cambios.
@@ -153,7 +155,7 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - Packs de guiños descargables.
 - Temas adicionales ("sabores") y sus packs de sonidos.
 - Inicio de sesión con Google u otros proveedores (opcional, sin compromiso). Requiere un pequeño servicio de autenticación intermedio entre el proveedor y Prosody.
-- Soporte para Windows y macOS.
+- Soporte para Windows.
 
 **Más adelante**
 - Voz y vídeo.
@@ -170,16 +172,17 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 
 | Riesgo | Impacto | Mitigación |
 |--------|---------|------------|
-| Animaciones a pantalla completa en Wayland | Alto | Prototipo temprano en el entorno propio. Fallback: animación dentro de la ventana en compositores sin soporte. |
-| Transparencias y audio en WebKitGTK | Medio | Validar en el mismo prototipo. Documentar dependencias (GStreamer). |
+| Efecto red: nadie con quien hablar | Alto | Definir los primeros usuarios (grupo de amigos). Interoperabilidad XMPP para hablar con quien ya use otro cliente. |
+| Animaciones a pantalla completa en Wayland | Alto | Forzar XWayland. Prototipo temprano en el entorno propio. Fallback: animación dentro de la ventana. |
 | Desarrollo en macOS sin equipo Linux disponible | Alto | Validar en Linux (equipo propio o VM) en cuanto sea posible, empezando por los guiños. No dar por buena ninguna función de ventana probada solo en macOS. |
 | Zumbido sin mover ventana en Wayland | Bajo | Aceptado. Sacudida interna + aviso en barra de tareas. |
 
 ## 7. Decisiones
 
 - [x] **Protocolo de mensajería** → XMPP (ver sección 2).
+- [x] **Framework de escritorio** → Electron; sustituye a Tauri por perfil web y paridad Linux/macOS (ver sección 2).
 - [x] **Framework de frontend** → Svelte + TypeScript (ver sección 2).
-- [x] **Ubicación de la lógica XMPP** → frontend JS para el MVP, encapsulada y migrable a Rust (ver sección 2).
+- [x] **Ubicación de la lógica XMPP** → proceso principal de Electron, una conexión compartida por IPC (ver sección 2).
 - [x] **Servidor XMPP** → Prosody (ver sección 2).
 - [x] **Transmisión de animaciones** → catálogo predefinido, extensible con packs (ver sección 3).
 - [x] **Alcance del MVP** → ver sección 4.
@@ -232,8 +235,9 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 ## 9. Próximos pasos
 
 1. Crear el repositorio privado en GitHub y subir este documento (`docs/palique.md`).
-2. Configurar el proyecto Tauri + Svelte en macOS y GitHub Actions para compilar en Linux.
-3. Montar Prosody en local (o Docker) con `mod_websocket` habilitado.
+2. Configurar el proyecto Electron + Svelte (electron-vite) en macOS y GitHub Actions para compilar en Linux.
+3. Montar Prosody en local (o Docker).
 4. Prototipo de guiños: ventana transparente a pantalla completa + sonido.
-5. Validar el prototipo en Linux (equipo propio o VM) en cuanto esté disponible.
-6. Diseño: elegir tema por defecto, paleta y tipografías; encargar las ilustraciones del elenco.
+5. Validar el prototipo en Linux (equipo propio o VM), incluido GNOME con XWayland.
+6. Esqueleto andante: login, lista de contactos, chat uno a uno y zumbido, de punta a punta. El resto del MVP se añade encima.
+7. Diseño: elegir tema por defecto, paleta y tipografías; encargar las ilustraciones del elenco (sin bloquear el desarrollo: avatares provisionales mientras tanto).

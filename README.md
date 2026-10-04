@@ -6,14 +6,14 @@ A desktop instant messenger inspired by MSN Messenger and AIM. Sounds, buzzes, f
 
 ## Stack
 
-- **App:** [Tauri 2](https://tauri.app) (Rust) + [Svelte](https://svelte.dev) (TypeScript)
-- **Messaging:** XMPP over WebSocket
+- **App:** [Electron](https://www.electronjs.org) + [Svelte](https://svelte.dev) (TypeScript)
+- **Messaging:** XMPP
 - **Server:** [Prosody](https://prosody.im)
 
 ## Platforms
 
-- Linux (primary target)
-- Windows and macOS may come later
+- Linux and macOS
+- Windows may come later
 
 ## Documentation
 
