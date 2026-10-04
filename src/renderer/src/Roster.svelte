@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Contact, OwnShow, Snapshot } from '../../main/xmpp'
+  import type { Contact, Invite, OwnShow, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
@@ -38,7 +38,11 @@
 
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
-    const offRoster = window.api.onRoster((value) => (roster = value))
+    const offRoster = window.api.onRoster((value) => {
+      roster = value
+      // Someone may have just joined with one of our invites.
+      if (invitesOpen) loadInvites()
+    })
     const offOnline = window.api.onContactOnline(() => {
       new Audio(onlineSound).play().catch(() => {})
     })
@@ -90,6 +94,48 @@
       avatarError = 'No se ha podido usar esa imagen.'
     }
   }
+
+  // "Invite a friend": the server creates the code and enforces the per-user limit.
+  let invitesOpen = $state(false)
+  let invites: Invite[] = $state([])
+  let maxInvites = $state(0)
+  let newInvite = $state('')
+  let inviteError = $state('')
+  let copied = $state(false)
+
+  async function loadInvites(): Promise<void> {
+    const result = await window.api.listInvites()
+    invites = result.invites
+    maxInvites = result.max
+  }
+
+  async function toggleInvites(): Promise<void> {
+    invitesOpen = !invitesOpen
+    newInvite = ''
+    inviteError = ''
+    if (invitesOpen) await loadInvites()
+  }
+
+  async function invite(): Promise<void> {
+    inviteError = ''
+    copied = false
+    try {
+      newInvite = (await window.api.createInvite()).token
+    } catch (e) {
+      inviteError = String(e).includes('limit')
+        ? `Ya tienes ${maxInvites} invitaciones sin usar. Espera a que se usen o caduquen.`
+        : 'No se ha podido crear la invitación.'
+    }
+    await loadInvites()
+  }
+
+  async function copyInvite(): Promise<void> {
+    await navigator.clipboard.writeText(newInvite)
+    copied = true
+  }
+
+  const until = (iso: string): string =>
+    new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' })
 
   async function add(event: SubmitEvent): Promise<void> {
     event.preventDefault()
@@ -195,7 +241,9 @@
         </details>
       {/each}
     {:else}
-      <p class="empty">Aún no tienes contactos. Añade a alguien por su usuario.</p>
+      <p class="empty">
+        Aún no tienes contactos. Invita a tus amigos o añade a alguien por su usuario.
+      </p>
     {/if}
   </div>
 
@@ -204,7 +252,30 @@
     <button type="submit">+ Añadir</button>
   </form>
 
+  {#if invitesOpen}
+    <div class="invites">
+      <p>
+        Para crear una cuenta en Palique hace falta una invitación. Quien entre con la tuya
+        aparecerá directamente en tus contactos.
+      </p>
+      {#if newInvite}
+        <div class="code">
+          <code>{newInvite}</code>
+          <button onclick={copyInvite}>{copied ? 'Copiado' : 'Copiar'}</button>
+        </div>
+      {/if}
+      {#if inviteError}<p class="error" role="alert">{inviteError}</p>{/if}
+      <button onclick={invite} disabled={invites.length >= maxInvites}>Crear invitación</button>
+      <p class="hint">
+        Invitaciones sin usar: {invites.length} de {maxInvites}{#if invites.length}{' '}· caducan el {invites
+            .map((i) => until(i.expires))
+            .join(', ')}{/if}
+      </p>
+    </div>
+  {/if}
+
   <footer>
+    <button onclick={toggleInvites} aria-expanded={invitesOpen}>Invitar</button>
     <button onclick={() => window.api.openOptions()}>Opciones</button>
     <button onclick={onlogout}>Cerrar sesión</button>
   </footer>
@@ -384,6 +455,46 @@
     margin: 0;
     padding: 16px 10px;
     color: var(--text-muted);
+  }
+
+  .invites {
+    display: grid;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--bar-bg);
+    border-top: 1px solid var(--line);
+  }
+
+  .invites p {
+    margin: 0;
+  }
+
+  .invites > button {
+    justify-self: start;
+  }
+
+  .code {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  code {
+    flex: 1;
+    padding: 3px 6px;
+    overflow: hidden;
+    border: solid var(--field-border-width);
+    border-color: var(--field-border-color);
+    border-radius: var(--radius);
+    background: var(--field-bg);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    user-select: all;
+  }
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 12px;
   }
 
   form,

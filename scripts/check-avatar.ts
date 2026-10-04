@@ -7,6 +7,7 @@ import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import * as A from '../src/main/xmpp.ts'
+import { adminInvite } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -45,7 +46,7 @@ function until<T>(get: () => T | undefined | false, label: string): Promise<T> {
 }
 
 for (const user of [a, b]) {
-  assert.equal((await A.login(user, pass, true)).ok, true)
+  assert.equal((await A.login(user, pass, { invite: adminInvite() })).ok, true)
   await A.logout()
 }
 

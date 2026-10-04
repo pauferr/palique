@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
+import { adminInvite } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -37,7 +38,7 @@ const contact = (s: A.Snapshot): A.Contact | undefined =>
   s.contacts.find((c) => c.jid === `${b}@localhost`)
 
 // B: a plain client that accepts anything A asks (fresh one per session).
-assert.equal((await A.login(b, pass, true)).ok, true)
+assert.equal((await A.login(b, pass, { invite: adminInvite() })).ok, true)
 await A.logout()
 async function startB(...presence: ReturnType<typeof xml>[]): Promise<ReturnType<typeof client>> {
   const B = client({
@@ -63,7 +64,7 @@ async function startB(...presence: ReturnType<typeof xml>[]): Promise<ReturnType
 let B = await startB(xml('show', {}, 'dnd'), xml('status', {}, 'currando'))
 
 // A adds B → mutual subscription, B's presence shows up.
-assert.equal((await A.login(a, pass, true)).ok, true)
+assert.equal((await A.login(a, pass, { invite: adminInvite() })).ok, true)
 await A.addContact(b)
 let s = await until(
   (s) => contact(s)?.subscription === 'both' && contact(s)?.show === 'dnd',

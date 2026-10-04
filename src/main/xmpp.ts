@@ -12,6 +12,7 @@ const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0
 const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
 
 const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
+const INVITES = 'urn:palique:invite:0' // server/modules/mod_palique_invites.lua
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
@@ -26,6 +27,7 @@ export type AuthError =
   | 'conflict' // username taken
   | 'not-acceptable' // username or password rejected by the server
   | 'not-authorized' // wrong username or password
+  | 'invalid-invite' // missing, wrong, used or expired invite code
   | 'unreachable'
   | 'unknown'
 
@@ -281,7 +283,29 @@ async function loadRoster(): Promise<void> {
 }
 
 // In-band registration (XEP-0077) on the already-encrypted stream, before SASL.
-async function registerAccount(entity: Client, username: string, password: string): Promise<void> {
+// The code can be pasted bare or as the whole invite link (xmpp:…;preauth=CODE;…).
+export function inviteToken(input: string): string {
+  const value = input.trim()
+  return value.match(/preauth=([^;&]+)/)?.[1] ?? value
+}
+
+// Registration is invite-only: hand the code to the server first (XEP-0401).
+async function registerAccount(
+  entity: Client,
+  username: string,
+  password: string,
+  invite: string
+): Promise<void> {
+  const preauth = await entity.sendReceive(
+    xml(
+      'iq',
+      { type: 'set', id: randomUUID() },
+      xml('preauth', { xmlns: 'urn:xmpp:pars:0', token: inviteToken(invite) })
+    )
+  )
+  if (preauth.attrs.type !== 'result') {
+    throw Object.assign(new Error('invalid invite'), { condition: 'invalid-invite' })
+  }
   const res = await entity.sendReceive(
     xml(
       'iq',
@@ -308,7 +332,8 @@ function toAuthError(e: unknown): AuthError {
   if (
     condition === 'conflict' ||
     condition === 'not-acceptable' ||
-    condition === 'not-authorized'
+    condition === 'not-authorized' ||
+    condition === 'invalid-invite'
   ) {
     return condition
   }
@@ -316,12 +341,12 @@ function toAuthError(e: unknown): AuthError {
   return 'unknown'
 }
 
-// `show`: status to sign in with, so an invisible user is never briefly visible.
+// Passing an invite code creates the account first. `show`: status to sign in with, so
+// an invisible user is never briefly visible.
 export async function login(
   username: string,
   password: string,
-  register = false,
-  show: OwnShow = 'online'
+  { invite, show = 'online' }: { invite?: string; show?: OwnShow } = {}
 ): Promise<AuthResult> {
   await logout()
   own = { show, status: '' }
@@ -329,7 +354,7 @@ export async function login(
     service: SERVICE,
     domain: DOMAIN,
     credentials: async (authenticate, mechanisms, _fast, conn) => {
-      if (register) await registerAccount(conn, username, password)
+      if (invite !== undefined) await registerAccount(conn, username, password, invite)
       // The server requires TLS, so its preferred mechanism is safe to use as-is.
       await authenticate(
         { username, password },
@@ -548,4 +573,34 @@ export async function setAvatar(png: Uint8Array): Promise<void> {
   avatars.set(me, { hash, url: `data:image/png;base64,${bytes.toString('base64')}` })
   await send(presenceStanza())
   emit()
+}
+
+export type Invite = { token: string; expires: string }
+
+function parseInvite(el: Element): Invite {
+  return { token: el.attrs.token, expires: el.attrs.expires }
+}
+
+// "Invite a friend". Rejects with 'limit' when the user already has the maximum active.
+export async function createInvite(): Promise<Invite> {
+  try {
+    const res = await xmpp!.iqCaller.request(
+      xml('iq', { type: 'set' }, xml('invite', { xmlns: INVITES }))
+    )
+    return parseInvite(res.getChild('invite', INVITES)!)
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    throw new Error(condition === 'resource-constraint' ? 'limit' : 'unknown')
+  }
+}
+
+export async function listInvites(): Promise<{ invites: Invite[]; max: number }> {
+  const res = await xmpp!.iqCaller.request(
+    xml('iq', { type: 'get' }, xml('invite', { xmlns: INVITES }))
+  )
+  const list = res.getChild('invites', INVITES)
+  return {
+    invites: (list?.getChildren('invite') ?? []).map(parseInvite),
+    max: Number(list?.attrs.max ?? 0)
+  }
 }

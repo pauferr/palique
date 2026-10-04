@@ -32,6 +32,14 @@ docker compose logs -f  # follow server logs
 docker compose down     # stop (accounts persist in the prosody-data volume)
 ```
 
+Registration is invite-only. Create an invite for the first account (then invite others from the app):
+
+```bash
+docker compose exec prosody prosodyctl shell invite create_account localhost
+```
+
+Paste the code after `preauth=` (or the whole link) into the app's "Código de invitación" field.
+
 TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the app trusts it only when connecting to `localhost`.
 
 ```bash
@@ -39,6 +47,7 @@ npm run check:auth      # registration/login check against the local server
 npm run check:roster    # contacts + presence check (uses a second test client)
 npm run check:chat      # messages, buzz, carbons and stranger filtering
 npm run check:avatar    # publish and fetch avatars
+npm run check:invites   # invite-only registration and per-user limit
 npm run check:invisible # invisible status (needs the server module)
 npm run check:history   # local sqlite history (no server needed)
 npm run check:export    # history export formats and html escaping

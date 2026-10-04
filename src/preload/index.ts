@@ -2,14 +2,17 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ExportFormat, ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
-import type { AuthResult, ChatMessage, OwnShow, Snapshot } from '../main/xmpp'
+import type { AuthResult, ChatMessage, Invite, OwnShow, Snapshot } from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
   login: (username: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:login', username, password, false),
-  register: (username: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:login', username, password, true),
+    ipcRenderer.invoke('auth:login', username, password),
+  register: (username: string, password: string, invite: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:login', username, password, invite),
+  createInvite: (): Promise<Invite> => ipcRenderer.invoke('invites:create'),
+  listInvites: (): Promise<{ invites: Invite[]; max: number }> =>
+    ipcRenderer.invoke('invites:list'),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   getRoster: (): Promise<Snapshot> => ipcRenderer.invoke('roster:snapshot'),
   // Returns an unsubscribe function.

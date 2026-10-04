@@ -7,6 +7,7 @@
     conflict: 'Ese nombre de usuario ya está cogido.',
     'not-acceptable': 'El servidor no acepta ese usuario o contraseña.',
     'not-authorized': 'Usuario o contraseña incorrectos.',
+    'invalid-invite': 'El código de invitación no es válido o ha caducado.',
     unreachable: 'No se puede conectar con el servidor.',
     unknown: 'Algo ha fallado. Inténtalo de nuevo.'
   }
@@ -15,6 +16,7 @@
   let username = $state('')
   let password = $state('')
   let confirm = $state('')
+  let invite = $state('')
   let error = $state('')
   let busy = $state(false)
 
@@ -29,7 +31,7 @@
     const user = username.trim().toLowerCase()
     const result =
       mode === 'register'
-        ? await window.api.register(user, password)
+        ? await window.api.register(user, password, invite)
         : await window.api.login(user, password)
     busy = false
     if ('jid' in result) onlogin(result.jid)
@@ -55,6 +57,18 @@
   </div>
 
   <form onsubmit={submit}>
+    {#if mode === 'register'}
+      <label>
+        Código de invitación
+        <input
+          bind:value={invite}
+          required
+          autocomplete="off"
+          placeholder="Pega el código o el enlace que te enviaron"
+        />
+      </label>
+    {/if}
+
     <label>
       Usuario
       <input

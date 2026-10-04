@@ -17,6 +17,10 @@ modules_enabled = {
 
 	-- Palique features
 	"register";      -- in-band registration (XEP-0077)
+	"invites";       -- invitation tokens (XEP-0401)
+	"invites_register"; -- registering needs a valid invite; inviter and invitee become contacts
+	"palique_invites"; -- our own: "invite a friend" with a per-user limit (server/modules)
+	"admin_shell";   -- prosodyctl shell (e.g. creating the first invite)
 	"carbons";       -- same account on several machines (XEP-0280)
 	"pep";           -- avatars (XEP-0084) and future user tune (XEP-0118)
 	"vcard4";
@@ -39,6 +43,9 @@ modules_enabled = {
 modules_disabled = { "s2s" }
 
 allow_registration = true
+registration_invite_only = true
+invite_expiry = "1 week"
+palique_invites_per_user = 5
 
 -- TLS required here too, with the dev-only cert in server/certs.
 c2s_require_encryption = true

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
+import { adminInvite } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -34,7 +35,7 @@ function until<T>(get: () => T | undefined | false, label: string): Promise<T> {
 }
 
 for (const user of [a, b]) {
-  assert.equal((await A.login(user, pass, true)).ok, true)
+  assert.equal((await A.login(user, pass, { invite: adminInvite() })).ok, true)
   await A.logout()
 }
 
@@ -92,7 +93,7 @@ assert.equal(aOnline, false, 'B reconnects and still does not see A')
 await A.logout()
 await sleep(300)
 assert.equal(aOnline, false)
-await A.login(a, pass, false, 'invisible')
+await A.login(a, pass, { show: 'invisible' })
 await until(() => seesB(), 'A sees B after sign-in')
 await sleep(800)
 assert.equal(aOnline, false, 'B never saw A')

@@ -32,6 +32,8 @@ import {
   DOMAIN,
   acceptRequest,
   addContact,
+  createInvite,
+  listInvites,
   login,
   logout,
   onChange,
@@ -327,11 +329,15 @@ app.whenReady().then(() => {
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
-  ipcMain.handle('auth:login', async (_, username: string, password: string, register: boolean) => {
+  // `invite`: present when creating the account.
+  ipcMain.handle('auth:login', async (_, username: string, password: string, invite?: string) => {
     // Sign in with the last status, so an invisible user is never briefly visible.
     const last = settings.get().show
     const show = shows.includes(last) ? last : 'online'
-    const result = await login(String(username), String(password), Boolean(register), show)
+    const result = await login(String(username), String(password), {
+      invite: invite === undefined ? undefined : String(invite),
+      show
+    })
     if (result.ok) account = result.jid
     return result
   })
@@ -347,6 +353,8 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
     announceArrivals(state)
   })
+  ipcMain.handle('invites:create', () => createInvite())
+  ipcMain.handle('invites:list', () => listInvites())
   ipcMain.handle('roster:snapshot', () => snapshot())
   ipcMain.handle('roster:add', (_, address: string) => addContact(String(address)))
   ipcMain.handle('roster:accept', (_, jid: string) => acceptRequest(String(jid)))
