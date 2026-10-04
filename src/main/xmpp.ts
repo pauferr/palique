@@ -6,6 +6,8 @@ import type { Element } from '@xmpp/xml'
 export const DOMAIN = process.env['PALIQUE_XMPP_DOMAIN'] ?? 'localhost'
 const SERVICE = process.env['PALIQUE_XMPP_SERVICE'] ?? `xmpp://${DOMAIN}:5222`
 const ROSTER = 'jabber:iq:roster'
+const ATTENTION = 'urn:xmpp:attention:0' // buzz (XEP-0224)
+const CARBONS = 'urn:xmpp:carbons:2' // copies from our other devices (XEP-0280)
 
 export type AuthError =
   | 'conflict' // username taken
@@ -32,6 +34,15 @@ export type Snapshot = {
   requests: string[] // people asking to add us
 }
 
+export type ChatMessage = {
+  id: string
+  with: string // the contact's bare JID
+  mine: boolean
+  body: string
+  buzz: boolean
+  at: number // ms timestamp
+}
+
 type Presence = { show: Show; status: string }
 type RosterEntry = Omit<Contact, 'show' | 'status'> & { resources: Map<string, Presence> }
 
@@ -41,6 +52,7 @@ let roster = new Map<string, RosterEntry>()
 let requests = new Set<string>()
 let own: Presence = { show: 'online', status: '' }
 let listener: (snapshot: Snapshot) => void = () => {}
+let messageListener: (message: ChatMessage) => void = () => {}
 
 // Best presence across the contact's connected devices.
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
@@ -58,6 +70,10 @@ export function onChange(callback: (snapshot: Snapshot) => void): void {
 }
 
 const emit = (): void => listener(snapshot())
+
+export function onMessage(callback: (message: ChatMessage) => void): void {
+  messageListener = callback
+}
 
 function send(stanza: Element): Promise<void> {
   return xmpp ? xmpp.send(stanza) : Promise.resolve()
@@ -123,6 +139,42 @@ function handlePresence(stanza: Element): void {
       return
   }
   emit()
+}
+
+function handleMessage(stanza: Element): void {
+  let message = stanza
+  let mine = false
+  const carbon = stanza.getChild('received', CARBONS) ?? stanza.getChild('sent', CARBONS)
+  if (carbon) {
+    // Anyone could wrap a fake message in a carbon: only accept them from our own account.
+    const from = stanza.attrs.from
+    if (!from || jid(from).bare().toString() !== me) return
+    const inner = carbon.getChild('forwarded', 'urn:xmpp:forward:0')?.getChild('message')
+    if (!inner) return
+    message = inner
+    mine = carbon.name === 'sent'
+  }
+  if (message.attrs.type === 'error' || message.attrs.type === 'groupchat') return
+
+  const other = mine ? message.attrs.to : message.attrs.from
+  if (!other) return
+  const bare = jid(other).bare().toString()
+  // Contacts only: strangers can't message you (no spam).
+  if (!roster.has(bare)) return
+
+  const buzz = Boolean(message.getChild('attention', ATTENTION))
+  const body = message.getChildText('body') ?? ''
+  if (!buzz && !body) return
+  // Offline messages carry the time they were sent.
+  const stamp = message.getChild('delay', 'urn:xmpp:delay')?.attrs.stamp
+  messageListener({
+    id: message.attrs.id ?? randomUUID(),
+    with: bare,
+    mine,
+    body,
+    buzz,
+    at: stamp ? Date.parse(stamp) : Date.now()
+  })
 }
 
 async function loadRoster(): Promise<void> {
@@ -200,6 +252,7 @@ export async function login(
   entity.on('error', () => {})
   entity.on('stanza', (stanza) => {
     if (stanza.is('presence')) handlePresence(stanza)
+    else if (stanza.is('message')) handleMessage(stanza)
   })
   // Roster pushes: the server tells us about changes to our contact list.
   entity.iqCallee.set(ROSTER, 'query', (ctx) => {
@@ -214,7 +267,11 @@ export async function login(
   // Also fires after automatic reconnects: refresh contacts and re-announce ourselves.
   entity.on('online', (address) => {
     me = address.bare().toString()
+    // Roster before presence: offline messages arrive after presence and need the contact list.
     loadRoster()
+      .then(() =>
+        xmpp?.iqCaller.request(xml('iq', { type: 'set' }, xml('enable', { xmlns: CARBONS })))
+      )
       .then(() => send(presenceStanza()))
       .catch(() => {})
   })
@@ -299,4 +356,21 @@ export async function removeContact(bare: string): Promise<void> {
 export async function setPresence(show: Show, status: string): Promise<void> {
   own = { show, status: status.trim().slice(0, 140) }
   await send(presenceStanza())
+}
+
+async function sendStanza(to: string, buzz: boolean, body: string): Promise<ChatMessage> {
+  const id = randomUUID()
+  const stanza = buzz
+    ? xml('message', { to, id, type: 'headline' }, xml('attention', { xmlns: ATTENTION }))
+    : xml('message', { to, id, type: 'chat' }, xml('body', {}, body))
+  await send(stanza)
+  return { id, with: to, mine: true, body, buzz, at: Date.now() }
+}
+
+export function sendMessage(to: string, body: string): Promise<ChatMessage> {
+  return sendStanza(to, false, body)
+}
+
+export function sendBuzz(to: string): Promise<ChatMessage> {
+  return sendStanza(to, true, '')
 }
