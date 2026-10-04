@@ -6,6 +6,9 @@ services:
       - "5280:5280" # HTTP / WebSocket
     volumes:
       - ./server/prosody.cfg.lua:/etc/prosody/prosody.cfg.lua:ro
+      # Dev-only cert the app trusts explicitly (see src/main/index.ts)
+      - ./server/certs/localhost.crt:/etc/prosody/certs/localhost.crt:ro
+      - ./server/certs/localhost.key:/etc/prosody/certs/localhost.key:ro
       - prosody-data:/var/lib/prosody
 
 volumes:

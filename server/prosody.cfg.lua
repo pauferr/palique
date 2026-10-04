@@ -35,7 +35,7 @@ modules_disabled = { "s2s" }
 
 allow_registration = true
 
--- The image ships a self-signed cert for localhost, so TLS is required here too.
+-- TLS required here too, with the dev-only cert in server/certs.
 c2s_require_encryption = true
 
 authentication = "internal_hashed"
