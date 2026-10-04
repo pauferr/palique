@@ -3,7 +3,13 @@ import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 
-export const DOMAIN = process.env['PALIQUE_XMPP_DOMAIN'] ?? 'localhost'
+// Which server: fixed at build time for releases (MAIN_VITE_* variables, see the release
+// workflow), overridable with PALIQUE_* at run time, localhost in development.
+const built = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {}
+const config = (name: string, buildName: string): string | undefined =>
+  process.env[name] || built[buildName] || undefined
+
+export const DOMAIN = config('PALIQUE_XMPP_DOMAIN', 'MAIN_VITE_XMPP_DOMAIN') ?? 'localhost'
 const SERVICE = process.env['PALIQUE_XMPP_SERVICE'] ?? `xmpp://${DOMAIN}:5222`
 const ROSTER = 'jabber:iq:roster'
 const ATTENTION = 'urn:xmpp:attention:0' // buzz (XEP-0224)
@@ -682,7 +688,8 @@ export async function inviteByEmail(address: string): Promise<void> {
 
 // --- password recovery (signed out, so over HTTP to the account service) --------------
 
-const ACCOUNTS_URL = process.env['PALIQUE_ACCOUNTS_URL'] ?? 'http://localhost:8080'
+const ACCOUNTS_URL =
+  config('PALIQUE_ACCOUNTS_URL', 'MAIN_VITE_ACCOUNTS_URL') ?? 'http://localhost:8080'
 
 // The service answers the same whether or not the account exists or has an email.
 export async function requestPasswordReset(username: string): Promise<void> {

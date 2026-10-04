@@ -4,7 +4,15 @@
   "private": true,
   "description": "Desktop instant messenger inspired by MSN Messenger and AIM",
   "main": "./out/main/index.js",
-  "author": "Paulo Ferreira",
+  "author": {
+    "name": "Paulo Ferreira",
+    "email": "203633342+pauferr@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/pauferr/palique",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pauferr/palique.git"
+  },
   "scripts": {
     "format": "prettier --plugin prettier-plugin-svelte --write .",
     "lint": "eslint --cache .",

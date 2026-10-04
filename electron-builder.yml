@@ -5,9 +5,11 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  # Server, checks and docs stay out of the app (server/ holds the dev TLS key).
+  - '!{server,scripts,docs,dist,.github}/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!svelte.config.mjs'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,CONTRIBUTING.md,compose.yaml}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 # palique:// links (password recovery emails open the app).
@@ -17,17 +19,43 @@ protocols:
       - palique
 asarUnpack:
   - resources/**
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - deb
-  maintainer: Paulo Ferreira
-  category: Network
-appImage:
-  artifactName: ${name}-${version}.${ext}
 npmRebuild: false
+
+mac:
+  category: public.app-category.social-networking
+  entitlementsInherit: build/entitlements.mac.plist
+  # Unsigned until there's an Apple Developer account (see README, "Releases").
+  notarize: false
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    # Not downloaded by users: the format future auto-updates use.
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: ${name}-${version}-mac-${arch}.${ext}
+
+linux:
+  maintainer: Paulo Ferreira <203633342+pauferr@users.noreply.github.com>
+  category: Network
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  artifactName: ${name}-${version}-linux-${arch}.${ext}
+
+# Windows is out of scope for now. To add it: uncomment, and add windows-latest to the
+# release workflow's matrix.
+# win:
+#   target:
+#     - target: nsis
+#       arch: [x64]
+#   artifactName: ${name}-${version}-windows-${arch}.${ext}
+# nsis:
+#   oneClick: false
+#   allowToChangeInstallationDirectory: true
+
+# GitHub Releases, as a draft to review before publishing (release workflow).
+publish:
+  provider: github
+  releaseType: draft

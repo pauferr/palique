@@ -1,0 +1,74 @@
+# Builds the installers on GitHub's machines (each OS builds its own).
+#  - Pushing a tag like v0.2.0: builds and attaches them to a draft GitHub Release.
+#  - "Run workflow" by hand (Actions tab): test build, installers downloadable as artifacts.
+# See README, "Releases".
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload its files
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest # Apple Silicon runner; also builds the Intel (x64) version
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          # Windows, when it's time (also uncomment win: in electron-builder.yml):
+          # - os: windows-latest
+          #   platform: win
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match package.json ($version). Use npm version."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # Typecheck + build. The server the app talks to comes from repository variables
+      # (Settings > Secrets and variables > Actions > Variables); empty means localhost.
+      - run: npm run build
+        env:
+          MAIN_VITE_XMPP_DOMAIN: ${{ vars.XMPP_DOMAIN }}
+          MAIN_VITE_ACCOUNTS_URL: ${{ vars.ACCOUNTS_URL }}
+
+      - name: Package
+        run: npx electron-builder --${{ matrix.platform }} --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned for now (no Apple Developer account yet).
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Keep test builds as downloadable artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: palique-${{ matrix.platform }}
+          path: |
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.exe
+          retention-days: 7

@@ -95,6 +95,34 @@ Newsletter choices are stored by the account service; only verified addresses ar
 
 In production the service also sends its emails through Brevo's SMTP relay (`SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_USER`/`SMTP_PASS` from *SMTP & API → SMTP*).
 
+## Releases
+
+Versions follow [Semantic Versioning](https://semver.org) (`MAJOR.MINOR.PATCH`; while in `0.x` anything may change). Installers are built by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)), each OS on its own machine:
+
+| OS | Files |
+|---|---|
+| macOS | `.dmg` (Apple Silicon and Intel), plus `.zip` for future auto-updates |
+| Linux | `.AppImage` and `.deb` (x64) |
+| Windows | ready to enable (`win:` in `electron-builder.yml` and the workflow matrix) |
+
+To publish a version:
+
+```bash
+npm version minor   # or patch / major: updates package.json, commits and tags (v0.2.0)
+```
+
+```bash
+git push --follow-tags
+```
+
+GitHub builds everything and creates a **draft** release with the installers. Review it on the repository's *Releases* page and publish it.
+
+To try a build without releasing: *Actions → Release → Run workflow*; the installers appear as downloadable artifacts of that run (kept 7 days).
+
+Which server the released app talks to is set at build time from repository variables (*Settings → Secrets and variables → Actions → Variables*): `XMPP_DOMAIN` (e.g. `palique.es`) and `ACCOUNTS_URL` (e.g. `https://cuentas.palique.es`). Unset, the app uses `localhost` like in development.
+
+Not yet signed: macOS shows an "unidentified developer" warning (open it with right click → Open) until there's an Apple Developer account (signing and notarization also enable auto-updates on macOS). Linux needs no signing.
+
 ## Platforms
 
 - Linux and macOS
