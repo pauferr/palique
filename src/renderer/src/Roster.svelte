@@ -300,6 +300,7 @@
     overflow-y: auto;
     border: solid var(--panel-border-width);
     border-color: var(--panel-border-color);
+    border-radius: var(--panel-radius);
     box-shadow: var(--panel-shadow);
     background: var(--list-bg);
   }

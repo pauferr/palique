@@ -287,6 +287,7 @@
     margin: var(--panel-margin);
     border: solid var(--panel-border-width);
     border-color: var(--panel-border-color);
+    border-radius: var(--panel-radius);
     box-shadow: var(--panel-shadow);
     padding: 8px 12px;
     overflow-y: auto;
@@ -334,7 +335,6 @@
     color: var(--text-muted);
     font-size: 12px;
     font-style: italic;
-    background: var(--list-bg);
   }
 
   .compose {

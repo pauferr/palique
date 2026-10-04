@@ -15,6 +15,7 @@
 
   --window-bg: #f3f6fc;
   --list-bg: #ffffff;
+  --field-bg: #ffffff;
   --header-bg: linear-gradient(#e3edfd, #c3d7f7);
   --bar-bg: #eaf0fb;
   --line: #c6d5ee;
@@ -25,6 +26,7 @@
   --radius: 2px;
   --radius-large: 12px;
   --avatar-radius: 8px;
+  --avatar-face-radius: 4px;
 
   --button-bg: linear-gradient(#ffffff, #c4dbf8);
   --button-bg-hover: linear-gradient(#ffffff, #a9cbf7);
@@ -44,6 +46,7 @@
   --panel-border-color: transparent;
   --panel-shadow: none;
   --panel-margin: 0;
+  --panel-radius: 0;
 
   --group-border: 1px solid #c6d5ee;
   --group-radius: 4px;

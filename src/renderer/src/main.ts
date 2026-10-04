@@ -2,6 +2,7 @@ import { mount } from 'svelte'
 
 import './themes/xp.css'
 import './themes/win98.css'
+import './themes/aero.css'
 import './themes/base.css'
 
 import App from './App.svelte'

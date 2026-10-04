@@ -1,4 +1,9 @@
-/* Shared look built only from theme variables (see xp.css, win98.css). */
+/* Shared look built only from theme variables (see xp.css, win98.css, aero.css). */
+html {
+  /* So gradient window backgrounds cover short pages without repeating. */
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--window-bg);
@@ -49,6 +54,6 @@ textarea {
   border-width: var(--field-border-width);
   border-color: var(--field-border-color);
   border-radius: var(--radius);
-  background: var(--list-bg);
+  background: var(--field-bg);
   box-shadow: var(--field-shadow);
 }

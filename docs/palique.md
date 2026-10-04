@@ -231,16 +231,16 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - **Temas seleccionables por el usuario ("sabores"):**
   - **XP / MSN 7, "Caramelo" (tema por defecto):** glossy, azules intensos, botones tipo caramelo. Tipografía Noto Sans. `src/renderer/src/themes/xp.css`.
   - **Win98 / AIM, "Clásico":** gris #c0c0c0, azul marino, biseles 3D (botones en relieve, campos y paneles hundidos, cuadros de grupo tallados), esquinas rectas. Tipografía IBM Plex Sans (se descartaron las pixeladas por legibilidad). `src/renderer/src/themes/win98.css`.
-  - Frutiger Aero: translúcido, verdes agua, burbujas, cielos. Hoja de ruta.
+  - **Frutiger Aero, "Cristal":** fondo degradado de cielo a hierba, paneles de cristal translúcido redondeados, botones aguamarina brillantes y avatares circulares. Tipografía Hind (sin cursiva propia: se inclina de forma sintética). `src/renderer/src/themes/aero.css`.
   - Descartado: moderno limpio con guiños retro.
-- Tipografías libres (OFL) incluidas en la app (alfabeto latino; normal, cursiva y negrita): Noto Sans (Caramelo) e IBM Plex Sans (Clásico). Las fuentes de Windows (Tahoma, Segoe UI, MS Sans Serif) son de Microsoft y no se pueden distribuir.
+- Tipografías libres (OFL) incluidas en la app (alfabeto latino): Noto Sans (Caramelo), IBM Plex Sans (Clásico) y Hind (Cristal). Las fuentes de Windows (Tahoma, Segoe UI, MS Sans Serif) son de Microsoft y no se pueden distribuir.
 - Estructura: `themes/base.css` define el aspecto común solo con variables; cada tema da valores a esas variables (`:root[data-theme="…"]`). El tema se elige en Opciones, se guarda en las preferencias y se aplica al momento en todas las ventanas.
-- En la interfaz los temas tienen nombres propios ("Caramelo", "Clásico"), sin marcas reales.
+- En la interfaz los temas tienen nombres propios ("Caramelo", "Clásico", "Cristal"), sin marcas reales.
 - Avatares por defecto: inicial sobre una paleta fija de 8 colores vivos definida por el tema; cada usuario siempre tiene el mismo color. Un borde blanco separa la imagen del marco de estado.
 - Las ventanas usan el marco del sistema operativo; imitar la barra de título de XP queda descartado por ahora (coste alto y distinto por sistema).
 - Arquitectura de temas desde el MVP: variables CSS (design tokens) + hoja de estilos por tema. Los temas pueden cambiar también forma (biseles, radios, sombras), no solo colores.
 - Idea: cada tema con su propio pack de sonidos.
-- Alcance: Caramelo y Clásico hechos; Aero en curso.
+- Alcance: los tres temas (Caramelo, Clásico y Cristal) están hechos y se eligen en Opciones.
 - Limitación técnica: el desenfoque real de lo que hay detrás de la ventana (Frutiger Aero) no está disponible de forma general en Linux; se simula con translucidez sobre fondo propio.
 - **Personajes: elenco de varios personajes propios, sin mascota única.**
   - Estilo de referencia: caricatura de finales de los 90 (línea gruesa y temblorosa, bocas enormes, proporciones exageradas, colores planos).

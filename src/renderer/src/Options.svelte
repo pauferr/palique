@@ -60,6 +60,14 @@
           onchange={() => window.api.setSettings({ theme })}
         /> Clásico (gris y biselado)
       </label>
+      <label>
+        <input
+          type="radio"
+          bind:group={theme}
+          value="aero"
+          onchange={() => window.api.setSettings({ theme })}
+        /> Cristal (verde agua y translúcido)
+      </label>
     </div>
   </fieldset>
 

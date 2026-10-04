@@ -14,6 +14,7 @@
 
   --window-bg: #c0c0c0;
   --list-bg: #ffffff;
+  --field-bg: #ffffff;
   --header-bg: #c0c0c0;
   --bar-bg: #c0c0c0;
   --line: #808080;
@@ -24,6 +25,7 @@
   --radius: 0;
   --radius-large: 0;
   --avatar-radius: 0;
+  --avatar-face-radius: 0;
 
   /* Raised bevel: light top-left, dark bottom-right; pressed swaps them. */
   --button-bg: #c0c0c0;
@@ -44,6 +46,7 @@
   --panel-border-color: #808080 #ffffff #ffffff #808080;
   --panel-shadow: inset 1px 1px #404040;
   --panel-margin: 0 6px;
+  --panel-radius: 0;
 
   --group-border: 2px groove #ffffff;
   --group-radius: 0;

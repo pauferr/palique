@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
 
-export const THEMES = ['xp', 'win98'] as const
+export const THEMES = ['xp', 'win98', 'aero'] as const
 export type Theme = (typeof THEMES)[number]
 
 export type Settings = {
