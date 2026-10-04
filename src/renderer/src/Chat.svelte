@@ -155,6 +155,19 @@
     onInput()
   }
 
+  // Wink thumbnails: frozen on a telling frame, playing while hovered or focused.
+  const STILL_AT = 1
+  function preview(event: Event): void {
+    const video = (event.currentTarget as HTMLElement).querySelector('video')!
+    video.currentTime = 0
+    video.play().catch(() => {})
+  }
+  function still(event: Event): void {
+    const video = (event.currentTarget as HTMLElement).querySelector('video')!
+    video.pause()
+    video.currentTime = STILL_AT
+  }
+
   async function wink(id: string): Promise<void> {
     pickerOpen = false
     canWink = false
@@ -230,11 +243,36 @@
           title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
           >😉 Guiño</summary
         >
-        <ul>
-          {#each Object.keys(winks) as id (id)}
-            <li><button onclick={() => wink(id)} disabled={!canWink}>{winkLabel(id)}</button></li>
-          {/each}
-        </ul>
+        <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
+        <div class="popup">
+          <ul class="winks">
+            {#each Object.entries(winks) as [id, src] (id)}
+              <li>
+                <button
+                  class="wink"
+                  onclick={() => wink(id)}
+                  disabled={!canWink}
+                  aria-label="Enviar el guiño {winkLabel(id)}"
+                  onmouseenter={preview}
+                  onmouseleave={still}
+                  onfocus={preview}
+                  onblur={still}
+                >
+                  <video
+                    src="{src}#t={STILL_AT}"
+                    muted
+                    loop
+                    playsinline
+                    preload="auto"
+                    aria-hidden="true"
+                  ></video>
+                  <span>{winkLabel(id)}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+          {#if !canWink}<p class="wait">Espera un poco para enviar otro guiño.</p>{/if}
+        </div>
       </details>
       <button
         onclick={buzz}
@@ -390,7 +428,8 @@
     opacity: 0.5;
   }
 
-  .picker ul {
+  .picker > ul,
+  .popup {
     position: absolute;
     bottom: calc(100% + 4px);
     left: 0;
@@ -403,6 +442,53 @@
     background: var(--list-bg);
     border: 1px solid var(--line);
     box-shadow: var(--popup-shadow);
+  }
+
+  .winks {
+    display: grid;
+    grid-template-columns: repeat(3, 96px);
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Just the thumbnail and its name: no button chrome, a soft highlight on hover/focus. */
+  .wink {
+    display: grid;
+    gap: 2px;
+    justify-items: center;
+    width: 100%;
+    padding: 4px;
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: none;
+    color: var(--text);
+    font-size: 11px;
+  }
+
+  .wink:hover:not(:disabled),
+  .wink:focus-visible {
+    background: var(--row-hover-bg);
+    outline: none;
+  }
+
+  .wink video {
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    pointer-events: none;
+    background: var(--field-bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .wait {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
   }
 
   .picker li {
