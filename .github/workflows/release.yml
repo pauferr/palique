@@ -1,6 +1,7 @@
-# Builds the installers on GitHub's machines (each OS builds its own).
-#  - Pushing a tag like v0.2.0: builds and attaches them to a draft GitHub Release.
+# Builds the installers on GitHub's machines (each OS builds its own), then:
+#  - Pushing a tag like v0.2.0: one draft GitHub Release with every file (release job).
 #  - "Run workflow" by hand (Actions tab): test build, installers downloadable as artifacts.
+# Builds don't publish themselves: in parallel they raced and made one draft each.
 # See README, "Releases".
 name: Release
 
@@ -55,20 +56,36 @@ jobs:
           MAIN_VITE_ACCOUNTS_URL: ${{ vars.ACCOUNTS_URL }}
 
       - name: Package
-        run: npx electron-builder --${{ matrix.platform }} --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+        run: npx electron-builder --${{ matrix.platform }} --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Unsigned for now (no Apple Developer account yet).
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Keep test builds as downloadable artifacts
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v7
+      # Installers plus the files future auto-updates read (latest*.yml, blockmaps).
+      - uses: actions/upload-artifact@v7
         with:
           name: palique-${{ matrix.platform }}
           path: |
             dist/*.dmg
+            dist/*.zip
             dist/*.AppImage
             dist/*.deb
             dist/*.exe
+            dist/*.blockmap
+            dist/latest*.yml
           retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Draft release with every platform's files
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --generate-notes --title "Palique ${GITHUB_REF_NAME#v}" --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
