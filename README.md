@@ -101,7 +101,7 @@ Versions follow [Semantic Versioning](https://semver.org) (`MAJOR.MINOR.PATCH`; 
 
 | OS | Files |
 |---|---|
-| macOS | `.dmg` (Apple Silicon and Intel), plus `.zip` for future auto-updates |
+| macOS | `.dmg` (Apple Silicon and Intel) |
 | Linux | `.AppImage` and `.deb` (x64) |
 | Windows | ready to enable (`win:` in `electron-builder.yml` and the workflow matrix) |
 

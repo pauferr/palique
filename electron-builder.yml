@@ -27,10 +27,8 @@ mac:
   # Unsigned until there's an Apple Developer account (see README, "Releases").
   notarize: false
   target:
+    # Only .dmg for now. Auto-updates on macOS will need a zip target too (electron-updater).
     - target: dmg
-      arch: [arm64, x64]
-    # Not downloaded by users: the format future auto-updates use.
-    - target: zip
       arch: [arm64, x64]
   artifactName: ${name}-${version}-mac-${arch}.${ext}
 
