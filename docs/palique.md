@@ -151,18 +151,37 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 
 ### Registro y autenticación
 
-**Decidido: registro desde la propia app con usuario y contraseña.**
+**Decidido: registro desde la app solo por invitación, con usuario, contraseña y correo verificado.**
 
-- Registro desde el cliente mediante XEP-0077 (*In-Band Registration*), soportado por Prosody sin desarrollo propio.
-- El nombre de usuario es el identificador que los contactos usan para añadirse.
+- Registro desde el cliente mediante XEP-0077 (*In-Band Registration*). El nombre de usuario es el identificador que los contactos usan para añadirse.
 - Requisito de diseño: encapsular la autenticación en el cliente para poder añadir otros métodos sin rehacer el flujo.
-- Pendiente de configurar en producción: medidas antiregistro masivo (límite de registros por IP, captcha o similar).
+
+**Invitaciones** (también es la principal medida contra el registro masivo):
+- Sin código de invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401). El cliente envía el código antes de registrarse (`<preauth xmlns="urn:xmpp:pars:0">`).
+- Cualquier usuario puede invitar desde la app ("Invitar a un amigo"), con límite: 5 invitaciones activas por usuario, que caducan a la semana. El límite lo aplica el servidor con un módulo propio (`server/modules/`), no la app.
+- Quien entra con una invitación queda añadido automáticamente como contacto de quien le invitó, en los dos sentidos.
+
+**Correo electrónico:**
+- Obligatorio al registrarse y verificado con un enlace. Mientras no esté verificado, la app funciona con un aviso fijo ("Verifica tu correo", con opción de reenviar) y no se puede recuperar la contraseña.
+- Usos: recuperar la contraseña y, si el usuario lo acepta, recibir el boletín de novedades.
+- Lo gestiona un servicio propio, el **servicio de cuentas** (`server/cuentas/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
+  - Se conecta a Prosody como componente XMPP (XEP-0114). La app le envía el correo a través de la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría asociar su correo a una cuenta ajena y robarla con la recuperación).
+  - Envía los correos de verificación y de recuperación.
+  - Recuperación de contraseña: desde la pantalla de inicio de sesión se pide un enlace; el correo abre una página web del servicio (con la estética de Palique) para escribir la nueva contraseña, que se cambia en Prosody con los comandos de administración estándar (XEP-0133).
+- Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
+
+**Boletín de novedades:**
+- Consentimiento explícito y separado al registrarse (casilla sin marcar por defecto), modificable en Opciones. Cada envío lleva enlace de baja.
+- Plataforma: **Brevo** (empresa europea, pensada para el RGPD). El servicio de cuentas sincroniza con Brevo a quienes aceptan el boletín (y tienen el correo verificado). Brevo envía también los correos de verificación y recuperación en producción.
+
+### Almacenamiento de datos
 
 ### Almacenamiento de datos
 
 **Decidido: historial de chat solo en local.**
 
 - En el servidor (lo que XMPP ya guarda por defecto): cuenta, lista de contactos, perfil (avatar, nombre, mensaje personal) y mensajes offline hasta que se entregan.
+- En el servicio de cuentas: correo, si está verificado y si acepta el boletín.
 - En el servidor NO se archivan conversaciones: `mod_mam` desactivado en Prosody. Argumento de privacidad comunicable al usuario.
 - En local: historial de chats (SQLite con el módulo `node:sqlite` que trae Electron, sin módulos nativos que recompilar; archivo `history.sqlite` en la carpeta de datos de la app) y preferencias de la app (sonidos, tema, opciones de guiños).
 - Cada conversación carga sus últimos 200 mensajes. Si varias personas usan Palique en el mismo equipo, cada cuenta tiene su propio historial.
