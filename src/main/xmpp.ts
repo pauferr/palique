@@ -9,6 +9,11 @@ const ROSTER = 'jabber:iq:roster'
 const ATTENTION = 'urn:xmpp:attention:0' // buzz (XEP-0224)
 const CARBONS = 'urn:xmpp:carbons:2' // copies from our other devices (XEP-0280)
 const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0085)
+const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
+
+// Wink ids come from the network and end up in a URL: keep them boring.
+export const isWinkId = (id: unknown): id is string =>
+  typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)
 
 export type AuthError =
   | 'conflict' // username taken
@@ -41,6 +46,7 @@ export type ChatMessage = {
   mine: boolean
   body: string
   buzz: boolean
+  wink: string // catalog id, '' when not a wink
   at: number // ms timestamp
 }
 
@@ -169,13 +175,16 @@ function handleMessage(stanza: Element): void {
   if (!roster.has(bare)) return
 
   const buzz = Boolean(message.getChild('attention', ATTENTION))
-  const body = message.getChildText('body') ?? ''
+  const winkId = message.getChild('wink', WINK)?.attrs.id
+  const wink = isWinkId(winkId) ? winkId : ''
+  // A wink's body is only the fallback text for other XMPP clients.
+  const body = wink ? '' : (message.getChildText('body') ?? '')
   // Our own typing on other devices doesn't matter. Any other chat state, or the
   // message itself, means they stopped typing.
   const state = message.getChildElements().find((el) => el.attrs.xmlns === CHATSTATES)?.name
-  if (!mine && (state || body || buzz))
-    typingListener(bare, state === 'composing' && !body && !buzz)
-  if (!buzz && !body) return
+  const content = Boolean(body || buzz || wink)
+  if (!mine && (state || content)) typingListener(bare, state === 'composing' && !content)
+  if (!content) return
   // Offline messages carry the time they were sent.
   const stamp = message.getChild('delay', 'urn:xmpp:delay')?.attrs.stamp
   messageListener({
@@ -184,6 +193,7 @@ function handleMessage(stanza: Element): void {
     mine,
     body,
     buzz,
+    wink,
     at: stamp ? Date.parse(stamp) : Date.now()
   })
 }
@@ -369,26 +379,42 @@ export async function setPresence(show: Show, status: string): Promise<void> {
   await send(presenceStanza())
 }
 
-async function sendStanza(to: string, buzz: boolean, body: string): Promise<ChatMessage> {
+async function sendStanza(
+  to: string,
+  stanza: Element,
+  content: Pick<ChatMessage, 'body' | 'buzz' | 'wink'>
+): Promise<ChatMessage> {
   const id = randomUUID()
-  const stanza = buzz
-    ? xml('message', { to, id, type: 'headline' }, xml('attention', { xmlns: ATTENTION }))
-    : xml(
-        'message',
-        { to, id, type: 'chat' },
-        xml('body', {}, body),
-        xml('active', { xmlns: CHATSTATES })
-      )
+  stanza.attrs.to = to
+  stanza.attrs.id = id
   await send(stanza)
-  return { id, with: to, mine: true, body, buzz, at: Date.now() }
+  return { id, with: to, mine: true, ...content, at: Date.now() }
 }
 
 export function sendMessage(to: string, body: string): Promise<ChatMessage> {
-  return sendStanza(to, false, body)
+  const stanza = xml(
+    'message',
+    { type: 'chat' },
+    xml('body', {}, body),
+    xml('active', { xmlns: CHATSTATES })
+  )
+  return sendStanza(to, stanza, { body, buzz: false, wink: '' })
 }
 
 export function sendBuzz(to: string): Promise<ChatMessage> {
-  return sendStanza(to, true, '')
+  const stanza = xml('message', { type: 'headline' }, xml('attention', { xmlns: ATTENTION }))
+  return sendStanza(to, stanza, { body: '', buzz: true, wink: '' })
+}
+
+export function sendWink(to: string, wink: string): Promise<ChatMessage> {
+  const stanza = xml(
+    'message',
+    { type: 'chat' },
+    xml('body', {}, `😉 Te he enviado un guiño (${wink}). Para verlo, usa Palique.`),
+    xml('wink', { xmlns: WINK, id: wink }),
+    xml('active', { xmlns: CHATSTATES })
+  )
+  return sendStanza(to, stanza, { body: '', buzz: false, wink })
 }
 
 export function sendTyping(to: string, typing: boolean): Promise<void> {

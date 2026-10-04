@@ -11,7 +11,15 @@ export type History = {
   all(account: string): ChatMessage[] // every conversation, by contact then time
 }
 
-type Row = { id: string; contact: string; mine: number; body: string; buzz: number; at: number }
+type Row = {
+  id: string
+  contact: string
+  mine: number
+  body: string
+  buzz: number
+  wink: string
+  at: number
+}
 
 export function openHistory(file: string): History {
   const db = new DatabaseSync(file)
@@ -29,18 +37,25 @@ export function openHistory(file: string): History {
     );
     CREATE INDEX IF NOT EXISTS messages_by_time ON messages (account, contact, at);
   `)
+  // Columns added after the first release.
+  const columns = (db.prepare('PRAGMA table_info(messages)').all() as { name: string }[]).map(
+    (c) => c.name
+  )
+  if (!columns.includes('wink')) {
+    db.exec("ALTER TABLE messages ADD COLUMN wink TEXT NOT NULL DEFAULT ''")
+  }
   const insert = db.prepare(
-    'INSERT OR IGNORE INTO messages (account, contact, id, mine, body, buzz, at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO messages (account, contact, id, mine, body, buzz, wink, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   )
   const latest = db.prepare(
     `SELECT * FROM (
-       SELECT rowid AS seq, id, contact, mine, body, buzz, at FROM messages
+       SELECT rowid AS seq, id, contact, mine, body, buzz, wink, at FROM messages
        WHERE account = ? AND contact = ? ORDER BY at DESC, seq DESC LIMIT ?
      ) ORDER BY at, seq`
   )
 
   const everything = db.prepare(
-    'SELECT id, contact, mine, body, buzz, at FROM messages WHERE account = ? ORDER BY contact, at, rowid'
+    'SELECT id, contact, mine, body, buzz, wink, at FROM messages WHERE account = ? ORDER BY contact, at, rowid'
   )
   const toMessage = (row: Row): ChatMessage => ({
     id: row.id,
@@ -48,12 +63,13 @@ export function openHistory(file: string): History {
     mine: row.mine === 1,
     body: row.body,
     buzz: row.buzz === 1,
+    wink: row.wink,
     at: row.at
   })
 
   return {
     save(account, m) {
-      insert.run(account, m.with, m.id, Number(m.mine), m.body, Number(m.buzz), m.at)
+      insert.run(account, m.with, m.id, Number(m.mine), m.body, Number(m.buzz), m.wink, m.at)
     },
     load(account, contact) {
       return (latest.all(account, contact, LIMIT) as Row[]).map(toMessage)

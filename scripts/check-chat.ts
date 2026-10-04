@@ -112,7 +112,7 @@ await B.xmpp.send(
 const text = await until(() => received.find((m) => m.id === 'm1'), 'A gets text')
 assert.deepEqual(
   { ...text, at: 0 },
-  { id: 'm1', with: at(b), mine: false, body: '¿qué pasa?', buzz: false, at: 0 }
+  { id: 'm1', with: at(b), mine: false, body: '¿qué pasa?', buzz: false, wink: '', at: 0 }
 )
 await B.xmpp.send(
   xml(
@@ -129,6 +129,28 @@ await until(
   () => B.inbox.find((m) => m.getChild('attention', 'urn:xmpp:attention:0')),
   'B gets buzz'
 )
+
+// Winks: A → B carries a fallback body for other clients; B → A is parsed, bad ids dropped.
+await A.sendWink(at(b), 'burbuja')
+const winkToB = await until(
+  () => B.inbox.find((m) => m.getChild('wink', 'urn:palique:wink:0')),
+  'B gets wink'
+)
+assert.equal(winkToB.getChild('wink', 'urn:palique:wink:0')?.attrs.id, 'burbuja')
+assert.match(winkToB.getChildText('body') ?? '', /guiño/)
+const wink = (msgId: string, winkId: string): Element =>
+  xml(
+    'message',
+    { to: at(a), type: 'chat', id: msgId },
+    xml('body', {}, 'fallback'),
+    xml('wink', { xmlns: 'urn:palique:wink:0', id: winkId })
+  )
+await B.xmpp.send(wink('w1', 'ola'))
+const winkToA = await until(() => received.find((m) => m.id === 'w1'), 'A gets wink')
+assert.deepEqual([winkToA.wink, winkToA.body], ['ola', ''])
+await B.xmpp.send(wink('w2', '../../etc/passwd'))
+const bad = await until(() => received.find((m) => m.id === 'w2'), 'bad wink id')
+assert.deepEqual([bad.wink, bad.body], ['', 'fallback'], 'invalid id: shown as plain text')
 
 // A writes from another device: the app sees a copy as its own message.
 const phone = await start(a)

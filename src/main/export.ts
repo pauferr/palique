@@ -22,7 +22,11 @@ function toText(account: string, messages: ChatMessage[]): string {
   const sections = [...byContact(messages)].map(([contact, list]) => {
     const lines = list.map((m) => {
       const who = m.mine ? name(account) : name(contact)
-      const what = m.buzz ? '*zumbido*' : m.body.replaceAll('\n', '\n    ')
+      const what = m.buzz
+        ? '*zumbido*'
+        : m.wink
+          ? `*guiño: ${m.wink}*`
+          : m.body.replaceAll('\n', '\n    ')
       return `[${stamp(m.at)}] ${who}: ${what}`
     })
     return `=== Conversación con ${contact} ===\n${lines.join('\n')}`
@@ -41,6 +45,9 @@ function toHtml(account: string, messages: ChatMessage[]): string {
     const items = list.map((m) => {
       const who = escape(m.mine ? name(account) : name(contact))
       const time = `<time>${escape(stamp(m.at))}</time>`
+      if (m.wink) {
+        return `<li class="buzz">${time} ¡${who} ha enviado un guiño: ${escape(m.wink)}!</li>`
+      }
       return m.buzz
         ? `<li class="buzz">${time} ¡${who} ha enviado un zumbido!</li>`
         : `<li${m.mine ? ' class="mine"' : ''}>${time} <b>${who} dice:</b><p>${escape(m.body)}</p></li>`
