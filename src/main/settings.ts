@@ -1,11 +1,13 @@
 // App preferences for this computer, as a small JSON file.
 import { readFileSync, writeFileSync } from 'node:fs'
+import type { OwnShow } from './xmpp'
 
 export type Settings = {
   winks: boolean // play winks full screen
+  show: OwnShow // last status, used at the next sign-in (like MSN)
 }
 
-const DEFAULTS: Settings = { winks: true }
+const DEFAULTS: Settings = { winks: true, show: 'online' }
 
 export type SettingsStore = {
   get(): Settings

@@ -15,7 +15,8 @@ const snap = (...contacts: Contact[]): Snapshot => ({
   connected: true,
   contacts,
   requests: [],
-  avatar: ''
+  avatar: '',
+  show: 'online'
 })
 
 const before = snap(

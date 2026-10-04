@@ -42,7 +42,7 @@ import {
   setPresence,
   snapshot,
   type ChatMessage,
-  type Show,
+  type OwnShow,
   type Snapshot
 } from './xmpp'
 
@@ -152,7 +152,13 @@ function notifyMessage(message: ChatMessage): void {
 }
 
 // "lolo se ha conectado", except for the burst of presences right after we sign in.
-let previous: Snapshot = { connected: false, contacts: [], requests: [], avatar: '' }
+let previous: Snapshot = {
+  connected: false,
+  contacts: [],
+  requests: [],
+  avatar: '',
+  show: 'online'
+}
 let connectedAt = 0
 
 function announceArrivals(state: Snapshot): void {
@@ -296,8 +302,12 @@ app.whenReady().then(() => {
   history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
 
+  const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
   ipcMain.handle('auth:login', async (_, username: string, password: string, register: boolean) => {
-    const result = await login(String(username), String(password), Boolean(register))
+    // Sign in with the last status, so an invisible user is never briefly visible.
+    const last = settings.get().show
+    const show = shows.includes(last) ? last : 'online'
+    const result = await login(String(username), String(password), Boolean(register), show)
     if (result.ok) account = result.jid
     return result
   })
@@ -313,15 +323,16 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
     announceArrivals(state)
   })
-  const shows: Show[] = ['online', 'away', 'dnd']
   ipcMain.handle('roster:snapshot', () => snapshot())
   ipcMain.handle('roster:add', (_, address: string) => addContact(String(address)))
   ipcMain.handle('roster:accept', (_, jid: string) => acceptRequest(String(jid)))
   ipcMain.handle('roster:reject', (_, jid: string) => rejectRequest(String(jid)))
   ipcMain.handle('roster:remove', (_, jid: string) => removeContact(String(jid)))
-  ipcMain.handle('presence:set', (_, show: Show, status: string) =>
-    setPresence(shows.includes(show) ? show : 'online', String(status))
-  )
+  ipcMain.handle('presence:set', async (_, show: OwnShow, status: string) => {
+    const valid = shows.includes(show) ? show : 'online'
+    await setPresence(valid, String(status))
+    settings.set({ show: valid })
+  })
   onMessage((message) => {
     deliver(message)
     // Our own winks sent from another device aren't replayed here.

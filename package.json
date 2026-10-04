@@ -26,7 +26,8 @@
     "check:settings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-settings.ts",
     "check:presence": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-presence.ts",
     "check:avatar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-avatar.ts",
-    "check:emoticons": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-emoticons.ts"
+    "check:emoticons": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-emoticons.ts",
+    "check:invisible": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invisible.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

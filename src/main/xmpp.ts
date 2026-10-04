@@ -11,6 +11,7 @@ const CARBONS = 'urn:xmpp:carbons:2' // copies from our other devices (XEP-0280)
 const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0085)
 const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
 
+const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
@@ -31,6 +32,7 @@ export type AuthError =
 export type AuthResult = { ok: true; jid: string } | { ok: false; error: AuthError }
 
 export type Show = 'online' | 'away' | 'dnd'
+export type OwnShow = Show | 'invisible' // contacts never look invisible: they look offline
 
 export type Contact = {
   jid: string
@@ -46,6 +48,7 @@ export type Snapshot = {
   contacts: Contact[]
   requests: string[] // people asking to add us
   avatar: string // our own avatar, data: URL or ''
+  show: OwnShow // our own status
 }
 
 export type ChatMessage = {
@@ -68,7 +71,7 @@ let xmpp: Client | null = null
 let me = ''
 let roster = new Map<string, RosterEntry>()
 let requests = new Set<string>()
-let own: Presence = { show: 'online', status: '' }
+let own: { show: OwnShow; status: string } = { show: 'online', status: '' }
 let avatars = new Map<string, Avatar>() // by bare JID, ours included
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
@@ -91,7 +94,8 @@ export function snapshot(): Snapshot {
     connected: xmpp?.status === 'online',
     contacts,
     requests: [...requests],
-    avatar: avatars.get(me)?.url ?? ''
+    avatar: avatars.get(me)?.url ?? '',
+    show: own.show
   }
 }
 
@@ -115,7 +119,7 @@ function send(stanza: Element): Promise<void> {
 
 function presenceStanza(): Element {
   const presence = xml('presence')
-  if (own.show !== 'online') presence.c('show').t(own.show)
+  if (own.show === 'away' || own.show === 'dnd') presence.c('show').t(own.show)
   if (own.status) presence.c('status').t(own.status)
   return presence
 }
@@ -310,12 +314,15 @@ function toAuthError(e: unknown): AuthError {
   return 'unknown'
 }
 
+// `show`: status to sign in with, so an invisible user is never briefly visible.
 export async function login(
   username: string,
   password: string,
-  register = false
+  register = false,
+  show: OwnShow = 'online'
 ): Promise<AuthResult> {
   await logout()
+  own = { show, status: '' }
   const entity = client({
     service: SERVICE,
     domain: DOMAIN,
@@ -353,7 +360,17 @@ export async function login(
       .then(() =>
         xmpp?.iqCaller.request(xml('iq', { type: 'set' }, xml('enable', { xmlns: CARBONS })))
       )
+      // Invisible must be set before presence goes out. If the server refuses, say so
+      // (we'd be visible) rather than pretend.
+      .then(() =>
+        own.show === 'invisible'
+          ? setInvisible(true).catch(() => {
+              own = { ...own, show: 'online' }
+            })
+          : undefined
+      )
       .then(() => send(presenceStanza()))
+      .then(emit)
       .catch(() => {})
     loadAvatar(me).then(emit, () => {})
   })
@@ -436,9 +453,21 @@ export async function removeContact(bare: string): Promise<void> {
   await rosterSet({ jid: bare, subscription: 'remove' })
 }
 
-export async function setPresence(show: Show, status: string): Promise<void> {
+function setInvisible(on: boolean): Promise<Element> {
+  return xmpp!.iqCaller.request(
+    xml('iq', { type: 'set' }, xml(on ? 'invisible' : 'visible', { xmlns: INVISIBLE }))
+  )
+}
+
+// Rejects (status unchanged) if the server doesn't support being invisible.
+export async function setPresence(show: OwnShow, status: string): Promise<void> {
+  if (!xmpp) return
+  const wasInvisible = own.show === 'invisible'
+  if (show === 'invisible' && !wasInvisible) await setInvisible(true)
+  if (show !== 'invisible' && wasInvisible) await setInvisible(false)
   own = { show, status: status.trim().slice(0, 140) }
   await send(presenceStanza())
+  emit()
 }
 
 async function sendStanza(
@@ -485,7 +514,7 @@ export function sendTyping(to: string, typing: boolean): Promise<void> {
 }
 
 // Used to mute notifications while busy.
-export const ownShow = (): Show => own.show
+export const ownShow = (): OwnShow => own.show
 
 // Publish a PNG as our avatar, then re-send presence so the server tells our contacts
 // the new hash right away.
