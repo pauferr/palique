@@ -3,6 +3,8 @@
 
 admins = { }
 
+plugin_paths = { "/etc/prosody/palique-modules" }
+
 modules_enabled = {
 	-- Core
 	"roster";        -- contact list
@@ -21,6 +23,7 @@ modules_enabled = {
 	"vcard_legacy";
 	"offline";       -- store messages until delivered
 	"blocklist";
+	"palique_invisible"; -- our own: invisible status (server/modules)
 	-- No "smacks" (stream management): @xmpp/client 0.14 emits "online" before enabling it,
 	-- miscounts acks on stanzas sent meanwhile and Prosody drops the session.
 	-- Plain reconnects already reload roster + presence; revisit if the library fixes it.
