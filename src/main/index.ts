@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
+import { openSettings, type SettingsStore } from './settings'
 import {
   DOMAIN,
   acceptRequest,
@@ -16,11 +17,13 @@ import {
   onChange,
   onMessage,
   onTyping,
+  isWinkId,
   rejectRequest,
   removeContact,
   sendBuzz,
   sendMessage,
   sendTyping,
+  sendWink,
   setPresence,
   snapshot,
   type ChatMessage,
@@ -72,6 +75,7 @@ function createWindow(): void {
 // One window per conversation, like MSN.
 const chats = new Map<string, BrowserWindow>()
 let history: History
+let settings: SettingsStore
 let account = '' // bare JID of the signed-in user
 
 function openChat(contact: string, focus: boolean): BrowserWindow {
@@ -111,7 +115,7 @@ function openOptions(): void {
   }
   options = new BrowserWindow({
     width: 420,
-    height: 480,
+    height: 600,
     show: false,
     resizable: false,
     autoHideMenuBar: true,
@@ -146,6 +150,20 @@ function deliver(message: ChatMessage): void {
   if (!message.mine && !win.isFocused()) win.flashFrame(true)
 }
 
+// Protections: winks can be turned off, and each contact gets at most one
+// full-screen wink per interval. Old ones (offline delivery) only show as text.
+const WINK_INTERVAL = 20_000
+const lastWink = new Map<string, number>()
+
+function playWink(message: ChatMessage): void {
+  if (!settings.get().winks || Date.now() - message.at > 60_000) return
+  if (!message.mine) {
+    if (Date.now() - (lastWink.get(message.with) ?? 0) < WINK_INTERVAL) return
+    lastWink.set(message.with, Date.now())
+  }
+  showWink(message.wink)
+}
+
 // Transparent, click-through window over the whole primary display.
 function showWink(id: string): void {
   const win = new BrowserWindow({
@@ -178,8 +196,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.on('wink:play', (_, id: string) => showWink(id))
   history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
+  settings = openSettings(join(app.getPath('userData'), 'settings.json'))
 
   ipcMain.handle('auth:login', async (_, username: string, password: string, register: boolean) => {
     const result = await login(String(username), String(password), Boolean(register))
@@ -206,7 +224,21 @@ app.whenReady().then(() => {
   ipcMain.handle('presence:set', (_, show: Show, status: string) =>
     setPresence(shows.includes(show) ? show : 'online', String(status))
   )
-  onMessage(deliver)
+  onMessage((message) => {
+    deliver(message)
+    // Our own winks sent from another device aren't replayed here.
+    if (message.wink && !message.mine) playWink(message)
+  })
+  ipcMain.handle('chat:wink', async (_, contact: string, wink: string) => {
+    if (!isWinkId(wink)) return
+    const message = await sendWink(String(contact), wink)
+    deliver(message)
+    playWink(message)
+  })
+  ipcMain.handle('settings:get', () => settings.get())
+  ipcMain.handle('settings:set', (_, patch: { winks?: unknown }) =>
+    typeof patch?.winks === 'boolean' ? settings.set({ winks: patch.winks }) : settings.get()
+  )
   // Typing only matters if the conversation is open; it never opens a window.
   onTyping((contact, typing) =>
     chats.get(contact)?.webContents.send('chat:typing', contact, typing)

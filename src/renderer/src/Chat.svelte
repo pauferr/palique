@@ -3,10 +3,12 @@
   import type { ChatMessage, Contact } from '../../main/xmpp'
   import buzzSound from './assets/sounds/buzz.ogg'
   import messageSound from './assets/sounds/message.ogg'
+  import { winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
 
   const BUZZ_COOLDOWN = 5000
+  const WINK_COOLDOWN = 20000 // matches the receiver's per-contact limit
   const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
   const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
   const labels: Record<Contact['show'], string> = {
@@ -23,6 +25,8 @@
   let draft = $state('')
   let shaking = $state(false)
   let canBuzz = $state(true)
+  let canWink = $state(true)
+  let pickerOpen = $state(false)
   let theyType = $state(false)
   let list: HTMLElement
   let composing = false
@@ -43,10 +47,16 @@
     if (messages.some((m) => m.id === message.id)) return
     messages.push(message)
     if (!message.mine) theyType = false
-    if (alert) {
+    if (alert && !message.mine) {
       if (message.buzz) shake()
-      if (!message.mine) play(message.buzz ? buzzSound : messageSound)
+      if (message.wink) {
+        // The full-screen wink brings its own sound; with winks off, a plain chime.
+        window.api.getSettings().then((s) => s.winks || play(messageSound))
+      } else {
+        play(message.buzz ? buzzSound : messageSound)
+      }
     }
+    if (alert && message.mine && message.buzz) shake()
     await tick()
     list.scrollTop = list.scrollHeight
   }
@@ -118,6 +128,13 @@
     setTimeout(() => (canBuzz = true), BUZZ_COOLDOWN)
   }
 
+  function wink(id: string): void {
+    pickerOpen = false
+    window.api.sendWink(jid, id)
+    canWink = false
+    setTimeout(() => (canWink = true), WINK_COOLDOWN)
+  }
+
   // "13:32" today, "3 oct, 13:32" on other days.
   function time(at: number): string {
     const date = new Date(at)
@@ -143,6 +160,12 @@
         {#if message.buzz}
           <em>{message.mine ? '¡Has enviado un zumbido!' : `¡${name} te ha enviado un zumbido!`}</em
           >
+        {:else if message.wink}
+          <em
+            >{message.mine ? 'Has enviado el guiño' : `${name} te ha enviado el guiño`} «{winkLabel(
+              message.wink
+            )}»</em
+          >
         {:else}
           <span class="meta"
             >{message.mine ? 'Tú dices' : `${name} dice`} ({time(message.at)}):</span
@@ -156,13 +179,27 @@
   <p class="typing" aria-live="polite">{theyType ? `${name} está escribiendo…` : ''}</p>
 
   <div class="compose">
-    <button
-      class="buzz"
-      onclick={buzz}
-      disabled={!canBuzz}
-      title="Enviar un zumbido"
-      aria-label="Enviar un zumbido">📳</button
-    >
+    <div class="actions">
+      <button
+        class="buzz"
+        onclick={buzz}
+        disabled={!canBuzz}
+        title="Enviar un zumbido"
+        aria-label="Enviar un zumbido">📳</button
+      >
+      <details class="winks" bind:open={pickerOpen}>
+        <summary
+          class:disabled={!canWink}
+          title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
+          aria-label="Enviar un guiño">😉</summary
+        >
+        <ul>
+          {#each Object.keys(winks) as id (id)}
+            <li><button onclick={() => wink(id)} disabled={!canWink}>{winkLabel(id)}</button></li>
+          {/each}
+        </ul>
+      </details>
+    </div>
     <textarea
       bind:value={draft}
       onkeydown={onKeydown}
@@ -247,6 +284,47 @@
     color: #888;
     font-size: 0.85rem;
     font-style: italic;
+  }
+
+  .actions {
+    display: grid;
+    gap: 0.25rem;
+    align-content: start;
+  }
+
+  .winks {
+    position: relative;
+  }
+
+  summary {
+    padding: 0.1rem 0.3rem;
+    list-style: none;
+    cursor: pointer;
+    border: 1px solid #aaa;
+    border-radius: 3px;
+    text-align: center;
+  }
+
+  summary.disabled {
+    opacity: 0.4;
+  }
+
+  .winks ul {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    display: grid;
+    gap: 0.25rem;
+    margin: 0 0 0.25rem;
+    padding: 0.4rem;
+    list-style: none;
+    background: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  }
+
+  .winks li {
+    margin: 0;
   }
 
   .compose {

@@ -1,13 +1,9 @@
 <script lang="ts">
-  // The catalog is whatever ships in assets/winks: file name = wink id.
-  const catalog = import.meta.glob<string>('./assets/winks/*.webm', {
-    eager: true,
-    import: 'default'
-  })
+  import { winks } from './winks'
 
   let { id }: { id: string } = $props()
   // svelte-ignore state_referenced_locally
-  const src = catalog[`./assets/winks/${id}.webm`]
+  const src = Object.hasOwn(winks, id) ? winks[id] : undefined
   const done = (): void => window.api.winkDone()
 
   // Unknown id (e.g. a pack the user doesn't have): close without showing anything.

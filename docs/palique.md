@@ -101,9 +101,12 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - **Formato: vídeo WebM (VP9 con canal alfa) con el sonido incluido (Opus).** Chromium lo reproduce con `<video>` sin librerías, y cualquier animador lo exporta (After Effects, Blender). Admite cualquier estilo, incluido el trazo tembloroso. El nombre del archivo es el identificador del guiño (`assets/winks/<id>.webm`).
 - Diseño extensible: el formato del mensaje debe permitir añadir packs descargables en el futuro sin cambios.
 - Descartado (por ahora) contenido enviado por el usuario: riesgo de contenido desagradable o con destellos (epilepsia fotosensible), transferencia y validación de archivos, latencia.
+- Protocolo: elemento propio `<wink xmlns="urn:palique:wink:0" id="…"/>` dentro de un mensaje de chat, con un texto alternativo en `<body>` para quien use otro cliente XMPP. El identificador se valida (`[a-z0-9-]`, máximo 64 caracteres); si no es válido, el mensaje se muestra como texto. Un identificador desconocido (p. ej. de un pack que no tienes) solo aparece en la conversación.
+- Catálogo provisional del MVP: `burbuja`, `rebote` y `ola` (formas de colores generadas por síntesis, hasta tener los definitivos).
 - Protecciones obligatorias desde el MVP:
-  - Opción para desactivar los guiños a pantalla completa.
-  - Límite de frecuencia por contacto.
+  - Opción para desactivar los guiños a pantalla completa (Opciones → Guiños). Desactivados, solo aparecen como texto en la conversación.
+  - Límite de frecuencia por contacto: como mucho un guiño a pantalla completa cada 20 segundos; el emisor tiene la misma espera.
+  - Los guiños recibidos con retraso (mensajes offline) solo aparecen como texto.
 
 ### Registro y autenticación
 

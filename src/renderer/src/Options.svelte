@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import type { ExportFormat } from '../../main/export'
 
   const results = {
@@ -10,6 +11,11 @@
   let format: ExportFormat = $state('html')
   let busy = $state(false)
   let message = $state('')
+  let winks = $state(true)
+
+  onMount(() => {
+    window.api.getSettings().then((s) => (winks = s.winks))
+  })
 
   async function exportHistory(): Promise<void> {
     busy = true
@@ -27,6 +33,19 @@
 
 <main>
   <h1>Opciones</h1>
+
+  <section>
+    <h2>Guiños</h2>
+    <label>
+      <input
+        type="checkbox"
+        bind:checked={winks}
+        onchange={() => window.api.setSettings({ winks })}
+      />
+      Mostrar los guiños a pantalla completa
+    </label>
+    <p class="hint">Desactivados, los guiños solo aparecen como texto en la conversación.</p>
+  </section>
 
   <section>
     <h2>Historial</h2>
@@ -59,6 +78,12 @@
 
   p {
     color: #444;
+  }
+
+  .hint {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: #777;
   }
 
   fieldset {
