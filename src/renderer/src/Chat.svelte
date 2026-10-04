@@ -4,6 +4,8 @@
   import buzzSound from './assets/sounds/buzz.ogg'
   import messageSound from './assets/sounds/message.ogg'
   import Avatar from './Avatar.svelte'
+  import Emoticons from './Emoticons.svelte'
+  import { EMOTICONS } from './emoticons'
   import { winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
@@ -28,6 +30,8 @@
   let canBuzz = $state(true)
   let canWink = $state(true)
   let pickerOpen = $state(false)
+  let emoticonsOpen = $state(false)
+  let input: HTMLTextAreaElement
   let theyType = $state(false)
   let list: HTMLElement
   let composing = false
@@ -129,6 +133,17 @@
     setTimeout(() => (canBuzz = true), BUZZ_COOLDOWN)
   }
 
+  // Insert the shortcut where the cursor is, like typing it.
+  async function insertEmoticon(code: string): Promise<void> {
+    emoticonsOpen = false
+    const { selectionStart: start, selectionEnd: end } = input
+    draft = draft.slice(0, start) + code + draft.slice(end)
+    await tick()
+    input.focus()
+    input.setSelectionRange(start + code.length, start + code.length)
+    onInput()
+  }
+
   function wink(id: string): void {
     pickerOpen = false
     window.api.sendWink(jid, id)
@@ -150,7 +165,11 @@
     <Avatar {jid} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div>
       <strong>{name}</strong>
-      <small>{contact?.status || labels[contact?.show ?? 'offline']}</small>
+      <small
+        >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
+            contact?.show ?? 'offline'
+          ]}{/if}</small
+      >
     </div>
   </header>
 
@@ -171,7 +190,7 @@
           <span class="meta"
             >{message.mine ? 'Tú dices' : `${name} dice`} ({time(message.at)}):</span
           >
-          <p>{message.body}</p>
+          <p><Emoticons text={message.body} /></p>
         {/if}
       </li>
     {/each}
@@ -188,7 +207,21 @@
         title="Enviar un zumbido"
         aria-label="Enviar un zumbido">📳</button
       >
-      <details class="winks" bind:open={pickerOpen}>
+      <details class="picker" bind:open={emoticonsOpen}>
+        <summary title="Emoticonos" aria-label="Emoticonos">🙂</summary>
+        <ul class="emoticons">
+          {#each EMOTICONS as { codes, emoji, name } (codes[0])}
+            <li>
+              <button
+                onclick={() => insertEmoticon(codes[0])}
+                title="{name} {codes[0]}"
+                aria-label="{name} {codes[0]}">{emoji}</button
+              >
+            </li>
+          {/each}
+        </ul>
+      </details>
+      <details class="picker" bind:open={pickerOpen}>
         <summary
           class:disabled={!canWink}
           title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
@@ -202,6 +235,7 @@
       </details>
     </div>
     <textarea
+      bind:this={input}
       bind:value={draft}
       onkeydown={onKeydown}
       oninput={onInput}
@@ -293,7 +327,7 @@
     align-content: start;
   }
 
-  .winks {
+  .picker {
     position: relative;
   }
 
@@ -310,7 +344,7 @@
     opacity: 0.4;
   }
 
-  .winks ul {
+  .picker ul {
     position: absolute;
     bottom: 100%;
     left: 0;
@@ -324,8 +358,20 @@
     box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
   }
 
-  .winks li {
+  .picker li {
     margin: 0;
+  }
+
+  .picker .emoticons {
+    grid-template-columns: repeat(7, auto);
+  }
+
+  .emoticons button {
+    padding: 0.1rem 0.2rem;
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
   }
 
   .compose {

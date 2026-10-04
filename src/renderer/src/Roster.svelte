@@ -3,6 +3,7 @@
   import type { Contact, Show, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
+  import Emoticons from './Emoticons.svelte'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -142,7 +143,7 @@
           {#if contact.pending}
             <small>Esperando a que te acepte</small>
           {:else if contact.status}
-            <small>{contact.status}</small>
+            <small><Emoticons text={contact.status} /></small>
           {/if}
         </span>
         <button class="remove" onclick={() => remove(contact)} aria-label="Eliminar contacto">
