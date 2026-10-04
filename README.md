@@ -55,6 +55,7 @@ npm run check:chat      # messages, buzz, carbons and stranger filtering
 npm run check:avatar    # publish and fetch avatars
 npm run check:invites   # invite-only registration and per-user limit
 npm run check:email     # email verification through the account service and Mailpit
+npm run check:invite-email # invites by email (no leaks about registered addresses)
 npm run check:invisible # invisible status (needs the server module)
 npm run check:history   # local sqlite history (no server needed)
 npm run check:export    # history export formats and html escaping

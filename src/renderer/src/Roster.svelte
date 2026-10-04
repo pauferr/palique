@@ -162,6 +162,28 @@
     await loadInvites()
   }
 
+  let inviteEmail = $state('')
+  let inviteSent = $state('')
+
+  // The answer is the same whether or not the address already has an account.
+  async function emailInvite(event: SubmitEvent): Promise<void> {
+    event.preventDefault()
+    inviteError = ''
+    inviteSent = ''
+    try {
+      await window.api.inviteByEmail(inviteEmail.trim())
+      inviteSent = `Invitación enviada a ${inviteEmail.trim()}.`
+      inviteEmail = ''
+    } catch (e) {
+      inviteError = String(e).includes('limit')
+        ? `Ya tienes ${maxInvites} invitaciones sin usar. Espera a que se usen o caduquen.`
+        : String(e).includes('invalid')
+          ? 'Esa dirección no parece válida.'
+          : 'No se ha podido enviar la invitación.'
+    }
+    await loadInvites()
+  }
+
   async function copyInvite(): Promise<void> {
     await navigator.clipboard.writeText(newInvite)
     copied = true
@@ -319,7 +341,19 @@
         </div>
       {/if}
       {#if inviteError}<p class="error" role="alert">{inviteError}</p>{/if}
-      <button onclick={invite} disabled={invites.length >= maxInvites}>Crear invitación</button>
+      <button onclick={invite} disabled={invites.length >= maxInvites}>Crear código</button>
+      <form class="send" onsubmit={emailInvite}>
+        <input
+          type="email"
+          bind:value={inviteEmail}
+          required
+          maxlength="254"
+          placeholder="o envíala a su correo"
+          aria-label="Correo de la persona invitada"
+        />
+        <button type="submit" disabled={invites.length >= maxInvites}>Enviar</button>
+      </form>
+      {#if inviteSent}<p class="hint" role="status">{inviteSent}</p>{/if}
       <p class="hint">
         Invitaciones sin usar: {invites.length} de {maxInvites}{#if invites.length}{' '}· caducan el {invites
             .map((i) => until(i.expires))
@@ -554,6 +588,19 @@
 
   .invites > button {
     justify-self: start;
+  }
+
+  .send {
+    display: flex;
+    gap: 6px;
+    padding: 0;
+    background: none;
+    border: none;
+  }
+
+  .send input {
+    flex: 1;
+    min-width: 0;
   }
 
   .code {

@@ -23,6 +23,7 @@ const api = {
     return () => ipcRenderer.off('account:email', listener)
   },
   createInvite: (): Promise<Invite> => ipcRenderer.invoke('invites:create'),
+  inviteByEmail: (address: string): Promise<void> => ipcRenderer.invoke('invites:email', address),
   listInvites: (): Promise<{ invites: Invite[]; max: number }> =>
     ipcRenderer.invoke('invites:list'),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),

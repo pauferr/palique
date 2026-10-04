@@ -662,3 +662,20 @@ export async function resendVerification(): Promise<void> {
     throw new Error(condition === 'resource-constraint' ? 'wait' : 'unknown')
   }
 }
+
+// Emails an invite. Resolves the same way whether or not the address already has an
+// account (the service doesn't say, on purpose). Rejects with 'limit' or 'invalid'.
+export async function inviteByEmail(address: string): Promise<void> {
+  try {
+    await accountsIq('set', xml('invite-email', { xmlns: ACCOUNTS, address }))
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    throw new Error(
+      condition === 'resource-constraint'
+        ? 'limit'
+        : condition === 'bad-request'
+          ? 'invalid'
+          : 'unknown'
+    )
+  }
+}

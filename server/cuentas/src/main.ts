@@ -35,14 +35,20 @@ xmpp.on('error', (e) => console.error('xmpp', e.message))
 xmpp.on('online', (address) => console.log('online as', address.toString()))
 
 function stanzaError(condition: string, text?: string) {
-  const error = xml('error', { type: 'modify' }, xml(condition, { xmlns: 'urn:ietf:params:xml:ns:xmpp-stanzas' }))
+  const error = xml(
+    'error',
+    { type: 'modify' },
+    xml(condition, { xmlns: 'urn:ietf:params:xml:ns:xmpp-stanzas' })
+  )
   if (text) error.c('text', { xmlns: 'urn:ietf:params:xml:ns:xmpp-stanzas' }).t(text)
   return error
 }
 
 // Only local users, as bare JIDs. The server sets `from`, so it can be trusted.
 function user(from: { local: string; domain: string } | null): string | undefined {
-  return from && from.local && from.domain === USER_DOMAIN ? `${from.local}@${from.domain}` : undefined
+  return from && from.local && from.domain === USER_DOMAIN
+    ? `${from.local}@${from.domain}`
+    : undefined
 }
 
 const validEmail = (value: string): boolean =>
@@ -76,7 +82,9 @@ xmpp.iqCallee.set(NS, 'email', async (ctx) => {
   const jid = user(ctx.from)
   if (!jid) return stanzaError('forbidden')
   const request = ctx.stanza.getChild('email', NS)!
-  const address = String(request.attrs.address ?? '').trim().toLowerCase()
+  const address = String(request.attrs.address ?? '')
+    .trim()
+    .toLowerCase()
   if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
   const token = db.setEmail(jid, address, request.attrs.newsletter === 'true')
   if (token) await sendVerification(address, token)
@@ -95,6 +103,50 @@ xmpp.iqCallee.set(NS, 'resend', async (ctx) => {
   const token = db.resendToken(jid)
   if (!token) return stanzaError('resource-constraint')
   await sendVerification(db.account(jid)!.email, token)
+  return true
+})
+
+// --- invites by email ---------------------------------------------------------------
+
+const INVITES = 'urn:palique:invite:0' // server/modules/mod_palique_invites.lua
+
+// Ask Prosody (our trusted component may act for a user) about the user's invites.
+function invitesIq(type: 'get' | 'set', username: string) {
+  return xmpp.iqCaller.request(
+    xml('iq', { type, to: USER_DOMAIN }, xml('invite', { xmlns: INVITES, for: username }))
+  )
+}
+
+// <invite-email address='…'/>. The answer never says whether the address has an account:
+// "sent" is the reply either way. Registered, recently invited or opted-out addresses get
+// nothing and cost no invite. The limit is checked first so it can't leak that either.
+xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid) return stanzaError('forbidden')
+  const username = jid.split('@')[0]
+  const address = String(ctx.stanza.getChild('invite-email', NS)!.attrs.address ?? '')
+    .trim()
+    .toLowerCase()
+  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
+
+  const usage = (await invitesIq('get', username)).getChild('invites', INVITES)!
+  if (Number(usage.attrs.active) >= Number(usage.attrs.max)) {
+    return stanzaError('resource-constraint')
+  }
+  if (db.isRegistered(address) || !db.mayInvite(address)) return true
+
+  const invite = (await invitesIq('set', username)).getChild('invite', INVITES)!
+  const optout = db.invited(address)
+  await send({
+    to: address,
+    subject: `${username} te invita a Palique`,
+    paragraphs: [
+      `${username} quiere chatear contigo en Palique, una app de mensajería con zumbidos, guiños y sonidos de toda la vida.`,
+      `Para crear tu cuenta, abre Palique, pulsa «¿No tienes cuenta? Crea una» y pega este código de invitación: ${invite.attrs.token}`,
+      `El código caduca en una semana. Al entrar, ${username} ya estará en tus contactos.`
+    ],
+    footer: `¿No conoces a ${username} o no quieres más invitaciones? No recibirás ninguna más: ${PUBLIC_URL}/no-invitaciones?t=${optout}`
+  })
   return true
 })
 
@@ -121,6 +173,12 @@ createServer((req, res) => {
     // Let the app know right away (it also asks on every sign-in).
     xmpp.send(xml('message', { to: account.jid }, status(account.jid))).catch(() => {})
     return reply(200, 'Correo confirmado', 'Gracias. Ya puedes volver a Palique.')
+  }
+  if (req.method === 'GET' && url.pathname === '/no-invitaciones') {
+    if (!db.optOut(url.searchParams.get('t') ?? '')) {
+      return reply(404, 'Enlace no válido', 'Este enlace no existe.')
+    }
+    return reply(200, 'Hecho', 'No volverás a recibir invitaciones a Palique en esta dirección.')
   }
   reply(404, 'Página no encontrada', 'Aquí no hay nada.')
 }).listen(Number(env('HTTP_PORT', '8080')), () => console.log('http ready'))

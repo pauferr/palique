@@ -46,6 +46,7 @@ allow_registration = true
 registration_invite_only = true
 invite_expiry = "1 week"
 palique_invites_per_user = 5
+palique_invites_trusted = { "cuentas.localhost" } -- account service: invites by email
 
 -- TLS required here too, with the dev-only cert in server/certs.
 c2s_require_encryption = true

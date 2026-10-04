@@ -73,30 +73,34 @@ export function openDb(file: string) {
       const row = get(jid)
       if (!row || row.verified === 1 || Date.now() - (row.token_sent_at ?? 0) < 60_000) return ''
       const t = token()
-      db.prepare('UPDATE accounts SET token = ?, token_sent_at = ? WHERE jid = ?').run(t, Date.now(), jid)
+      db.prepare('UPDATE accounts SET token = ?, token_sent_at = ? WHERE jid = ?').run(
+        t,
+        Date.now(),
+        jid
+      )
       return t
     },
 
     // The account whose link this was, now verified; undefined if unknown or used.
     verify(t: string): Account | undefined {
       const row = db.prepare('SELECT * FROM accounts WHERE token = ?').get(t) as
-        | AccountRow
-        | undefined
+        AccountRow | undefined
       if (!row) return undefined
       db.prepare('UPDATE accounts SET verified = 1, token = NULL WHERE jid = ?').run(row.jid)
       return { ...toAccount(row), verified: true }
     },
 
     isRegistered(email: string): boolean {
-      return Boolean(db.prepare('SELECT 1 FROM accounts WHERE email = ? AND verified = 1').get(email))
+      return Boolean(
+        db.prepare('SELECT 1 FROM accounts WHERE email = ? AND verified = 1').get(email)
+      )
     },
 
     // May this address get an invite email now? (not opted out, none in the last week)
     mayInvite(email: string): boolean {
       if (db.prepare('SELECT 1 FROM invite_optout WHERE email = ?').get(email)) return false
       const sent = db.prepare('SELECT sent_at FROM invite_emails WHERE email = ?').get(email) as
-        | { sent_at: number }
-        | undefined
+        { sent_at: number } | undefined
       return !sent || Date.now() - sent.sent_at > WEEK
     },
 
@@ -112,8 +116,7 @@ export function openDb(file: string) {
 
     optOut(t: string): boolean {
       const row = db.prepare('SELECT email FROM invite_emails WHERE optout_token = ?').get(t) as
-        | { email: string }
-        | undefined
+        { email: string } | undefined
       if (!row) return false
       db.prepare('INSERT OR IGNORE INTO invite_optout (email) VALUES (?)').run(row.email)
       return true

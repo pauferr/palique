@@ -1,12 +1,23 @@
 // Outgoing email over SMTP (Mailpit in development, Brevo in production).
 import nodemailer from 'nodemailer'
 
-const escape = (text: string): string =>
-  text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+const escape = (text: string): string => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
-export type Mail = { to: string; subject: string; paragraphs: string[]; link?: { href: string; label: string }; footer?: string }
+export type Mail = {
+  to: string
+  subject: string
+  paragraphs: string[]
+  link?: { href: string; label: string }
+  footer?: string
+}
 
-export function mailer(options: { host: string; port: number; from: string; user?: string; pass?: string }) {
+export function mailer(options: {
+  host: string
+  port: number
+  from: string
+  user?: string
+  pass?: string
+}) {
   const transport = nodemailer.createTransport({
     host: options.host,
     port: options.port,
@@ -30,7 +41,13 @@ ${mail.link ? `<p><a href="${escape(mail.link.href)}" style="display:inline-bloc
 </div>
 ${mail.footer ? `<div style="padding:10px 20px;font-size:12px;color:#5b6f94;border-top:1px solid #c6d5ee">${escape(mail.footer)}</div>` : ''}
 </div></body></html>`
-    return transport.sendMail({ from: options.from, to: mail.to, subject: mail.subject, text, html })
+    return transport.sendMail({
+      from: options.from,
+      to: mail.to,
+      subject: mail.subject,
+      text,
+      html
+    })
   }
 }
 

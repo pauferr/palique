@@ -34,6 +34,7 @@ import {
   addContact,
   createInvite,
   emailStatus,
+  inviteByEmail,
   listInvites,
   onEmail,
   resendVerification,
@@ -374,6 +375,7 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('account:resend', () => resendVerification())
   ipcMain.handle('invites:create', () => createInvite())
+  ipcMain.handle('invites:email', (_, address: string) => inviteByEmail(String(address)))
   ipcMain.handle('invites:list', () => listInvites())
   ipcMain.handle('roster:snapshot', () => snapshot())
   ipcMain.handle('roster:add', (_, address: string) => addContact(String(address)))
