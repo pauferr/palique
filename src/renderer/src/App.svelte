@@ -13,16 +13,5 @@
 {#if jid}
   <Roster {jid} onlogout={logout} />
 {:else}
-  <main>
-    <Login onlogin={(value) => (jid = value)} />
-  </main>
+  <Login onlogin={(value) => (jid = value)} />
 {/if}
-
-<style>
-  main {
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    min-height: 100vh;
-  }
-</style>

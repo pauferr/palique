@@ -31,11 +31,13 @@
 
 <svelte:head><title>Opciones</title></svelte:head>
 
-<main>
+<header>
   <h1>Opciones</h1>
+</header>
 
-  <section>
-    <h2>Guiños</h2>
+<main>
+  <fieldset class="group">
+    <legend>Guiños</legend>
     <label>
       <input
         type="checkbox"
@@ -45,50 +47,83 @@
       Mostrar los guiños a pantalla completa
     </label>
     <p class="hint">Desactivados, los guiños solo aparecen como texto en la conversación.</p>
-  </section>
+  </fieldset>
 
-  <section>
-    <h2>Historial</h2>
+  <fieldset class="group">
+    <legend>Historial</legend>
     <p>
       Tus conversaciones solo se guardan en este equipo: el servidor no las archiva. Si formateas o
       cambias de ordenador, se pierden. Expórtalas para guardar una copia.
     </p>
 
-    <fieldset>
-      <legend>Formato</legend>
+    <div class="formats" role="radiogroup" aria-label="Formato">
       <label><input type="radio" bind:group={format} value="html" /> HTML (para leer)</label>
       <label><input type="radio" bind:group={format} value="txt" /> Texto plano</label>
       <label><input type="radio" bind:group={format} value="json" /> JSON (para importar)</label>
-    </fieldset>
+    </div>
 
     <button onclick={exportHistory} disabled={busy}>Exportar historial…</button>
-    {#if message}<p role="status">{message}</p>{/if}
-  </section>
+    {#if message}<p class="hint" role="status">{message}</p>{/if}
+  </fieldset>
 </main>
 
 <style>
-  main {
-    padding: 0 1rem 1rem;
-    font-family: system-ui, sans-serif;
+  header {
+    padding: 12px 16px;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--line);
   }
 
-  h2 {
-    font-size: 1rem;
+  h1 {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 18px;
+  }
+
+  main {
+    display: grid;
+    gap: 14px;
+    padding: 14px 16px;
+  }
+
+  /* XP-style group box: soft rounded border, blue title on the line. */
+  .group {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 12px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--list-bg);
+  }
+
+  legend {
+    padding: 0 4px;
+    color: var(--text-strong);
+    font-weight: bold;
   }
 
   p {
-    color: #444;
+    margin: 0;
   }
 
   .hint {
-    margin-top: 0.25rem;
-    font-size: 0.85rem;
-    color: #777;
+    color: var(--text-muted);
+    font-size: 12px;
   }
 
-  fieldset {
+  label {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .formats {
     display: grid;
-    gap: 0.25rem;
-    margin-bottom: 0.75rem;
+    gap: 2px;
+  }
+
+  button {
+    justify-self: start;
   }
 </style>
