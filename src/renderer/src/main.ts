@@ -1,11 +1,11 @@
 import { mount } from 'svelte'
 
-import './assets/main.css'
-
 import App from './App.svelte'
+import Wink from './Wink.svelte'
 
-const app = mount(App, {
-  target: document.getElementById('app')!
-})
+const target = document.getElementById('app')!
+const wink = new URLSearchParams(location.hash.slice(1)).get('wink')
+
+const app = wink ? mount(Wink, { target, props: { id: wink } }) : mount(App, { target })
 
 export default app

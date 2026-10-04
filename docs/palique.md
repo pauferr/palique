@@ -83,6 +83,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 ### Notificaciones con sonido
 - Sonidos propios para mensaje entrante, contacto conectado, zumbido, etc.
+- **Origen: provisionales libres para el prototipo y el MVP** (CC0 de Freesound o generados con sfxr/sintetizador). Los definitivos se encargan o se crean más adelante. Los sonidos originales de MSN/AIM no se pueden usar (son de Microsoft/AOL).
 
 ### Zumbidos
 - Sonido + sacudida del contenido **dentro** de la ventana (funciona en cualquier entorno).
@@ -96,6 +97,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Wayland: los clientes Wayland nativos no pueden ponerse siempre encima en todos los compositores (GNOME no lo permite). Solución: arrancar Electron en XWayland (`--ozone-platform=x11`), donde la superposición funciona también en GNOME. Hay que validarlo pronto.
 - Nombre en la app: "guiños" (como en MSN).
 - **Transmisión: catálogo predefinido.** Las animaciones vienen incluidas en la app; el mensaje solo lleva un identificador (p. ej. `tarta-cumple`). Mensaje ligero, reproducción instantánea y contenido controlado.
+- **Formato: vídeo WebM (VP9 con canal alfa) con el sonido incluido (Opus).** Chromium lo reproduce con `<video>` sin librerías, y cualquier animador lo exporta (After Effects, Blender). Admite cualquier estilo, incluido el trazo tembloroso. El nombre del archivo es el identificador del guiño (`assets/winks/<id>.webm`).
 - Diseño extensible: el formato del mensaje debe permitir añadir packs descargables en el futuro sin cambios.
 - Descartado (por ahora) contenido enviado por el usuario: riesgo de contenido desagradable o con destellos (epilepsia fotosensible), transferencia y validación de archivos, latencia.
 - Protecciones obligatorias desde el MVP:
@@ -185,6 +187,8 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - [x] **Ubicación de la lógica XMPP** → proceso principal de Electron, una conexión compartida por IPC (ver sección 2).
 - [x] **Servidor XMPP** → Prosody (ver sección 2).
 - [x] **Transmisión de animaciones** → catálogo predefinido, extensible con packs (ver sección 3).
+- [x] **Formato de los guiños** → WebM VP9 con alfa y sonido incluido (ver sección 3).
+- [x] **Sonidos** → provisionales libres (CC0 / generados) hasta tener los definitivos (ver sección 3).
 - [x] **Alcance del MVP** → ver sección 4.
 - [x] **Historial de chat** → solo local, con aviso y exportación (ver sección 3).
 - [x] **Registro y autenticación** → usuario y contraseña desde la app (XEP-0077); Google y otros proveedores en la hoja de ruta (ver sección 3).

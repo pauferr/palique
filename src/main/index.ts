@@ -1,20 +1,31 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+// Native Wayland clients can't stay on top in every compositor (GNOME refuses),
+// which would break the full-screen wink overlay. XWayland handles it everywhere.
+if (process.platform === 'linux') app.commandLine.appendSwitch('ozone-platform', 'x11')
+
+const preload = join(__dirname, '../preload/index.js')
+
+// Every window loads the same renderer; the hash picks the view.
+function loadRenderer(win: BrowserWindow, hash = ''): void {
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${hash}`)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
+  }
+}
+
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+    webPreferences: { preload, sandbox: false }
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -26,20 +37,32 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  loadRenderer(mainWindow)
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// Transparent, click-through window over the whole primary display.
+function showWink(id: string): void {
+  const win = new BrowserWindow({
+    ...screen.getPrimaryDisplay().bounds,
+    show: false,
+    transparent: true,
+    frame: false,
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
+  })
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  win.setIgnoreMouseEvents(true)
+  win.once('ready-to-show', () => win.showInactive())
+  loadRenderer(win, `wink=${encodeURIComponent(id)}`)
+}
+
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.palique.app')
 
   // Default open or close DevTools by F12 in development
@@ -49,8 +72,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.on('wink:play', (_, id: string) => showWink(id))
+  ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   createWindow()
 
@@ -69,6 +92,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
