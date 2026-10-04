@@ -11,10 +11,14 @@ import {
   login,
   logout,
   onChange,
+  onMessage,
   rejectRequest,
   removeContact,
+  sendBuzz,
+  sendMessage,
   setPresence,
   snapshot,
+  type ChatMessage,
   type Show
 } from './xmpp'
 
@@ -40,8 +44,8 @@ function loadRenderer(win: BrowserWindow, hash = ''): void {
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 360,
+    height: 620,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -58,6 +62,48 @@ function createWindow(): void {
   })
 
   loadRenderer(mainWindow)
+}
+
+// One window per conversation, like MSN. Messages live in memory for the session
+// (ponytail: local SQLite history is its own MVP step).
+const chats = new Map<string, BrowserWindow>()
+const logs = new Map<string, ChatMessage[]>()
+
+function openChat(contact: string, focus: boolean): BrowserWindow {
+  const existing = chats.get(contact)
+  if (existing) {
+    if (focus) {
+      if (existing.isMinimized()) existing.restore()
+      existing.focus()
+    }
+    return existing
+  }
+  const win = new BrowserWindow({
+    width: 440,
+    height: 520,
+    minWidth: 320,
+    minHeight: 360,
+    show: false,
+    autoHideMenuBar: true,
+    title: contact.split('@')[0],
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
+  })
+  chats.set(contact, win)
+  win.on('closed', () => chats.delete(contact))
+  win.on('focus', () => win.flashFrame(false))
+  win.once('ready-to-show', () => (focus ? win.show() : win.showInactive()))
+  loadRenderer(win, `chat=${encodeURIComponent(contact)}`)
+  return win
+}
+
+// Incoming messages open the conversation without stealing focus, and flash it
+// (taskbar on Linux, dock bounce on macOS).
+function deliver(message: ChatMessage): void {
+  logs.set(message.with, [...(logs.get(message.with) ?? []), message])
+  const win = openChat(message.with, false)
+  win.webContents.send('chat:message', message)
+  if (!message.mine && !win.isFocused()) win.flashFrame(true)
 }
 
 // Transparent, click-through window over the whole primary display.
@@ -96,7 +142,11 @@ app.whenReady().then(() => {
   ipcMain.handle('auth:login', (_, username: string, password: string, register: boolean) =>
     login(String(username), String(password), Boolean(register))
   )
-  ipcMain.handle('auth:logout', () => logout())
+  ipcMain.handle('auth:logout', async () => {
+    await logout()
+    chats.forEach((win) => win.close())
+    logs.clear()
+  })
 
   // Every window gets the full contact list on each change.
   onChange((state) => {
@@ -110,6 +160,18 @@ app.whenReady().then(() => {
   ipcMain.handle('roster:remove', (_, jid: string) => removeContact(String(jid)))
   ipcMain.handle('presence:set', (_, show: Show, status: string) =>
     setPresence(shows.includes(show) ? show : 'online', String(status))
+  )
+  onMessage(deliver)
+  ipcMain.handle('chat:open', (_, contact: string) => {
+    openChat(String(contact), true)
+  })
+  ipcMain.handle('chat:history', (_, contact: string) => logs.get(String(contact)) ?? [])
+  ipcMain.handle('chat:send', async (_, contact: string, body: string) => {
+    const text = String(body).trim().slice(0, 4000)
+    if (text) deliver(await sendMessage(String(contact), text))
+  })
+  ipcMain.handle('chat:buzz', async (_, contact: string) =>
+    deliver(await sendBuzz(String(contact)))
   )
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 

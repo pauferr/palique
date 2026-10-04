@@ -82,7 +82,9 @@
       <li>
         <span class="dot {contact.show}" title={labels[contact.show]}></span>
         <span class="who">
-          <span>{name(contact.jid)}</span>
+          <button class="name" onclick={() => window.api.openChat(contact.jid)}>
+            {name(contact.jid)}
+          </button>
           {#if contact.pending}
             <small>Esperando a que te acepte</small>
           {:else if contact.status}
@@ -189,6 +191,15 @@
 
   .offline {
     background: #bbb;
+  }
+
+  .name {
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
   .remove {

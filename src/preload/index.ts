@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { AuthResult, Show, Snapshot } from '../main/xmpp'
+import type { AuthResult, ChatMessage, Show, Snapshot } from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
@@ -22,6 +22,17 @@ const api = {
   removeContact: (jid: string): Promise<void> => ipcRenderer.invoke('roster:remove', jid),
   setPresence: (show: Show, status: string): Promise<void> =>
     ipcRenderer.invoke('presence:set', show, status),
+  openChat: (contact: string): Promise<void> => ipcRenderer.invoke('chat:open', contact),
+  getChatHistory: (contact: string): Promise<ChatMessage[]> =>
+    ipcRenderer.invoke('chat:history', contact),
+  onChatMessage: (callback: (message: ChatMessage) => void): (() => void) => {
+    const listener = (_: unknown, message: ChatMessage): void => callback(message)
+    ipcRenderer.on('chat:message', listener)
+    return () => ipcRenderer.off('chat:message', listener)
+  },
+  sendMessage: (contact: string, body: string): Promise<void> =>
+    ipcRenderer.invoke('chat:send', contact, body),
+  sendBuzz: (contact: string): Promise<void> => ipcRenderer.invoke('chat:buzz', contact),
   playWink: (id: string): void => ipcRenderer.send('wink:play', id),
   winkDone: (): void => ipcRenderer.send('wink:done')
 }

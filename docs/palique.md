@@ -87,7 +87,8 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 ### Zumbidos
 - Sonido + sacudida del contenido **dentro** de la ventana (funciona en cualquier entorno).
-- Refuerzo con `flashFrame` (Linux) y `app.dock.bounce` (macOS) de Electron: resaltan la app en la barra de tareas/dock.
+- Refuerzo con `flashFrame` de Electron: parpadeo en la barra de tareas (Linux) y rebote del icono en el dock (macOS).
+- Límite de envío: un zumbido cada 5 segundos por conversación.
 - Opcional a futuro: en X11, mover la ventana real como en el MSN original.
 - Decisión: no se considera un problema que en Wayland la ventana no se desplace.
 
