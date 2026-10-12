@@ -41,7 +41,8 @@
     "check:invites": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invites.ts",
     "check:email": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-email.ts",
     "check:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-reset.ts",
-    "check:newsletter": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-newsletter.ts"
+    "check:newsletter": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-newsletter.ts",
+    "check:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-version.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

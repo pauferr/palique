@@ -2,9 +2,10 @@
 # (Actions > Release > Run workflow), never on push:
 #  - "publish" off: test build, installers downloadable as artifacts.
 #  - "publish" on: one GitHub Release with every OS's files.
-# Versions are dates (Spain time): v2026.10.12, then v2026.10.12-2 for a second one that
-# day. They're worked out here, never committed; package.json only holds the stage
-# ("alpha", "beta", or "" when stable), which marks the release as a pre-release.
+# Versions are semver, worked out from the commits since the last release
+# (scripts/next-version.ts) and never committed: v0.3.0-alpha, v0.3.1-alpha, v0.4.0-alpha…
+# package.json only holds the stage ("alpha", "beta", or "" when stable); with one, the
+# release is a pre-release.
 # Builds don't publish themselves: in parallel they raced and made one release each.
 # See AGENTS.md, "Releases".
 name: Release
@@ -13,37 +14,53 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Create the release (today's version) with every installer
+        description: Create the release (next version) with every installer
         type: boolean
         default: false
       draft:
         description: As a draft (publish it yourself from the Releases page)
         type: boolean
         default: true
+      version:
+        description: Force this version (e.g. 1.0.0); empty works it out from the commits
+        type: string
+        default: ''
 
 permissions:
   contents: write # create the release and upload its files
 
 jobs:
-  # Today's date, plus -2, -3… if that tag already exists.
+  # The next version from the commits since the last tag (or the one given by hand).
   version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.pick.outputs.version }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # every commit and tag
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - id: pick
         run: |
-          base="$(TZ=Europe/Madrid date +%Y.%-m.%-d)"
-          version="$base"
-          n=1
-          while gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" >/dev/null 2>&1; do
-            n=$((n + 1))
-            version="$base-$n"
-          done
+          version="${FORCED#v}"
+          if [ -z "$version" ]; then
+            version="$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/next-version.ts)"
+          elif ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Not a version: $version"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version already exists."
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: v$version"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCED: ${{ inputs.version }}
 
   build:
     needs: version
@@ -112,13 +129,17 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # Creates the tag on the commit that was built. Alpha and beta are pre-releases.
+      # The tag goes up first, on the commit that was built: a draft release doesn't create
+      # it, and the next run counts from it. Versions with a suffix (alpha…) are pre-releases.
       - name: Release with every platform's files
         run: |
           version="${{ needs.version.outputs.version }}"
-          stage="$(node -p 'require("./package.json").stage || ""')"
-          gh release create "v$version" dist/* --target "$GITHUB_SHA" --generate-notes \
-            --title "Palique $version${stage:+ ($stage)}" ${stage:+--prerelease} \
+          git tag "v$version" "$GITHUB_SHA"
+          git push origin "v$version"
+          prerelease=""
+          case "$version" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "v$version" dist/* --verify-tag --generate-notes \
+            --title "Palique $version" $prerelease \
             ${{ inputs.draft && '--draft' || '' }} --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

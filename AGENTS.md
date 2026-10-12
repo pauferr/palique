@@ -154,6 +154,7 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `newsletter` | newsletter choice, Brevo client, unsubscribe webhook |
 | `invisible` | invisible status (needs the server module) |
 | `history`, `export`, `settings`, `presence`, `emoticons`, `cooldown` | local logic, no server |
+| `version` | next release version from the commits |
 
 Add or update the matching check with any change to that logic. Before committing, run `npm run typecheck`, `npm run lint` and the affected checks.
 
@@ -184,16 +185,23 @@ GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) 
 - **Linux:** `.AppImage` and `.deb`
 - **Windows:** unsigned `.exe`
 
-**Versions are dates**, worked out by the workflow (Spain time) and never committed:
+**Versions are semver, worked out from the commits** since the last release by [scripts/next-version.ts](scripts/next-version.ts). That's one more reason to keep commit messages in Conventional Commits.
 
-- The first release of a day is `v2026.10.12`, a second one that day `v2026.10.12-2`. Months and days have no leading zero (`v2027.1.5`), as semver requires.
-- `package.json` keeps `"version": "0.0.0-dev"`; the app shows "desarrollo" in development.
-- The **stage** lives in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable). It marks releases as pre-releases and appears in their title and in the app ("v2026.10.12 · alpha", on the sign-in screen and in Options).
-- Don't use `npm version`.
+| Since the last version tag | Bump |
+|---|---|
+| `type!:` or `BREAKING CHANGE:` | major (minor while still `0.x`) |
+| any `feat` | minor |
+| anything else | patch |
+| nothing | no release (the run fails) |
+
+- The first release is `0.3.0`. The **stage** in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable) goes on as a suffix (`v0.3.0-alpha`) and makes the release a pre-release.
+- Versions are never committed: `package.json` keeps `"version": "0.0.0-dev"`, and the app shows "desarrollo" in development and `v0.3.0-alpha` in releases (sign-in screen and Options). Don't use `npm version`.
+- `node scripts/next-version.ts` prints what the next release would be. `npm run check:version` checks the rules.
+- To force a version (e.g. `1.0.0`), fill the workflow's **version** input.
 
 The workflow **never runs on push**: releasing is a manual decision.
 
-- **Release:** *Actions → Release → Run workflow* with **publish** on. It picks today's version, every OS builds, then **one** release gets all the files and its tag is created on the built commit.
+- **Release:** *Actions → Release → Run workflow* with **publish** on. It works out the version, every OS builds, then the tag is pushed on the built commit and **one** release gets all the files.
   - **draft** on (the default): you publish it yourself from *Releases*. Off: it's published straight away.
 - **Try a build without releasing:** same workflow with **publish** off. The installers are downloadable as artifacts (kept 7 days).
 - **Server the build talks to:** set at build time from repository variables `XMPP_DOMAIN` and `ACCOUNTS_URL` (`MAIN_VITE_*`). Unset means `localhost`.

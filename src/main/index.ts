@@ -16,7 +16,6 @@ import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import devCert from '../../server/certs/localhost.crt?raw'
-import { stage } from '../../package.json'
 import {
   ARRIVAL_INTERVAL,
   BUZZ_INTERVAL,
@@ -551,10 +550,8 @@ app.whenReady().then(() => {
       Buffer.from(png.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
     return isPng ? setAvatar(png) : undefined
   })
-  // "v2026.10.12 · alpha". Releases get their version at build time (see release.yml).
-  ipcMain.handle('app:version', () =>
-    [app.isPackaged ? `v${app.getVersion()}` : 'desarrollo', stage].filter(Boolean).join(' · ')
-  )
+  // "v0.3.0-alpha". Releases get their version at build time (see release.yml).
+  ipcMain.handle('app:version', () => (app.isPackaged ? `v${app.getVersion()}` : 'desarrollo'))
   ipcMain.handle('settings:get', () => settings.get())
   // Only known keys with valid values; every window hears about the change (e.g. the theme).
   ipcMain.handle('settings:set', (_, patch: { winks?: unknown; theme?: unknown }) => {
