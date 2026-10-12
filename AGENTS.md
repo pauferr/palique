@@ -178,22 +178,23 @@ Add or update the matching check with any change to that logic. Before committin
 
 ## Releases
 
-Semantic Versioning. GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) builds each OS on its own machine:
+GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) builds each OS on its own machine:
 
 - **macOS:** `.dmg` (arm64 and x64) plus `.zip`
 - **Linux:** `.AppImage` and `.deb`
 - **Windows:** unsigned `.exe`
 
+**Versions are dates**, worked out by the workflow (Spain time) and never committed:
+
+- The first release of a day is `v2026.10.12`, a second one that day `v2026.10.12-2`. Months and days have no leading zero (`v2027.1.5`), as semver requires.
+- `package.json` keeps `"version": "0.0.0-dev"`; the app shows "desarrollo" in development.
+- The **stage** lives in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable). It marks releases as pre-releases and appears in their title and in the app ("v2026.10.12 · alpha", on the sign-in screen and in Options).
+- Don't use `npm version`.
+
 The workflow **never runs on push**: releasing is a manual decision.
 
-```bash
-npm version minor        # or patch / major: bumps package.json, commits and tags
-git push --follow-tags   # just pushes; nothing gets built
-```
-
-- **Release:** *Actions → Release → Run workflow* with **publish** on. Every OS builds first, then **one** release `vX.Y.Z` (version from `package.json`) gets all the files. It uses the existing tag, or creates it on the built commit.
+- **Release:** *Actions → Release → Run workflow* with **publish** on. It picks today's version, every OS builds, then **one** release gets all the files and its tag is created on the built commit.
   - **draft** on (the default): you publish it yourself from *Releases*. Off: it's published straight away.
-  - The run refuses a version that already has a release.
 - **Try a build without releasing:** same workflow with **publish** off. The installers are downloadable as artifacts (kept 7 days).
 - **Server the build talks to:** set at build time from repository variables `XMPP_DOMAIN` and `ACCOUNTS_URL` (`MAIN_VITE_*`). Unset means `localhost`.
 - **Unsigned builds:** macOS asks to open with right click → Open, and Windows shows a SmartScreen warning.

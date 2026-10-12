@@ -29,6 +29,7 @@
   let error = $state('')
   let info = $state('')
   let busy = $state(false)
+  let version = $state('')
 
   const address = (): string => email.trim().toLowerCase()
   // The invite code can be pasted bare or as the whole link (palique://registro?t=CODE).
@@ -65,6 +66,7 @@
 
   onMount(() => {
     window.api.lastEmail().then((value) => (email ||= value))
+    window.api.version().then((value) => (version = value))
     window.api.pendingLink().then(useLink)
     return window.api.onLink(useLink)
   })
@@ -217,6 +219,7 @@
         Volver a iniciar sesión
       </button>
     {/if}
+    <small class="version">{version}</small>
   </footer>
 </div>
 
@@ -302,6 +305,11 @@
     justify-items: center;
     margin-top: auto;
     padding: 12px;
+  }
+
+  .version {
+    color: var(--text-muted);
+    font-size: 11px;
   }
 
   .intro {

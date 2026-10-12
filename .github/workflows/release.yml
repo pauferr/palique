@@ -1,7 +1,10 @@
 # Builds the installers on GitHub's machines (each OS builds its own). Only run by hand
 # (Actions > Release > Run workflow), never on push:
 #  - "publish" off: test build, installers downloadable as artifacts.
-#  - "publish" on: one GitHub Release (vX.Y.Z from package.json) with every OS's files.
+#  - "publish" on: one GitHub Release with every OS's files.
+# Versions are dates (Spain time): v2026.10.12, then v2026.10.12-2 for a second one that
+# day. They're worked out here, never committed; package.json only holds the stage
+# ("alpha", "beta", or "" when stable), which marks the release as a pre-release.
 # Builds don't publish themselves: in parallel they raced and made one release each.
 # See AGENTS.md, "Releases".
 name: Release
@@ -10,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Create the release vX.Y.Z (from package.json) with every installer
+        description: Create the release (today's version) with every installer
         type: boolean
         default: false
       draft:
@@ -22,7 +25,28 @@ permissions:
   contents: write # create the release and upload its files
 
 jobs:
+  # Today's date, plus -2, -3… if that tag already exists.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - id: pick
+        run: |
+          base="$(TZ=Europe/Madrid date +%Y.%-m.%-d)"
+          version="$base"
+          n=1
+          while gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" >/dev/null 2>&1; do
+            n=$((n + 1))
+            version="$base-$n"
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: v$version"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -43,19 +67,10 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Check this version isn't released yet
-        if: inputs.publish
-        shell: bash
-        run: |
-          version="v$(node -p 'require("./package.json").version')"
-          if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::$version already has a release. Bump the version first (npm version)."
-            exit 1
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - run: npm ci
+
+      # The app and the installers' names take the version from here.
+      - run: npm pkg set version=${{ needs.version.outputs.version }}
 
       # Typecheck + build. The server the app talks to comes from repository variables
       # (Settings > Secrets and variables > Actions > Variables); empty means localhost.
@@ -87,7 +102,7 @@ jobs:
   # Only once every OS has built: one release with all the files.
   release:
     if: inputs.publish
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -97,13 +112,13 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # Uses the tag if it exists (npm version + git push --follow-tags), or creates it
-      # on the commit that was built.
+      # Creates the tag on the commit that was built. Alpha and beta are pre-releases.
       - name: Release with every platform's files
         run: |
-          version="v$(node -p 'require("./package.json").version')"
-          gh release create "$version" dist/* --target "$GITHUB_SHA" --generate-notes \
-            --title "Palique ${version#v}" ${{ inputs.draft && '--draft' || '' }} \
-            --repo "$GITHUB_REPOSITORY"
+          version="${{ needs.version.outputs.version }}"
+          stage="$(node -p 'require("./package.json").stage || ""')"
+          gh release create "v$version" dist/* --target "$GITHUB_SHA" --generate-notes \
+            --title "Palique $version${stage:+ ($stage)}" ${stage:+--prerelease} \
+            ${{ inputs.draft && '--draft' || '' }} --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

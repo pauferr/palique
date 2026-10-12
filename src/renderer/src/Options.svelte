@@ -15,6 +15,7 @@
   let message = $state('')
   let winks = $state(true)
   let theme: Theme = $state('xp')
+  let version = $state('')
 
   // The email is how you sign in. Changing it needs a link from the new inbox; until then
   // the old one still works.
@@ -57,6 +58,7 @@
   }
 
   onMount(() => {
+    window.api.version().then((value) => (version = value))
     window.api.getSettings().then((s) => {
       winks = s.winks
       theme = s.theme
@@ -191,6 +193,8 @@
     <button onclick={exportHistory} disabled={busy}>Exportar historial…</button>
     {#if message}<p class="hint" role="status">{message}</p>{/if}
   </fieldset>
+
+  <p class="hint version">Palique {version}</p>
 </main>
 
 <style>
@@ -242,6 +246,10 @@
     display: flex;
     gap: 6px;
     align-items: center;
+  }
+
+  .version {
+    text-align: center;
   }
 
   .formats {

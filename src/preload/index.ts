@@ -101,6 +101,7 @@ const api = {
   sendWink: (contact: string, wink: string): Promise<number> =>
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
+  version: (): Promise<string> => ipcRenderer.invoke('app:version'),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   onSettings: (callback: (settings: Settings) => void): (() => void) => {
     const listener = (_: unknown, settings: Settings): void => callback(settings)
