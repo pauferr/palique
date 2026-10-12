@@ -9,7 +9,7 @@ files:
   - '!{server,deploy,scripts,docs,dist,.github}/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!svelte.config.mjs'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,CONTRIBUTING.md,compose.yaml}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,CONTRIBUTING.md,AGENTS.md,CLAUDE.md,compose.yaml}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 # palique:// links (password recovery emails open the app).
@@ -24,7 +24,7 @@ npmRebuild: false
 mac:
   category: public.app-category.social-networking
   entitlementsInherit: build/entitlements.mac.plist
-  # Unsigned until there's an Apple Developer account (see README, "Releases").
+  # Unsigned until there's an Apple Developer account (see AGENTS.md, "Releases").
   notarize: false
   target:
     - target: dmg

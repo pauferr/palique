@@ -2,7 +2,7 @@
 #  - Pushing a tag like v0.2.0: one draft GitHub Release with every file (release job).
 #  - "Run workflow" by hand (Actions tab): test build, installers downloadable as artifacts.
 # Builds don't publish themselves: in parallel they raced and made one draft each.
-# See README, "Releases".
+# See AGENTS.md, "Releases".
 name: Release
 
 on:

@@ -191,7 +191,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Plataforma: **Brevo** (empresa europea, pensada para el RGPD). Brevo envía también los correos de verificación y recuperación en producción (SMTP).
 - El servicio de cuentas guarda la elección y la fecha del consentimiento, y la sincroniza con una lista de Brevo (todas las direcciones están verificadas: la invitación o el cambio de correo llegaron a ellas): al cambiar la preferencia en Opciones y al cambiar de dirección (la antigua sale de la lista).
 - Cada boletín lleva el enlace de baja de Brevo. Un *webhook* de Brevo (bajas, rebotes graves, spam), protegido con un código secreto, desmarca el boletín en Palique y la app se entera al momento.
-- Preparado sin cuenta de Brevo: sin clave, las elecciones se guardan sin sincronizar, y `src/sync-brevo.ts` pone la lista al día cuando se añade la clave. Pasos en el README.
+- Preparado sin cuenta de Brevo: sin clave, las elecciones se guardan sin sincronizar, y `src/sync-brevo.ts` pone la lista al día cuando se añade la clave. Pasos en AGENTS.md.
 
 ### Almacenamiento de datos
 
