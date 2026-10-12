@@ -1,14 +1,22 @@
-# Builds the installers on GitHub's machines (each OS builds its own), then:
-#  - Pushing a tag like v0.2.0: one draft GitHub Release with every file (release job).
-#  - "Run workflow" by hand (Actions tab): test build, installers downloadable as artifacts.
-# Builds don't publish themselves: in parallel they raced and made one draft each.
+# Builds the installers on GitHub's machines (each OS builds its own). Only run by hand
+# (Actions > Release > Run workflow), never on push:
+#  - "publish" off: test build, installers downloadable as artifacts.
+#  - "publish" on: one GitHub Release (vX.Y.Z from package.json) with every OS's files.
+# Builds don't publish themselves: in parallel they raced and made one release each.
 # See AGENTS.md, "Releases".
 name: Release
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Create the release vX.Y.Z (from package.json) with every installer
+        type: boolean
+        default: false
+      draft:
+        description: As a draft (publish it yourself from the Releases page)
+        type: boolean
+        default: true
 
 permissions:
   contents: write # create the release and upload its files
@@ -35,15 +43,17 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Check the tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Check this version isn't released yet
+        if: inputs.publish
         shell: bash
         run: |
           version="v$(node -p 'require("./package.json").version')"
-          if [ "$GITHUB_REF_NAME" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match package.json ($version). Use npm version."
+          if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$version already has a release. Bump the version first (npm version)."
             exit 1
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: npm ci
 
@@ -74,17 +84,26 @@ jobs:
             dist/latest*.yml
           retention-days: 7
 
+  # Only once every OS has built: one release with all the files.
   release:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: inputs.publish
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
 
-      - name: Draft release with every platform's files
-        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --generate-notes --title "Palique ${GITHUB_REF_NAME#v}" --repo "$GITHUB_REPOSITORY"
+      # Uses the tag if it exists (npm version + git push --follow-tags), or creates it
+      # on the commit that was built.
+      - name: Release with every platform's files
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          gh release create "$version" dist/* --target "$GITHUB_SHA" --generate-notes \
+            --title "Palique ${version#v}" ${{ inputs.draft && '--draft' || '' }} \
+            --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

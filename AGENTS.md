@@ -184,12 +184,17 @@ Semantic Versioning. GitHub Actions ([.github/workflows/release.yml](.github/wor
 - **Linux:** `.AppImage` and `.deb`
 - **Windows:** unsigned `.exe`
 
+The workflow **never runs on push**: releasing is a manual decision.
+
 ```bash
 npm version minor        # or patch / major: bumps package.json, commits and tags
-git push --follow-tags   # CI builds and creates one draft release; publish it on GitHub
+git push --follow-tags   # just pushes; nothing gets built
 ```
 
-- **Try a build without releasing:** *Actions → Release → Run workflow* (artifacts kept 7 days).
+- **Release:** *Actions → Release → Run workflow* with **publish** on. Every OS builds first, then **one** release `vX.Y.Z` (version from `package.json`) gets all the files. It uses the existing tag, or creates it on the built commit.
+  - **draft** on (the default): you publish it yourself from *Releases*. Off: it's published straight away.
+  - The run refuses a version that already has a release.
+- **Try a build without releasing:** same workflow with **publish** off. The installers are downloadable as artifacts (kept 7 days).
 - **Server the build talks to:** set at build time from repository variables `XMPP_DOMAIN` and `ACCOUNTS_URL` (`MAIN_VITE_*`). Unset means `localhost`.
 - **Unsigned builds:** macOS asks to open with right click → Open, and Windows shows a SmartScreen warning.
 
