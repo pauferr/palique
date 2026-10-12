@@ -18,7 +18,6 @@ const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0
 const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
 
 const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
-const INVITES = 'urn:palique:invite:0' // server/modules/mod_palique_invites.lua
 const ACCOUNTS = 'urn:palique:cuentas:0' // account service, server/cuentas
 export const ACCOUNTS_JID = process.env['PALIQUE_ACCOUNTS_JID'] ?? `cuentas.${DOMAIN}`
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
@@ -26,26 +25,33 @@ const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 export const AVATAR_MAX_BYTES = 100_000
+const NICK = 'http://jabber.org/protocol/nick' // display names (XEP-0172): PEP and presence
+export const NICK_MAX = 64
 
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)
 
 export type AuthError =
-  | 'conflict' // username taken
-  | 'not-acceptable' // username or password rejected by the server
-  | 'not-authorized' // wrong username or password
+  | 'conflict' // the invite's account already exists
+  | 'not-acceptable' // password rejected by the server
+  | 'not-authorized' // wrong email or password
   | 'invalid-invite' // missing, wrong, used or expired invite code
+  | 'wait' // too many attempts, try again in a minute
   | 'unreachable'
   | 'unknown'
 
 export type AuthResult = { ok: true; jid: string } | { ok: false; error: AuthError }
+
+// palique:// links from emails. `email` only for password resets.
+export type AuthLink = { kind: 'invite' | 'reset'; token: string; email: string }
 
 export type Show = 'online' | 'away' | 'dnd'
 export type OwnShow = Show | 'invisible' // contacts never look invisible: they look offline
 
 export type Contact = {
   jid: string
+  name: string // display name (a placeholder until we know it)
   show: Show | 'offline'
   status: string // personal message
   subscription: 'none' | 'to' | 'from' | 'both'
@@ -56,7 +62,8 @@ export type Contact = {
 export type Snapshot = {
   connected: boolean
   contacts: Contact[]
-  requests: string[] // people asking to add us
+  requests: { jid: string; name: string }[] // people asking to add us
+  name: string // our own display name
   avatar: string // our own avatar, data: URL or ''
   show: OwnShow // our own status
 }
@@ -73,7 +80,7 @@ export type ChatMessage = {
 }
 
 type Presence = { show: Show; status: string }
-type RosterEntry = Omit<Contact, 'show' | 'status' | 'avatar'> & {
+type RosterEntry = Omit<Contact, 'show' | 'status' | 'avatar' | 'name'> & {
   resources: Map<string, Presence>
 }
 type Avatar = { hash: string; url: string }
@@ -84,10 +91,14 @@ let roster = new Map<string, RosterEntry>()
 let requests = new Set<string>()
 let own: { show: OwnShow; status: string } = { show: 'online', status: '' }
 let avatars = new Map<string, Avatar>() // by bare JID, ours included
+let nicks = new Map<string, string>() // display names by bare JID, ours included
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
 let emailListener: (email: EmailStatus) => void = () => {}
+
+// JIDs are random ids: never show them. Other XMPP clients may not send a name.
+const nameOf = (bare: string): string => nicks.get(bare) || 'Sin nombre'
 
 // Best presence across the contact's connected devices.
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
@@ -99,13 +110,15 @@ export function snapshot(): Snapshot {
       ...entry,
       show: best?.show ?? 'offline',
       status: best?.status ?? '',
-      avatar: avatars.get(entry.jid)?.url ?? ''
+      avatar: avatars.get(entry.jid)?.url ?? '',
+      name: nameOf(entry.jid)
     }
   })
   return {
     connected: xmpp?.status === 'online',
     contacts,
-    requests: [...requests],
+    requests: [...requests].map((jid) => ({ jid, name: nameOf(jid) })),
+    name: nameOf(me),
     avatar: avatars.get(me)?.url ?? '',
     show: own.show
   }
@@ -133,12 +146,30 @@ function send(stanza: Element): Promise<void> {
   return xmpp ? xmpp.send(stanza) : Promise.resolve()
 }
 
+// Display names come from the network: one line, no control characters, not too long.
+export const cleanNick = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/[\p{Cc}\p{Cf}]/gu, '')
+    .trim()
+    .slice(0, NICK_MAX)
+
+// Our name goes in every presence (contacts see changes right away) and in PEP (for
+// contacts who were offline).
+function withNick(presence: Element): Element {
+  const name = nicks.get(me)
+  if (name) presence.c('nick', { xmlns: NICK }).t(name)
+  return presence
+}
+
 function presenceStanza(): Element {
   const presence = xml('presence')
   if (own.show === 'away' || own.show === 'dnd') presence.c('show').t(own.show)
   if (own.status) presence.c('status').t(own.status)
-  return presence
+  return withNick(presence)
 }
+
+const subscribeStanza = (to: string): Element =>
+  withNick(xml('presence', { to, type: 'subscribe' }))
 
 function applyRosterItem(item: Element): void {
   const bare = item.attrs.jid as string
@@ -167,6 +198,9 @@ function handlePresence(stanza: Element): void {
   const bare = from.bare().toString()
   if (bare === me) return
   const entry = roster.get(bare)
+
+  const nick = cleanNick(stanza.getChildText('nick', NICK))
+  if (nick && (entry || stanza.attrs.type === 'subscribe')) nicks.set(bare, nick)
 
   // The server adds the avatar's hash to presence (XEP-0153 style): fetch it when it changes.
   const photo = stanza.getChild('x', 'vcard-temp:x:update')?.getChild('photo')
@@ -285,6 +319,16 @@ async function loadAvatar(owner: string): Promise<void> {
   avatars.set(owner, { hash, url: `data:${type};base64,${bytes.toString('base64')}` })
 }
 
+// Someone's display name from their PEP (ours when it's us). Contacts who haven't
+// accepted us yet can't read it: their subscription request carried it instead.
+async function loadNick(owner: string): Promise<void> {
+  const res = await pubsubItems(owner === me ? undefined : owner, NICK)
+  const nick = cleanNick(
+    res.getChild('pubsub')?.getChild('items')?.getChild('item')?.getChildText('nick', NICK)
+  )
+  if (nick) nicks.set(owner, nick)
+}
+
 async function loadRoster(): Promise<void> {
   if (!xmpp) return
   const res = await xmpp.iqCaller.request(
@@ -299,15 +343,10 @@ async function loadRoster(): Promise<void> {
     if (old) roster.get(item.attrs.jid)!.resources = old.resources
   }
   emit()
+  for (const bare of roster.keys()) loadNick(bare).then(emit, () => {})
 }
 
 // In-band registration (XEP-0077) on the already-encrypted stream, before SASL.
-// The code can be pasted bare or as the whole invite link (xmpp:…;preauth=CODE;…).
-export function inviteToken(input: string): string {
-  const value = input.trim()
-  return value.match(/preauth=([^;&]+)/)?.[1] ?? value
-}
-
 // Registration is invite-only: hand the code to the server first (XEP-0401).
 async function registerAccount(
   entity: Client,
@@ -319,7 +358,7 @@ async function registerAccount(
     xml(
       'iq',
       { type: 'set', id: randomUUID() },
-      xml('preauth', { xmlns: 'urn:xmpp:pars:0', token: inviteToken(invite) })
+      xml('preauth', { xmlns: 'urn:xmpp:pars:0', token: invite })
     )
   )
   if (preauth.attrs.type !== 'result') {
@@ -360,12 +399,13 @@ function toAuthError(e: unknown): AuthError {
   return 'unknown'
 }
 
-// Passing an invite code creates the account first. `show`: status to sign in with, so
-// an invisible user is never briefly visible.
+// Signs in with the account's JID localpart (see accountFor). Passing an invite code
+// creates the account first, and `nick` publishes its display name. `show`: status to
+// sign in with, so an invisible user is never briefly visible.
 export async function login(
   username: string,
   password: string,
-  { invite, show = 'online' }: { invite?: string; show?: OwnShow } = {}
+  { invite, show = 'online', nick }: { invite?: string; show?: OwnShow; nick?: string } = {}
 ): Promise<AuthResult> {
   await logout()
   own = { show, status: '' }
@@ -394,15 +434,23 @@ export async function login(
     // the library fills it with the domain when `from` is missing.
     const from = ctx.stanza.attrs.from
     if (from && jid(from).bare().toString() !== me) return false
-    ctx.stanza.getChild('query')?.getChildren('item').forEach(applyRosterItem)
+    for (const item of ctx.stanza.getChild('query')?.getChildren('item') ?? []) {
+      applyRosterItem(item)
+      // Just accepted: now we may read their name.
+      const bare = item.attrs.jid as string
+      const sub = item.attrs.subscription
+      if ((sub === 'to' || sub === 'both') && !nicks.has(bare)) loadNick(bare).then(emit, () => {})
+    }
     emit()
     return true
   })
   // Also fires after automatic reconnects: refresh contacts and re-announce ourselves.
+  // The first time, login() waits for it (so a new account's name is surely published).
+  let ready: Promise<void> = Promise.resolve()
   entity.on('online', (address) => {
     me = address.bare().toString()
     // Roster before presence: offline messages arrive after presence and need the contact list.
-    loadRoster()
+    ready = loadRoster()
       .then(() =>
         xmpp?.iqCaller.request(xml('iq', { type: 'set' }, xml('enable', { xmlns: CARBONS })))
       )
@@ -415,6 +463,8 @@ export async function login(
             })
           : undefined
       )
+      // Our name first, so the first presence already carries it.
+      .then(() => (nick ? publishNick(nick) : loadNick(me).catch(() => {})))
       .then(() => send(presenceStanza()))
       .then(emit)
       .catch(() => {})
@@ -430,6 +480,7 @@ export async function login(
   xmpp = entity
   try {
     await entity.start()
+    await ready
     return { ok: true, jid: me }
   } catch (e) {
     xmpp = null
@@ -447,18 +498,11 @@ export async function logout(): Promise<void> {
   requests = new Set()
   own = { show: 'online', status: '' }
   avatars = new Map()
+  nicks = new Map()
   if (!entity) return
   entity.reconnect.stop()
   await entity.stop().catch(() => {})
   emit()
-}
-
-// "fina" → "fina@<domain>"; full addresses are kept for other XMPP servers.
-function toBare(address: string): string {
-  const value = address.trim().toLowerCase()
-  return jid(value.includes('@') ? value : `${value}@${DOMAIN}`)
-    .bare()
-    .toString()
 }
 
 function rosterSet(item: Record<string, string>): Promise<Element> {
@@ -467,11 +511,11 @@ function rosterSet(item: Record<string, string>): Promise<Element> {
   )
 }
 
-export async function addContact(address: string): Promise<void> {
-  const bare = toBare(address)
+// `bare`: from lookupContact.
+export async function addContact(bare: string): Promise<void> {
   if (!xmpp || bare === me) return
   await rosterSet({ jid: bare })
-  await send(xml('presence', { to: bare, type: 'subscribe' }))
+  await send(subscribeStanza(bare))
 }
 
 export async function acceptRequest(bare: string): Promise<void> {
@@ -482,7 +526,7 @@ export async function acceptRequest(bare: string): Promise<void> {
   const entry = roster.get(bare)
   if (!entry || entry.subscription === 'none' || entry.subscription === 'from') {
     if (!entry) await rosterSet({ jid: bare })
-    await send(xml('presence', { to: bare, type: 'subscribe' }))
+    await send(subscribeStanza(bare))
   }
   emit()
 }
@@ -594,63 +638,90 @@ export async function setAvatar(png: Uint8Array): Promise<void> {
   emit()
 }
 
-export type Invite = { token: string; expires: string }
-
-function parseInvite(el: Element): Invite {
-  return { token: el.attrs.token, expires: el.attrs.expires }
-}
-
-// "Invite a friend". Rejects with 'limit' when the user already has the maximum active.
-export async function createInvite(): Promise<Invite> {
-  try {
-    const res = await xmpp!.iqCaller.request(
-      xml('iq', { type: 'set' }, xml('invite', { xmlns: INVITES }))
+// Our display name, published to PEP (readable by contacts, like the avatar).
+async function publishNick(name: string): Promise<void> {
+  await xmpp!.iqCaller.request(
+    xml(
+      'iq',
+      { type: 'set' },
+      xml(
+        'pubsub',
+        { xmlns: PUBSUB },
+        xml('publish', { node: NICK }, xml('item', {}, xml('nick', { xmlns: NICK }, name)))
+      )
     )
-    return parseInvite(res.getChild('invite', INVITES)!)
-  } catch (e) {
-    const condition = (e as { condition?: string }).condition
-    throw new Error(condition === 'resource-constraint' ? 'limit' : 'unknown')
-  }
-}
-
-export async function listInvites(): Promise<{ invites: Invite[]; max: number }> {
-  const res = await xmpp!.iqCaller.request(
-    xml('iq', { type: 'get' }, xml('invite', { xmlns: INVITES }))
   )
-  const list = res.getChild('invites', INVITES)
-  return {
-    invites: (list?.getChildren('invite') ?? []).map(parseInvite),
-    max: Number(list?.attrs.max ?? 0)
-  }
+  nicks.set(me, name)
 }
 
-// --- email (account service) ---------------------------------------------------------
-
-export type EmailStatus = { address: string; verified: boolean; newsletter: boolean }
-
-function parseEmail(el: Element): EmailStatus {
-  return {
-    address: el.attrs.address ?? '',
-    verified: el.attrs.verified === 'true',
-    newsletter: el.attrs.newsletter === 'true'
-  }
+// Changes our display name; contacts online see it with the next presence.
+export async function setNick(value: string): Promise<void> {
+  const name = cleanNick(value)
+  if (!xmpp || !name) return
+  await publishNick(name)
+  await send(presenceStanza())
+  emit()
 }
+
+// --- account service (email, invites, contacts by email) -------------------------------
+
+const condition = (e: unknown): string | undefined => (e as { condition?: string }).condition
 
 function accountsIq(type: 'get' | 'set', child: Element): Promise<Element> {
   return xmpp!.iqCaller.request(xml('iq', { type, to: ACCOUNTS_JID }, child))
 }
 
-// Sends a verification link to the address. Rejects with 'invalid' for a bad address.
-export async function setEmail(address: string, newsletter: boolean): Promise<EmailStatus> {
+export type InviteStatus = { max: number; used: number }
+
+function parseInvites(el: Element | undefined): InviteStatus {
+  return { max: Number(el?.attrs.max ?? 0), used: Number(el?.attrs.used ?? 0) }
+}
+
+export async function inviteStatus(): Promise<InviteStatus> {
+  const res = await accountsIq('get', xml('invites', { xmlns: ACCOUNTS }))
+  return parseInvites(res.getChild('invites', ACCOUNTS))
+}
+
+// Emails an invite (with our display name, for the email). Rejects with 'limit' (none
+// left), 'registered' (that address already has an account) or 'invalid'.
+export async function inviteByEmail(address: string): Promise<InviteStatus> {
   try {
     const res = await accountsIq(
       'set',
-      xml('email', { xmlns: ACCOUNTS, address, newsletter: String(newsletter) })
+      xml('invite-email', { xmlns: ACCOUNTS, address, name: nicks.get(me) ?? '' })
     )
-    return parseEmail(res.getChild('email', ACCOUNTS)!)
+    return parseInvites(res.getChild('invites', ACCOUNTS))
   } catch (e) {
-    const condition = (e as { condition?: string }).condition
-    throw new Error(condition === 'bad-request' ? 'invalid' : 'unknown')
+    const errors: Record<string, string> = {
+      'resource-constraint': 'limit',
+      conflict: 'registered',
+      'bad-request': 'invalid'
+    }
+    throw new Error(errors[condition(e) ?? ''] ?? 'unknown')
+  }
+}
+
+// The JID of whoever has this email, '' if nobody. Rejects with 'invalid' or 'wait'.
+export async function lookupContact(address: string): Promise<string> {
+  try {
+    const res = await accountsIq('get', xml('lookup', { xmlns: ACCOUNTS, address }))
+    return res.getChild('lookup', ACCOUNTS)?.attrs.jid ?? ''
+  } catch (e) {
+    const c = condition(e)
+    throw new Error(
+      c === 'bad-request' ? 'invalid' : c === 'resource-constraint' ? 'wait' : 'unknown'
+    )
+  }
+}
+
+// `pending`: a new address waiting to be confirmed from its inbox ('' if none).
+export type EmailStatus = { address: string; pending: string; newsletter: boolean }
+
+function parseEmail(el: Element): EmailStatus {
+  return {
+    address: el.attrs.address ?? '',
+    pending: el.attrs.pending ?? '',
+    newsletter: el.attrs.newsletter === 'true'
   }
 }
 
@@ -659,58 +730,68 @@ export async function emailStatus(): Promise<EmailStatus> {
   return parseEmail(res.getChild('email', ACCOUNTS)!)
 }
 
-// Another verification link; rejects with 'wait' if one was sent less than a minute ago.
+// Asks to change the address: a link goes to the new one. Rejects with 'invalid'.
+export async function changeEmail(address: string): Promise<EmailStatus> {
+  try {
+    const res = await accountsIq('set', xml('email', { xmlns: ACCOUNTS, address }))
+    return parseEmail(res.getChild('email', ACCOUNTS)!)
+  } catch (e) {
+    throw new Error(condition(e) === 'bad-request' ? 'invalid' : 'unknown')
+  }
+}
+
+// Another link for the pending address; rejects with 'wait' within a minute of the last.
 export async function resendVerification(): Promise<void> {
   try {
     await accountsIq('set', xml('resend', { xmlns: ACCOUNTS }))
   } catch (e) {
-    const condition = (e as { condition?: string }).condition
-    throw new Error(condition === 'resource-constraint' ? 'wait' : 'unknown')
+    throw new Error(condition(e) === 'resource-constraint' ? 'wait' : 'unknown')
   }
 }
 
-// Emails an invite. Resolves the same way whether or not the address already has an
-// account (the service doesn't say, on purpose). Rejects with 'limit' or 'invalid'.
-export async function inviteByEmail(address: string): Promise<void> {
-  try {
-    await accountsIq('set', xml('invite-email', { xmlns: ACCOUNTS, address }))
-  } catch (e) {
-    const condition = (e as { condition?: string }).condition
-    throw new Error(
-      condition === 'resource-constraint'
-        ? 'limit'
-        : condition === 'bad-request'
-          ? 'invalid'
-          : 'unknown'
-    )
-  }
+export async function setNewsletter(subscribe: boolean): Promise<EmailStatus> {
+  const res = await accountsIq(
+    'set',
+    xml('newsletter', { xmlns: ACCOUNTS, subscribe: String(subscribe) })
+  )
+  return parseEmail(res.getChild('email', ACCOUNTS)!)
 }
 
-// --- password recovery (signed out, so over HTTP to the account service) --------------
+// --- signed out: over HTTP to the account service --------------------------------------
 
 const ACCOUNTS_URL =
   config('PALIQUE_ACCOUNTS_URL', 'MAIN_VITE_ACCOUNTS_URL') ?? 'http://localhost:8080'
 
-// The service answers the same whether or not the account exists or has an email.
-export async function requestPasswordReset(username: string): Promise<void> {
-  const res = await fetch(`${ACCOUNTS_URL}/recuperar`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: username.trim().toLowerCase() })
-  })
-  if (!res.ok) throw new Error('unreachable')
+// Errors: 'unreachable', 'wait' (too many requests), or the service's own.
+async function accountsPost<T>(path: string, body: Record<string, string>): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${ACCOUNTS_URL}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+  } catch {
+    throw new Error('unreachable')
+  }
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string }
+  if (res.status === 429) throw new Error('wait')
+  if (!res.ok) throw new Error(data.error ?? 'unreachable')
+  return data
 }
 
-// The newsletter choice, any time. Rejects with 'no-email' if there's no address on file.
-export async function setNewsletter(subscribe: boolean): Promise<EmailStatus> {
-  try {
-    const res = await accountsIq(
-      'set',
-      xml('newsletter', { xmlns: ACCOUNTS, subscribe: String(subscribe) })
-    )
-    return parseEmail(res.getChild('email', ACCOUNTS)!)
-  } catch (e) {
-    const condition = (e as { condition?: string }).condition
-    throw new Error(condition === 'item-not-found' ? 'no-email' : 'unknown')
-  }
+// The JID localpart to sign in with. Addresses without an account get one too (that
+// just fails to sign in), so this never tells whether an address is registered.
+export async function accountFor(email: string): Promise<string> {
+  return (await accountsPost<{ username: string }>('/cuenta', { email })).username
+}
+
+// Which account an invite creates. Rejects with 'invalid-invite' if it's wrong or used.
+export function inviteInfo(token: string): Promise<{ email: string; username: string }> {
+  return accountsPost('/registro', { token })
+}
+
+// The service answers the same whether or not the address has an account.
+export async function requestPasswordReset(email: string): Promise<void> {
+  await accountsPost('/recuperar', { email })
 }

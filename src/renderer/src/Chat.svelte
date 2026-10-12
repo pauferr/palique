@@ -19,10 +19,13 @@
     offline: 'Desconectado'
   }
 
-  // svelte-ignore state_referenced_locally
-  const name = jid.split('@')[0]
   let messages: ChatMessage[] = $state([])
   let contact: Contact | undefined = $state()
+  // Their display name can change while the window is open.
+  const name = $derived(contact?.name ?? '')
+  $effect(() => {
+    if (name) document.title = name
+  })
   let draft = $state('')
   let shaking = $state(false)
   let canBuzz = $state(true)
@@ -73,7 +76,6 @@
   }
 
   onMount(() => {
-    document.title = name
     // Quiet ones (over the contact's buzz limit) show up without shaking or sound.
     const offMessage = window.api.onChatMessage((m, quiet) => {
       if (m.with === jid) add(m, !quiet)
@@ -185,7 +187,7 @@
 
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
   <header>
-    <Avatar {jid} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
+    <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
       <span>Para: <strong>{name}</strong></span>
       <small

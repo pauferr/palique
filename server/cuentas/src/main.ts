@@ -93,9 +93,18 @@ const fakeLocalpart = (email: string): string =>
 
 const INVITES = 'urn:palique:invite:0'
 
-function prosodyIq(child: ReturnType<typeof xml>) {
+function prosodyIq(child: ReturnType<typeof xml>): Promise<ReturnType<typeof xml>> {
   return xmpp.iqCaller.request(xml('iq', { type: 'set', to: USER_DOMAIN }, child))
 }
+
+// Someone just created their account with an invite: from now on it's theirs (if we miss
+// this, their first request here does the same, see db.account).
+xmpp.on('stanza', (stanza) => {
+  const registered = stanza.is('message') && stanza.getChild('registered', INVITES)
+  if (registered && stanza.attrs.from === USER_DOMAIN) {
+    db.account(`${registered.attrs.username}@${USER_DOMAIN}`)
+  }
+})
 
 // --- signed-in users (over XMPP) --------------------------------------------------------
 
@@ -197,7 +206,7 @@ xmpp.iqCallee.get(NS, 'lookup', (ctx) => {
 
 // --- invites (by email only) ------------------------------------------------------------
 
-const inviteStatus = (jid: string) =>
+const inviteStatus = (jid: string): ReturnType<typeof xml> =>
   xml('invites', { xmlns: NS, max: String(MAX_INVITES), used: String(db.invitesUsed(jid)) })
 
 xmpp.iqCallee.get(NS, 'invites', (ctx) => {
@@ -250,7 +259,13 @@ xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
   if (db.invitesUsed(jid) >= MAX_INVITES) return stanzaError('resource-constraint')
   if (db.accountByEmail(address)) return stanzaError('conflict')
   if (db.mayInvite(address) && !db.taken(address)) {
-    await invite(address, jid, String(request.attrs.name ?? '').trim().slice(0, 64))
+    await invite(
+      address,
+      jid,
+      String(request.attrs.name ?? '')
+        .trim()
+        .slice(0, 64)
+    )
   }
   return inviteStatus(jid)
 })
@@ -326,7 +341,7 @@ async function sendReset(email: string): Promise<void> {
       token
     ],
     link: {
-      href: `palique://recuperar?u=${encodeURIComponent(username)}&t=${encodeURIComponent(token)}`,
+      href: `palique://recuperar?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
       label: 'Abrir Palique y elegir contraseña'
     },
     footer:
@@ -336,7 +351,8 @@ async function sendReset(email: string): Promise<void> {
 
 // Signing in: the app asks which JID goes with the email. Unknown addresses get a made-up
 // one that's always the same, so the sign-in just fails like a wrong password.
-const signInIps = ipLimit(30, 60_000)
+// Per IP a minute; development raises it so the checks can run back to back.
+const signInIps = ipLimit(Number(env('SIGNIN_LIMIT', '30')), 60_000)
 
 // Brevo's webhook (configure it with ?token=BREVO_WEBHOOK_TOKEN): someone left the list
 // from a newsletter's own link, or the address bounced or complained. Mirror it here.

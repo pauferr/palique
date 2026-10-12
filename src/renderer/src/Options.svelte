@@ -16,8 +16,33 @@
   let winks = $state(true)
   let theme: Theme = $state('xp')
 
-  // Newsletter: stored with the account service, synced to Brevo once the email is verified.
+  // The email is how you sign in. Changing it needs a link from the new inbox; until then
+  // the old one still works.
   let email: EmailStatus | undefined = $state()
+  let newEmail = $state('')
+  let emailNote = $state('')
+
+  async function changeEmail(event: SubmitEvent): Promise<void> {
+    event.preventDefault()
+    emailNote = ''
+    try {
+      email = await window.api.changeEmail(newEmail.trim())
+      newEmail = ''
+    } catch {
+      emailNote = 'Esa dirección no parece válida.'
+    }
+  }
+
+  async function resend(): Promise<void> {
+    try {
+      await window.api.resendVerification()
+      emailNote = 'Enlace reenviado.'
+    } catch {
+      emailNote = 'Espera un minuto antes de pedir otro enlace.'
+    }
+  }
+
+  // Newsletter: stored with the account service, synced to Brevo.
   let newsletterNote = $state('')
 
   async function toggleNewsletter(event: Event): Promise<void> {
@@ -40,7 +65,10 @@
       .getEmail()
       .then((value) => (email = value))
       .catch(() => {})
-    return window.api.onEmail((value) => (email = value))
+    return window.api.onEmail((value) => {
+      email = value
+      emailNote = ''
+    })
   })
 
   async function exportHistory(): Promise<void> {
@@ -62,6 +90,30 @@
 </header>
 
 <main>
+  <fieldset class="group">
+    <legend>Cuenta</legend>
+    <p>Entras en Palique con <strong>{email?.address}</strong>. Tus contactos no lo ven.</p>
+    {#if email?.pending}
+      <p class="hint" role="status">
+        Te hemos enviado un enlace a {email.pending} para confirmarlo. Hasta entonces sigues entrando
+        con el correo de siempre.
+        <button class="link" onclick={resend}>Reenviar</button>
+      </p>
+    {/if}
+    <form class="change" onsubmit={changeEmail}>
+      <input
+        type="email"
+        bind:value={newEmail}
+        required
+        maxlength="254"
+        placeholder="Nuevo correo"
+        aria-label="Nuevo correo"
+      />
+      <button type="submit">Cambiar</button>
+    </form>
+    {#if emailNote}<p class="hint" role="alert">{emailNote}</p>{/if}
+  </fieldset>
+
   <fieldset class="group">
     <legend>Tema</legend>
     <div class="formats" role="radiogroup" aria-label="Tema">
@@ -111,20 +163,14 @@
       <input
         type="checkbox"
         checked={email?.newsletter ?? false}
-        disabled={!email?.address}
+        disabled={!email}
         onchange={toggleNewsletter}
       />
       Recibir el boletín con las novedades de Palique
     </label>
     <p class="hint">
-      {#if !email?.address}
-        Añade tu correo desde la lista de contactos para poder recibirlo.
-      {:else if !email.verified}
-        Lo recibirás en {email.address} en cuanto confirmes ese correo.
-      {:else}
-        Se envía a {email.address} cuando hay versión nueva o alguna noticia. Puedes darte de baja aquí
-        o desde el enlace de cada boletín.
-      {/if}
+      Se envía a {email?.address} cuando hay versión nueva o alguna noticia. Puedes darte de baja aquí
+      o desde el enlace de cada boletín.
     </p>
     {#if newsletterNote}<p class="hint" role="alert">{newsletterNote}</p>{/if}
   </fieldset>
@@ -205,5 +251,28 @@
 
   button {
     justify-self: start;
+  }
+
+  .change {
+    display: flex;
+    gap: 6px;
+  }
+
+  .change input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .link {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--text-strong);
+    text-decoration: underline;
+  }
+
+  .link:hover:not(:disabled) {
+    background: none;
   }
 </style>

@@ -3,17 +3,18 @@
 
   let {
     jid,
+    name = '',
     url = '',
     show = 'online',
     size = 40
-  }: { jid: string; url?: string; show?: Contact['show']; size?: number } = $props()
+  }: { jid: string; name?: string; url?: string; show?: Contact['show']; size?: number } = $props()
 
   // Default avatar until the cast illustrations exist: initial on one of the theme's colors,
   // always the same for a given user.
   const color = $derived(
     `var(--avatar-${[...jid].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 8})`
   )
-  const initial = $derived(jid.charAt(0).toUpperCase())
+  const initial = $derived((name || jid).charAt(0).toUpperCase())
 </script>
 
 <span class="avatar {show}" style:--size="{size}px" style:--color={color} aria-hidden="true">

@@ -5,7 +5,8 @@ export const FORMATS = ['html', 'txt', 'json'] as const
 export type ExportFormat = (typeof FORMATS)[number]
 export type ExportResult = 'saved' | 'canceled' | 'empty'
 
-const name = (jid: string): string => jid.split('@')[0]
+// Display names by JID (the JIDs themselves are random ids).
+type Names = (jid: string) => string
 
 function stamp(at: number): string {
   return new Date(at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })
@@ -18,7 +19,7 @@ function byContact(messages: ChatMessage[]): Map<string, ChatMessage[]> {
   return groups
 }
 
-function toText(account: string, messages: ChatMessage[]): string {
+function toText(account: string, messages: ChatMessage[], name: Names): string {
   const sections = [...byContact(messages)].map(([contact, list]) => {
     const lines = list.map((m) => {
       const who = m.mine ? name(account) : name(contact)
@@ -29,9 +30,9 @@ function toText(account: string, messages: ChatMessage[]): string {
           : m.body.replaceAll('\n', '\n    ')
       return `[${stamp(m.at)}] ${who}: ${what}`
     })
-    return `=== Conversación con ${contact} ===\n${lines.join('\n')}`
+    return `=== Conversación con ${name(contact)} ===\n${lines.join('\n')}`
   })
-  return `Historial de Palique de ${account}\n\n${sections.join('\n\n')}\n`
+  return `Historial de Palique de ${name(account)}\n\n${sections.join('\n\n')}\n`
 }
 
 const escape = (text: string): string =>
@@ -40,7 +41,7 @@ const escape = (text: string): string =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   )
 
-function toHtml(account: string, messages: ChatMessage[]): string {
+function toHtml(account: string, messages: ChatMessage[], name: Names): string {
   const sections = [...byContact(messages)].map(([contact, list]) => {
     const items = list.map((m) => {
       const who = escape(m.mine ? name(account) : name(contact))
@@ -52,12 +53,12 @@ function toHtml(account: string, messages: ChatMessage[]): string {
         ? `<li class="buzz">${time} ¡${who} ha enviado un zumbido!</li>`
         : `<li${m.mine ? ' class="mine"' : ''}>${time} <b>${who} dice:</b><p>${escape(m.body)}</p></li>`
     })
-    return `<section><h2>${escape(name(contact))} <small>${escape(contact)}</small></h2><ol>${items.join('')}</ol></section>`
+    return `<section><h2>${escape(name(contact))}</h2><ol>${items.join('')}</ol></section>`
   })
   return `<!doctype html>
 <html lang="es">
 <meta charset="utf-8">
-<title>Historial de Palique de ${escape(account)}</title>
+<title>Historial de Palique de ${escape(name(account))}</title>
 <style>
   body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; font-family: system-ui, sans-serif; }
   ol { padding: 0; list-style: none; }
@@ -68,7 +69,7 @@ function toHtml(account: string, messages: ChatMessage[]): string {
   p { margin: 0.1rem 0 0 1rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   .buzz { color: #b03a2e; font-style: italic; }
 </style>
-<h1>Historial de Palique de ${escape(account)}</h1>
+<h1>Historial de Palique de ${escape(name(account))}</h1>
 ${sections.join('\n')}
 </html>
 `
@@ -91,9 +92,10 @@ function toJson(account: string, messages: ChatMessage[]): string {
 export function exportHistory(
   format: ExportFormat,
   account: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  name: Names
 ): string {
-  if (format === 'html') return toHtml(account, messages)
-  if (format === 'txt') return toText(account, messages)
+  if (format === 'html') return toHtml(account, messages, name)
+  if (format === 'txt') return toText(account, messages, name)
   return toJson(account, messages)
 }

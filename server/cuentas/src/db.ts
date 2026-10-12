@@ -71,9 +71,8 @@ export function openDb(file: string) {
   // Someone signed in with an invited JID: the account exists now, with the invited address.
   function claim(jid: string): void {
     if (get(jid)) return
-    const invite = db
-      .prepare('SELECT * FROM invites WHERE jid = ? AND used = 0')
-      .get(jid) as Invite | undefined
+    const invite = db.prepare('SELECT * FROM invites WHERE jid = ? AND used = 0').get(jid) as
+      Invite | undefined
     if (!invite) return
     db.prepare('UPDATE invites SET used = 1 WHERE token = ?').run(invite.token)
     db.prepare('INSERT OR IGNORE INTO accounts (jid, email) VALUES (?, ?)').run(jid, invite.email)

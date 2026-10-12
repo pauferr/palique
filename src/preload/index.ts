@@ -2,30 +2,44 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ExportFormat, ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
-import type { AuthResult, ChatMessage, EmailStatus, Invite, OwnShow, Snapshot } from '../main/xmpp'
+import type {
+  AuthError,
+  AuthLink,
+  AuthResult,
+  ChatMessage,
+  EmailStatus,
+  InviteStatus,
+  OwnShow,
+  Snapshot
+} from '../main/xmpp'
 
 // Custom APIs for renderer
 const api = {
-  login: (username: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:login', username, password),
-  register: (
-    username: string,
-    password: string,
-    signup: { invite: string; email: string; newsletter: boolean }
-  ): Promise<AuthResult> => ipcRenderer.invoke('auth:login', username, password, signup),
-  forgotPassword: (username: string): Promise<void> => ipcRenderer.invoke('auth:forgot', username),
-  resetPassword: (username: string, token: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:reset', username, token, password),
-  pendingReset: (): Promise<{ username: string; token: string } | null> =>
-    ipcRenderer.invoke('auth:pending-reset'),
-  onResetLink: (callback: (link: { username: string; token: string }) => void): (() => void) => {
-    const listener = (_: unknown, link: { username: string; token: string }): void => callback(link)
-    ipcRenderer.on('auth:reset-link', listener)
-    return () => ipcRenderer.off('auth:reset-link', listener)
+  login: (email: string, password: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:login', email, password),
+  inviteEmail: (
+    token: string
+  ): Promise<{ ok: true; email: string } | { ok: false; error: AuthError }> =>
+    ipcRenderer.invoke('auth:invite', token),
+  register: (signup: {
+    token: string
+    nick: string
+    password: string
+    newsletter: boolean
+  }): Promise<AuthResult> => ipcRenderer.invoke('auth:register', signup),
+  forgotPassword: (email: string): Promise<void> => ipcRenderer.invoke('auth:forgot', email),
+  resetPassword: (email: string, token: string, password: string): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:reset', email, token, password),
+  lastEmail: (): Promise<string> => ipcRenderer.invoke('auth:last-email'),
+  pendingLink: (): Promise<AuthLink | null> => ipcRenderer.invoke('auth:pending-link'),
+  onLink: (callback: (link: AuthLink) => void): (() => void) => {
+    const listener = (_: unknown, link: AuthLink): void => callback(link)
+    ipcRenderer.on('auth:link', listener)
+    return () => ipcRenderer.off('auth:link', listener)
   },
   getEmail: (): Promise<EmailStatus> => ipcRenderer.invoke('account:email'),
-  setEmail: (address: string, newsletter: boolean): Promise<EmailStatus> =>
-    ipcRenderer.invoke('account:set-email', address, newsletter),
+  changeEmail: (address: string): Promise<EmailStatus> =>
+    ipcRenderer.invoke('account:set-email', address),
   resendVerification: (): Promise<void> => ipcRenderer.invoke('account:resend'),
   setNewsletter: (subscribe: boolean): Promise<EmailStatus> =>
     ipcRenderer.invoke('account:newsletter', subscribe),
@@ -34,10 +48,10 @@ const api = {
     ipcRenderer.on('account:email', listener)
     return () => ipcRenderer.off('account:email', listener)
   },
-  createInvite: (): Promise<Invite> => ipcRenderer.invoke('invites:create'),
-  inviteByEmail: (address: string): Promise<void> => ipcRenderer.invoke('invites:email', address),
-  listInvites: (): Promise<{ invites: Invite[]; max: number }> =>
-    ipcRenderer.invoke('invites:list'),
+  setNick: (name: string): Promise<void> => ipcRenderer.invoke('account:nick', name),
+  inviteStatus: (): Promise<InviteStatus> => ipcRenderer.invoke('invites:status'),
+  inviteByEmail: (address: string): Promise<InviteStatus> =>
+    ipcRenderer.invoke('invites:email', address),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   getRoster: (): Promise<Snapshot> => ipcRenderer.invoke('roster:snapshot'),
   // Returns an unsubscribe function.
@@ -51,7 +65,8 @@ const api = {
     ipcRenderer.on('contact:online', listener)
     return () => ipcRenderer.off('contact:online', listener)
   },
-  addContact: (address: string): Promise<void> => ipcRenderer.invoke('roster:add', address),
+  addContact: (address: string): Promise<'added' | 'not-found' | 'self'> =>
+    ipcRenderer.invoke('roster:add', address),
   acceptRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:accept', jid),
   rejectRequest: (jid: string): Promise<void> => ipcRenderer.invoke('roster:reject', jid),
   removeContact: (jid: string): Promise<void> => ipcRenderer.invoke('roster:remove', jid),

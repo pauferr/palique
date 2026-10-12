@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Contact, EmailStatus, Invite, OwnShow, Snapshot } from '../../main/xmpp'
+  import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
@@ -18,6 +18,7 @@
     connected: true,
     contacts: [],
     requests: [],
+    name: '',
     avatar: '',
     show: 'online'
   })
@@ -25,37 +26,23 @@
   let avatarError = $state('')
   let presenceError = $state('')
   let status = $state('')
-  let address = $state('')
 
   // Two groups like MSN, alphabetical inside each.
-  let sorted = $derived([...roster.contacts].sort((a, b) => a.jid.localeCompare(b.jid)))
+  let sorted = $derived(
+    [...roster.contacts].sort((a, b) => a.name.localeCompare(b.name) || a.jid.localeCompare(b.jid))
+  )
   let groups = $derived([
     { label: 'Conectados', contacts: sorted.filter((c) => c.show !== 'offline') },
     { label: 'Desconectados', contacts: sorted.filter((c) => c.show === 'offline') }
   ])
 
-  const name = (jid: string): string => jid.split('@')[0]
-
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
-    window.api
-      .getEmail()
-      .then((value) => (email = value))
-      .catch(() => {})
-    const offEmail = window.api.onEmail((value) => {
-      email = value
-      emailNote = ''
-    })
-    const offRoster = window.api.onRoster((value) => {
-      roster = value
-      // Someone may have just joined with one of our invites.
-      if (invitesOpen) loadInvites()
-    })
+    const offRoster = window.api.onRoster((value) => (roster = value))
     const offOnline = window.api.onContactOnline(() => {
       new Audio(onlineSound).play().catch(() => {})
     })
     return () => {
-      offEmail()
       offRoster()
       offOnline()
     }
@@ -71,6 +58,21 @@
     } catch {
       presenceError = 'No se ha podido cambiar el estado.'
       statusSelect.value = roster.show
+    }
+  }
+
+  // Our display name, edited in place like the personal message. Empty puts it back.
+  async function rename(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement
+    if (!input.value.trim()) {
+      input.value = roster.name
+      return
+    }
+    try {
+      await window.api.setNick(input.value)
+    } catch {
+      input.value = roster.name
+      presenceError = 'No se ha podido cambiar tu nombre.'
     }
   }
 
@@ -104,102 +106,79 @@
     }
   }
 
-  // Email for password recovery: a notice until it's verified.
-  let email: EmailStatus | undefined = $state()
-  let newEmail = $state('')
-  let emailNote = $state('')
-
-  async function saveEmail(event: SubmitEvent): Promise<void> {
-    event.preventDefault()
-    emailNote = ''
-    try {
-      email = await window.api.setEmail(newEmail.trim(), email?.newsletter ?? false)
-    } catch {
-      emailNote = 'Esa dirección no parece válida.'
-    }
-  }
-
-  async function resend(): Promise<void> {
-    try {
-      await window.api.resendVerification()
-      emailNote = 'Enlace reenviado.'
-    } catch {
-      emailNote = 'Espera un minuto antes de pedir otro enlace.'
-    }
-  }
-
-  // "Invite a friend": the server creates the code and enforces the per-user limit.
-  let invitesOpen = $state(false)
-  let invites: Invite[] = $state([])
-  let maxInvites = $state(0)
-  let newInvite = $state('')
-  let inviteError = $state('')
-  let copied = $state(false)
-
-  async function loadInvites(): Promise<void> {
-    const result = await window.api.listInvites()
-    invites = result.invites
-    maxInvites = result.max
-  }
-
-  async function toggleInvites(): Promise<void> {
-    invitesOpen = !invitesOpen
-    newInvite = ''
-    inviteError = ''
-    if (invitesOpen) await loadInvites()
-  }
-
-  async function invite(): Promise<void> {
-    inviteError = ''
-    copied = false
-    try {
-      newInvite = (await window.api.createInvite()).token
-    } catch (e) {
-      inviteError = String(e).includes('limit')
-        ? `Ya tienes ${maxInvites} invitaciones sin usar. Espera a que se usen o caduquen.`
-        : 'No se ha podido crear la invitación.'
-    }
-    await loadInvites()
-  }
-
-  let inviteEmail = $state('')
-  let inviteSent = $state('')
-
-  // The answer is the same whether or not the address already has an account.
-  async function emailInvite(event: SubmitEvent): Promise<void> {
-    event.preventDefault()
-    inviteError = ''
-    inviteSent = ''
-    try {
-      await window.api.inviteByEmail(inviteEmail.trim())
-      inviteSent = `Invitación enviada a ${inviteEmail.trim()}.`
-      inviteEmail = ''
-    } catch (e) {
-      inviteError = String(e).includes('limit')
-        ? `Ya tienes ${maxInvites} invitaciones sin usar. Espera a que se usen o caduquen.`
-        : String(e).includes('invalid')
-          ? 'Esa dirección no parece válida.'
-          : 'No se ha podido enviar la invitación.'
-    }
-    await loadInvites()
-  }
-
-  async function copyInvite(): Promise<void> {
-    await navigator.clipboard.writeText(newInvite)
-    copied = true
-  }
-
-  const until = (iso: string): string =>
-    new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' })
+  // Adding someone is by email. If they're not on Palique, inviting them is a separate,
+  // explicit step (invites are limited).
+  let address = $state('')
+  let addNote = $state('')
+  let notFound = $state('') // address with no account, offered an invite
 
   async function add(event: SubmitEvent): Promise<void> {
     event.preventDefault()
-    await window.api.addContact(address)
-    address = ''
+    addNote = ''
+    notFound = ''
+    const value = address.trim().toLowerCase()
+    try {
+      const result = await window.api.addContact(value)
+      if (result === 'added') {
+        addNote = 'Solicitud enviada. Aparecerá en tu lista cuando te acepte.'
+        address = ''
+      } else if (result === 'self') addNote = 'Ese es tu propio correo.'
+      else notFound = value
+    } catch (e) {
+      addNote = String(e).includes('wait')
+        ? 'Has buscado demasiados correos. Espera un rato.'
+        : String(e).includes('invalid')
+          ? 'Esa dirección no parece válida.'
+          : 'No se ha podido añadir.'
+    }
+  }
+
+  // Invites: email only, a few per person.
+  let invitesOpen = $state(false)
+  let invites: InviteStatus | undefined = $state()
+  let inviteEmail = $state('')
+  let inviteNote = $state('')
+  const left = $derived(invites ? Math.max(0, invites.max - invites.used) : 0)
+
+  async function toggleInvites(): Promise<void> {
+    invitesOpen = !invitesOpen
+    inviteNote = ''
+    if (invitesOpen) invites = await window.api.inviteStatus()
+  }
+
+  async function sendInvite(value: string): Promise<void> {
+    inviteNote = ''
+    invites ??= await window.api.inviteStatus().catch(() => undefined)
+    const count = left === 1 ? 'Te queda 1 invitación' : `Te quedan ${left} invitaciones`
+    if (!confirm(`¿Enviar una invitación a Palique a ${value}? ${count}.`)) return
+    try {
+      invites = await window.api.inviteByEmail(value)
+      inviteNote = `Invitación enviada a ${value}. Cuando cree su cuenta, estaréis en vuestras listas.`
+      inviteEmail = ''
+      if (notFound === value) notFound = ''
+    } catch (e) {
+      const reason = String(e)
+      inviteNote = reason.includes('limit')
+        ? 'Ya no te quedan invitaciones.'
+        : reason.includes('registered')
+          ? 'Esa persona ya está en Palique: añádela con su correo.'
+          : reason.includes('invalid')
+            ? 'Esa dirección no parece válida.'
+            : 'No se ha podido enviar la invitación.'
+    }
+    if (notFound === value) {
+      addNote = inviteNote
+      notFound = ''
+    }
+  }
+
+  function emailInvite(event: SubmitEvent): void {
+    event.preventDefault()
+    sendInvite(inviteEmail.trim().toLowerCase())
   }
 
   function remove(contact: Contact): void {
-    if (confirm(`¿Eliminar a ${name(contact.jid)} de tus contactos?`)) {
+    if (confirm(`¿Eliminar a ${contact.name} de tus contactos?`)) {
       window.api.removeContact(contact.jid)
     }
   }
@@ -210,6 +189,7 @@
     <button class="me" onclick={() => picker.click()} title="Cambiar tu imagen">
       <Avatar
         {jid}
+        name={roster.name}
         url={roster.avatar}
         show={roster.show === 'invisible' ? 'offline' : roster.show}
         size={56}
@@ -224,7 +204,14 @@
     />
     <div class="identity">
       <div class="line">
-        <strong>{name(jid)}</strong>
+        <input
+          class="nick"
+          value={roster.name}
+          onchange={rename}
+          maxlength="64"
+          aria-label="Tu nombre"
+          title="Cambiar tu nombre"
+        />
         <select
           bind:this={statusSelect}
           value={roster.show}
@@ -253,37 +240,16 @@
   {#if roster.show === 'invisible'}
     <p class="notice">Estás invisible: tus contactos te ven desconectado, pero puedes chatear.</p>
   {/if}
-  {#if email && !email.address}
-    <form class="notice warning email" onsubmit={saveEmail}>
-      <span>Añade tu correo para poder recuperar la contraseña si la olvidas.</span>
-      <input
-        type="email"
-        bind:value={newEmail}
-        required
-        maxlength="254"
-        placeholder="tu@correo.com"
-        aria-label="Correo electrónico"
-      />
-      <button type="submit">Guardar</button>
-      {#if emailNote}<span>{emailNote}</span>{/if}
-    </form>
-  {:else if email && !email.verified}
-    <p class="notice warning" role="status">
-      Confirma tu correo: te enviamos un enlace a <strong>{email.address}</strong>.
-      <button class="link" onclick={resend}>Reenviar</button>
-      {#if emailNote}<span>{emailNote}</span>{/if}
-    </p>
-  {/if}
   {#if !roster.connected}
     <p class="notice warning" role="status">Reconectando…</p>
   {/if}
 
   <div class="list">
-    {#each roster.requests as request (request)}
+    {#each roster.requests as request (request.jid)}
       <div class="request">
-        <span><strong>{name(request)}</strong> quiere añadirte</span>
-        <button onclick={() => window.api.acceptRequest(request)}>Aceptar</button>
-        <button onclick={() => window.api.rejectRequest(request)}>Rechazar</button>
+        <span><strong>{request.name}</strong> quiere añadirte</span>
+        <button onclick={() => window.api.acceptRequest(request.jid)}>Aceptar</button>
+        <button onclick={() => window.api.rejectRequest(request.jid)}>Rechazar</button>
       </div>
     {/each}
 
@@ -295,10 +261,16 @@
             {#each group.contacts as contact (contact.jid)}
               <li>
                 <span title={labels[contact.show]}>
-                  <Avatar jid={contact.jid} url={contact.avatar} show={contact.show} size={28} />
+                  <Avatar
+                    jid={contact.jid}
+                    name={contact.name}
+                    url={contact.avatar}
+                    show={contact.show}
+                    size={28}
+                  />
                 </span>
                 <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                  {name(contact.jid)}
+                  {contact.name}
                   {#if contact.pending}
                     <small>- Esperando a que te acepte</small>
                   {:else if contact.status}
@@ -309,7 +281,7 @@
                   class="remove"
                   onclick={() => remove(contact)}
                   title="Eliminar contacto"
-                  aria-label="Eliminar a {name(contact.jid)}">×</button
+                  aria-label="Eliminar a {contact.name}">×</button
                 >
               </li>
             {/each}
@@ -317,14 +289,29 @@
         </details>
       {/each}
     {:else}
-      <p class="empty">
-        Aún no tienes contactos. Invita a tus amigos o añade a alguien por su usuario.
-      </p>
+      <p class="empty">Aún no tienes contactos. Añade a alguien con su correo o invítale.</p>
     {/if}
   </div>
 
+  {#if addNote || notFound}
+    <p class="notice" role="status">
+      {#if notFound}
+        No hay nadie en Palique con {notFound}.
+        <button class="link" onclick={() => sendInvite(notFound)}>Enviar invitación</button>
+      {:else}
+        {addNote}
+      {/if}
+    </p>
+  {/if}
   <form onsubmit={add}>
-    <input bind:value={address} required placeholder="Usuario del contacto" aria-label="Usuario" />
+    <input
+      type="email"
+      bind:value={address}
+      required
+      maxlength="254"
+      placeholder="Correo del contacto"
+      aria-label="Correo del contacto"
+    />
     <button type="submit">+ Añadir</button>
   </form>
 
@@ -334,31 +321,24 @@
         Para crear una cuenta en Palique hace falta una invitación. Quien entre con la tuya
         aparecerá directamente en tus contactos.
       </p>
-      {#if newInvite}
-        <div class="code">
-          <code>{newInvite}</code>
-          <button onclick={copyInvite}>{copied ? 'Copiado' : 'Copiar'}</button>
-        </div>
-      {/if}
-      {#if inviteError}<p class="error" role="alert">{inviteError}</p>{/if}
-      <button onclick={invite} disabled={invites.length >= maxInvites}>Crear código</button>
       <form class="send" onsubmit={emailInvite}>
         <input
           type="email"
           bind:value={inviteEmail}
           required
           maxlength="254"
-          placeholder="o envíala a su correo"
+          placeholder="Su correo"
           aria-label="Correo de la persona invitada"
         />
-        <button type="submit" disabled={invites.length >= maxInvites}>Enviar</button>
+        <button type="submit" disabled={!left}>Invitar</button>
       </form>
-      {#if inviteSent}<p class="hint" role="status">{inviteSent}</p>{/if}
-      <p class="hint">
-        Invitaciones sin usar: {invites.length} de {maxInvites}{#if invites.length}{' '}· caducan el {invites
-            .map((i) => until(i.expires))
-            .join(', ')}{/if}
-      </p>
+      {#if inviteNote}<p class="hint" role="status">{inviteNote}</p>{/if}
+      {#if invites}
+        <p class="hint">
+          {left === 1 ? 'Te queda 1 invitación' : `Te quedan ${left} invitaciones`} de {invites.max}.
+          Las que caducan sin usarse vuelven a contar.
+        </p>
+      {/if}
     </div>
   {/if}
 
@@ -406,8 +386,16 @@
     align-items: center;
   }
 
-  .line strong {
+  /* Our name reads as bold text until you click it. */
+  .nick {
+    flex: 1;
+    min-width: 0;
+    padding: 0 2px;
+    border-color: transparent;
+    box-shadow: none;
+    background: transparent;
     color: var(--text-strong);
+    font-weight: bold;
   }
 
   /* Status reads like text next to the name, MSN style. */
@@ -429,6 +417,8 @@
     font-style: italic;
   }
 
+  .nick:hover,
+  .nick:focus,
   .personal:hover,
   .personal:focus {
     border-color: var(--field-border-color);
@@ -451,22 +441,6 @@
 
   .notice.warning {
     background: var(--warning-bg);
-  }
-
-  .notice.email {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 6px;
-    align-items: center;
-  }
-
-  .notice.email span {
-    flex-basis: 100%;
-  }
-
-  .notice.email input {
-    flex: 1;
-    min-width: 0;
   }
 
   .link {
@@ -586,10 +560,6 @@
     margin: 0;
   }
 
-  .invites > button {
-    justify-self: start;
-  }
-
   .send {
     display: flex;
     gap: 6px;
@@ -601,25 +571,6 @@
   .send input {
     flex: 1;
     min-width: 0;
-  }
-
-  .code {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-
-  code {
-    flex: 1;
-    padding: 3px 6px;
-    overflow: hidden;
-    border: solid var(--field-border-width);
-    border-color: var(--field-border-color);
-    border-radius: var(--radius);
-    background: var(--field-bg);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    user-select: all;
   }
 
   .hint {

@@ -9,9 +9,10 @@ export type Settings = {
   theme: Theme
   winks: boolean // play winks full screen
   show: OwnShow // last status, used at the next sign-in (like MSN)
+  email: string // last account signed in, pre-filled on the sign-in screen
 }
 
-const DEFAULTS: Settings = { theme: 'xp', winks: true, show: 'online' }
+const DEFAULTS: Settings = { theme: 'xp', winks: true, show: 'online', email: '' }
 
 export type SettingsStore = {
   get(): Settings

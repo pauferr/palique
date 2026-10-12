@@ -7,6 +7,7 @@
 --     become mutual contacts.
 --   iq set <reset for='username'/>  -> a password reset code (valid 1 hour, single use;
 --     the app re-registers the same username with it, see mod_invites).
+-- New accounts are announced to them: <message><registered username='…'/></message>.
 
 local st = require "prosody.util.stanza";
 local datetime = require "prosody.util.datetime";
@@ -61,6 +62,10 @@ module:hook("user-registering", function (event)
 end);
 
 module:hook("user-registered", function (event)
+	for component in trusted do
+		module:send(st.message({ to = component, from = module.host })
+			:tag("registered", { xmlns = xmlns, username = event.username }));
+	end
 	local invite = event.validated_invite or (event.session and event.session.validated_invite);
 	local inviter = invite and invite.additional_data and invite.additional_data.palique_inviter;
 	if not inviter or not usermanager.user_exists(inviter, module.host) then return; end

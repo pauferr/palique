@@ -10,10 +10,10 @@
     jid = ''
   }
 
-  // A password recovery link while signed in: sign out so the reset form shows (it picks
-  // the link up itself).
+  // An invite or password recovery link while signed in: sign out so its form shows (it
+  // picks the link up itself).
   onMount(() =>
-    window.api.onResetLink(() => {
+    window.api.onLink(() => {
       if (jid) logout()
     })
   )

@@ -31,16 +31,19 @@ import {
   AVATAR_MAX_BYTES,
   DOMAIN,
   acceptRequest,
+  accountFor,
   addContact,
-  createInvite,
+  changeEmail,
   emailStatus,
   inviteByEmail,
-  listInvites,
+  inviteInfo,
+  inviteStatus,
+  lookupContact,
   onEmail,
   requestPasswordReset,
   resendVerification,
-  setEmail,
   setNewsletter,
+  setNick,
   login,
   logout,
   onChange,
@@ -56,7 +59,10 @@ import {
   sendWink,
   setAvatar,
   setPresence,
+  cleanNick,
   snapshot,
+  type AuthLink,
+  type AuthResult,
   type ChatMessage,
   type OwnShow,
   type Snapshot
@@ -66,48 +72,51 @@ import {
 // window. That's also the way back on desktops without a tray (GNOME by default).
 if (!app.requestSingleInstanceLock()) app.exit(0)
 
-// palique:// links (password recovery emails). In development Electron itself is the
-// handler, so it needs the app's path to know what to open.
+// palique:// links (invite and password recovery emails). In development Electron itself
+// is the handler, so it needs the app's path to know what to open.
 if (process.defaultApp && process.argv[1]) {
   app.setAsDefaultProtocolClient('palique', process.execPath, [resolve(process.argv[1])])
 } else {
   app.setAsDefaultProtocolClient('palique')
 }
 
-type ResetLink = { username: string; token: string }
-let pendingReset: ResetLink | null = null
+let pendingLink: AuthLink | null = null
 
-// Only palique://recuperar?u=…&t=… with sane values; anything else is ignored.
-function parseResetLink(value: string | undefined): ResetLink | null {
+// Only palique://registro?t=… and palique://recuperar?e=…&t=… with sane values; anything
+// else is ignored.
+function parseLink(value: string | undefined): AuthLink | null {
   if (!value?.startsWith('palique://')) return null
   try {
     const url = new URL(value)
-    const username = url.searchParams.get('u') ?? ''
     const token = url.searchParams.get('t') ?? ''
-    if (url.hostname !== 'recuperar') return null
-    if (!/^[a-z0-9._-]{1,64}$/.test(username) || !/^[\w-]{8,64}$/.test(token)) return null
-    return { username, token }
+    const email = url.searchParams.get('e') ?? ''
+    if (!/^[\w-]{8,64}$/.test(token)) return null
+    if (url.hostname === 'registro') return { kind: 'invite', token, email: '' }
+    if (url.hostname === 'recuperar' && email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email)) {
+      return { kind: 'reset', token, email }
+    }
+    return null
   } catch {
     return null
   }
 }
 
-// Opens the sign-in screen's "new password" form, filled in (never submitted by itself).
-function openResetLink(link: ResetLink | null): void {
+// Opens the sign-up or "new password" form, filled in (never submitted by itself).
+function openLink(link: AuthLink | null): void {
   if (!link) return
-  pendingReset = link
+  pendingLink = link
   showMain()
-  mainWindow?.webContents.send('auth:reset-link', link)
+  mainWindow?.webContents.send('auth:link', link)
 }
 
 // macOS delivers links as an event (possibly before the app is ready)…
 app.on('open-url', (event, url) => {
   event.preventDefault()
-  if (app.isReady()) openResetLink(parseResetLink(url))
-  else pendingReset = parseResetLink(url)
+  if (app.isReady()) openLink(parseLink(url))
+  else pendingLink = parseLink(url)
 })
 // …Linux and Windows as an argument, at launch or to the already running instance.
-pendingReset ??= parseResetLink(process.argv.find((arg) => arg.startsWith('palique://')))
+pendingLink ??= parseLink(process.argv.find((arg) => arg.startsWith('palique://')))
 
 // Native Wayland clients can't stay on top in every compositor (GNOME refuses),
 // which would break the full-screen wink overlay. XWayland handles it everywhere.
@@ -197,7 +206,8 @@ function notify(title: string, body: string, onClick: () => void): void {
   notification.show()
 }
 
-const contactName = (jid: string): string => jid.split('@')[0]
+const contactName = (jid: string): string =>
+  snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre'
 
 function notifyMessage(message: ChatMessage): void {
   const body = message.buzz
@@ -215,6 +225,7 @@ let previous: Snapshot = {
   connected: false,
   contacts: [],
   requests: [],
+  name: '',
   avatar: '',
   show: 'online'
 }
@@ -257,7 +268,7 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
     minHeight: 360,
     show: false,
     autoHideMenuBar: true,
-    title: contact.split('@')[0],
+    title: contactName(contact),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
   })
@@ -306,7 +317,10 @@ async function exportChats(win: BrowserWindow | null, format: ExportFormat): Pro
     ? await dialog.showSaveDialog(win, save)
     : await dialog.showSaveDialog(save)
   if (canceled || !filePath) return 'canceled'
-  await writeFile(filePath, exportHistory(format, account, messages), 'utf8')
+  const state = snapshot()
+  const name = (jid: string): string =>
+    jid === account ? state.name : (state.contacts.find((c) => c.jid === jid)?.name ?? jid)
+  await writeFile(filePath, exportHistory(format, account, messages, name), 'utf8')
   return 'saved'
 }
 
@@ -383,35 +397,82 @@ app.whenReady().then(() => {
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
-  // `signup`: present when creating the account (invite code, email, newsletter consent).
-  type Signup = { invite: string; email: string; newsletter: boolean }
-  ipcMain.handle('auth:login', async (_, username: string, password: string, signup?: Signup) => {
-    // Sign in with the last status, so an invisible user is never briefly visible.
+  // Sign in with the last status, so an invisible user is never briefly visible.
+  const lastShow = (): OwnShow => {
     const last = settings.get().show
-    const show = shows.includes(last) ? last : 'online'
-    const result = await login(String(username), String(password), {
-      invite: signup ? String(signup.invite) : undefined,
-      show
-    })
-    if (result.ok) account = result.jid
-    // The account exists now; if this fails, the contact list asks for the email again.
-    if (result.ok && signup) {
-      await setEmail(String(signup.email), Boolean(signup.newsletter)).catch(() => {})
+    return shows.includes(last) ? last : 'online'
+  }
+  // Errors before reaching the XMPP server (the account service) as sign-in errors.
+  const failed = (e: unknown): AuthResult => {
+    const error = (e as Error).message
+    return {
+      ok: false,
+      error: error === 'wait' || error === 'invalid-invite' ? error : 'unreachable'
     }
-    return result
-  })
-  ipcMain.handle('auth:forgot', (_, username: string) => requestPasswordReset(String(username)))
-  // Sets a new password with the emailed code, then signs in with it.
-  ipcMain.handle('auth:reset', async (_, username: string, token: string, password: string) => {
-    const result = await login(String(username), String(password), { invite: String(token) })
+  }
+  // Signed in: remember the email for next time (pre-filled on the sign-in screen).
+  const signedIn = (result: AuthResult, email: string): AuthResult => {
     if (result.ok) {
       account = result.jid
-      pendingReset = null
+      pendingLink = null
+      settings.set({ email })
     }
     return result
+  }
+  const clean = (email: unknown): string => String(email).trim().toLowerCase()
+
+  ipcMain.handle('auth:login', async (_, email: string, password: string) => {
+    try {
+      const username = await accountFor(clean(email))
+      const result = await login(username, String(password), { show: lastShow() })
+      return signedIn(result, clean(email))
+    } catch (e) {
+      return failed(e)
+    }
+  })
+  // Which address an invite is for (the sign-up form shows it).
+  ipcMain.handle('auth:invite', async (_, token: string) => {
+    try {
+      return { ok: true, email: (await inviteInfo(String(token).trim())).email }
+    } catch (e) {
+      return failed(e)
+    }
+  })
+  type Signup = { token: string; nick: string; password: string; newsletter: boolean }
+  ipcMain.handle('auth:register', async (_, signup: Signup) => {
+    try {
+      const token = String(signup.token).trim()
+      const nick = cleanNick(signup.nick)
+      if (!nick) return { ok: false, error: 'unknown' }
+      const invite = await inviteInfo(token)
+      const result = await login(invite.username, String(signup.password), {
+        invite: token,
+        nick,
+        show: lastShow()
+      })
+      if (result.ok && signup.newsletter) await setNewsletter(true).catch(() => {})
+      return signedIn(result, invite.email)
+    } catch (e) {
+      return failed(e)
+    }
+  })
+  ipcMain.handle('auth:forgot', (_, email: string) => requestPasswordReset(clean(email)))
+  // Sets a new password with the emailed code, then signs in with it.
+  ipcMain.handle('auth:reset', async (_, email: string, token: string, password: string) => {
+    try {
+      const username = await accountFor(clean(email))
+      const result = await login(username, String(password), {
+        invite: String(token).trim(),
+        show: lastShow()
+      })
+      return signedIn(result, clean(email))
+    } catch (e) {
+      return failed(e)
+    }
   })
   // A link may have opened the app before the sign-in screen was listening.
-  ipcMain.handle('auth:pending-reset', () => pendingReset)
+  ipcMain.handle('auth:pending-link', () => pendingLink)
+  ipcMain.handle('auth:last-email', () => settings.get().email)
   ipcMain.handle('auth:logout', async () => {
     await logout()
     account = ''
@@ -428,8 +489,8 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
   })
   ipcMain.handle('account:email', () => emailStatus())
-  ipcMain.handle('account:set-email', (_, address: string, newsletter: boolean) =>
-    setEmail(String(address), Boolean(newsletter)).then((email) => {
+  ipcMain.handle('account:set-email', (_, address: string) =>
+    changeEmail(clean(address)).then((email) => {
       BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
       return email
     })
@@ -441,11 +502,21 @@ app.whenReady().then(() => {
       return email
     })
   )
-  ipcMain.handle('invites:create', () => createInvite())
-  ipcMain.handle('invites:email', (_, address: string) => inviteByEmail(String(address)))
-  ipcMain.handle('invites:list', () => listInvites())
+  ipcMain.handle('account:nick', (_, name: string) => setNick(String(name)))
+  ipcMain.handle('invites:status', () => inviteStatus())
+  ipcMain.handle('invites:email', (_, address: string) => inviteByEmail(clean(address)))
   ipcMain.handle('roster:snapshot', () => snapshot())
-  ipcMain.handle('roster:add', (_, address: string) => addContact(String(address)))
+  // By email. Inviting someone without an account is a separate, explicit step.
+  ipcMain.handle(
+    'roster:add',
+    async (_, address: string): Promise<'added' | 'not-found' | 'self'> => {
+      const jid = await lookupContact(clean(address))
+      if (!jid) return 'not-found'
+      if (jid === account) return 'self'
+      await addContact(jid)
+      return 'added'
+    }
+  )
   ipcMain.handle('roster:accept', (_, jid: string) => acceptRequest(String(jid)))
   ipcMain.handle('roster:reject', (_, jid: string) => rejectRequest(String(jid)))
   ipcMain.handle('roster:remove', (_, jid: string) => removeContact(String(jid)))
@@ -535,7 +606,7 @@ app.whenReady().then(() => {
   createTray()
   app.on('second-instance', (_, argv) => {
     showMain()
-    openResetLink(parseResetLink(argv.find((arg) => arg.startsWith('palique://'))))
+    openLink(parseLink(argv.find((arg) => arg.startsWith('palique://'))))
   })
   // macOS: clicking the dock icon brings the contact list back.
   app.on('activate', showMain)

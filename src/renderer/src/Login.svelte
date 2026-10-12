@@ -1,63 +1,86 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import type { AuthLink } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
 
   let { onlogin }: { onlogin: (jid: string) => void } = $props()
 
   const messages = {
-    conflict: 'Ese nombre de usuario ya está cogido.',
-    'not-acceptable': 'El servidor no acepta ese usuario o contraseña.',
-    'not-authorized': 'Usuario o contraseña incorrectos.',
-    'invalid-invite': 'El código de invitación no es válido o ha caducado.',
+    conflict: 'Esta invitación ya se usó para crear una cuenta. Inicia sesión.',
+    'not-acceptable': 'El servidor no acepta esa contraseña.',
+    'not-authorized': 'Correo o contraseña incorrectos.',
+    'invalid-invite': 'La invitación no es válida, ya se usó o ha caducado.',
+    wait: 'Demasiados intentos. Espera un minuto.',
     unreachable: 'No se puede conectar con el servidor.',
     unknown: 'Algo ha fallado. Inténtalo de nuevo.'
   }
 
-  // forgot: ask for a recovery email. reset: new password with the emailed code.
+  // register: with an invite from an email. forgot: ask for a recovery email.
+  // reset: new password with the emailed code.
   let mode: 'login' | 'register' | 'forgot' | 'reset' = $state('login')
-  let username = $state('')
+  let email = $state('')
   let password = $state('')
   let confirm = $state('')
   let invite = $state('')
+  let invitedEmail = $state('') // the invite's address, once the code checks out
+  let nick = $state('')
   let code = $state('')
-  let email = $state('')
   let newsletter = $state(false)
   let error = $state('')
   let info = $state('')
   let busy = $state(false)
 
-  const user = (): string => username.trim().toLowerCase()
-  const submitLabel = {
+  const address = (): string => email.trim().toLowerCase()
+  // The invite code can be pasted bare or as the whole link (palique://registro?t=CODE).
+  const inviteCode = (): string => invite.trim().match(/[?&]t=([^&\s]+)/)?.[1] ?? invite.trim()
+  const submitLabel = $derived({
     login: 'Iniciar sesión',
-    register: 'Crear cuenta',
+    register: invitedEmail ? 'Crear cuenta' : 'Continuar',
     forgot: 'Enviar enlace',
     reset: 'Cambiar contraseña'
-  }
+  })
 
   function go(next: typeof mode): void {
     mode = next
     error = ''
     info = ''
     confirm = ''
+    invitedEmail = ''
     if (next !== 'login') password = ''
   }
 
-  // A recovery link from the email fills the form in; the user still confirms.
-  function useLink(link: { username: string; token: string } | null): void {
+  // A link from an email fills the form in; the user still confirms.
+  function useLink(link: AuthLink | null): void {
     if (!link) return
-    go('reset')
-    username = link.username
-    code = link.token
+    if (link.kind === 'reset') {
+      go('reset')
+      email = link.email
+      code = link.token
+    } else {
+      go('register')
+      invite = link.token
+      checkInvite()
+    }
   }
 
   onMount(() => {
-    window.api.pendingReset().then(useLink)
-    return window.api.onResetLink(useLink)
+    window.api.lastEmail().then((value) => (email ||= value))
+    window.api.pendingLink().then(useLink)
+    return window.api.onLink(useLink)
   })
+
+  async function checkInvite(): Promise<void> {
+    busy = true
+    const result = await window.api.inviteEmail(inviteCode())
+    busy = false
+    if ('email' in result) invitedEmail = result.email
+    else error = messages[result.error]
+  }
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault()
     error = ''
+    if (mode === 'register' && !invitedEmail) return checkInvite()
     if ((mode === 'register' || mode === 'reset') && password !== confirm) {
       error = 'Las contraseñas no coinciden.'
       return
@@ -65,8 +88,8 @@
     busy = true
     if (mode === 'forgot') {
       try {
-        await window.api.forgotPassword(user())
-        info = `Si «${user()}» tiene un correo confirmado, te hemos enviado un enlace y un código. Caducan en una hora.`
+        await window.api.forgotPassword(address())
+        info = `Si ${address()} tiene cuenta, te hemos enviado un enlace y un código. Caducan en una hora.`
       } catch {
         error = messages.unreachable
       }
@@ -75,10 +98,10 @@
     }
     const result =
       mode === 'register'
-        ? await window.api.register(user(), password, { invite, email: email.trim(), newsletter })
+        ? await window.api.register({ token: inviteCode(), nick, password, newsletter })
         : mode === 'reset'
-          ? await window.api.resetPassword(user(), code.trim(), password)
-          : await window.api.login(user(), password)
+          ? await window.api.resetPassword(address(), code.trim(), password)
+          : await window.api.login(address(), password)
     busy = false
     if ('jid' in result) onlogin(result.jid)
     else if (mode === 'reset' && result.error === 'invalid-invite') {
@@ -95,42 +118,45 @@
 
   <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
   <div class="frame">
-    <Avatar jid={username.trim() || 'palique'} show="online" size={mode === 'login' ? 96 : 56} />
+    <Avatar
+      jid={(mode === 'register' ? nick : email).trim() || 'palique'}
+      show="online"
+      size={mode === 'login' ? 96 : 56}
+    />
   </div>
 
   <form onsubmit={submit}>
     {#if mode === 'forgot'}
-      <p class="intro">
-        Escribe tu usuario y te enviaremos a tu correo un enlace para elegir otra contraseña.
-      </p>
+      <p class="intro">Escribe tu correo y te enviaremos un enlace para elegir otra contraseña.</p>
     {:else if mode === 'reset'}
       <p class="intro">Elige tu nueva contraseña. El código está en el correo que te enviamos.</p>
+    {:else if mode === 'register' && !invitedEmail}
+      <p class="intro">
+        Para crear una cuenta hace falta una invitación. Pulsa el botón del correo que te llegó o
+        pega aquí su código.
+      </p>
     {/if}
 
     {#if mode === 'register'}
+      {#if invitedEmail}
+        <p class="intro">Entrarás con <strong>{invitedEmail}</strong>.</p>
+        <label>
+          Tu nombre
+          <input bind:value={nick} required maxlength="64" autocomplete="nickname" />
+          <small>Es lo que verán tus contactos. Puedes cambiarlo cuando quieras.</small>
+        </label>
+      {:else}
+        <label>
+          Código de invitación
+          <input bind:value={invite} required autocomplete="off" />
+        </label>
+      {/if}
+    {:else}
       <label>
-        Código de invitación
-        <input
-          bind:value={invite}
-          required
-          autocomplete="off"
-          placeholder="Pega el código o el enlace que te enviaron"
-        />
+        Correo electrónico
+        <input type="email" bind:value={email} autocomplete="email" required maxlength="254" />
       </label>
     {/if}
-
-    <label>
-      Usuario
-      <input
-        bind:value={username}
-        autocomplete="username"
-        required
-        minlength="3"
-        maxlength="32"
-        pattern="[A-Za-z0-9._\-]+"
-        title="Letras, números, punto, guion y guion bajo"
-      />
-    </label>
 
     {#if mode === 'reset'}
       <label>
@@ -139,7 +165,7 @@
       </label>
     {/if}
 
-    {#if mode !== 'forgot'}
+    {#if mode === 'login' || mode === 'reset' || invitedEmail}
       <label>
         {mode === 'reset' ? 'Nueva contraseña' : 'Contraseña'}
         <input
@@ -152,21 +178,14 @@
       </label>
     {/if}
 
-    {#if mode === 'register' || mode === 'reset'}
+    {#if mode === 'reset' || invitedEmail}
       <label>
         Repite la contraseña
         <input type="password" bind:value={confirm} autocomplete="new-password" required />
       </label>
     {/if}
 
-    {#if mode === 'register'}
-      <label>
-        Correo electrónico
-        <input type="email" bind:value={email} autocomplete="email" required maxlength="254" />
-        <small
-          >Para recuperar tu contraseña si la olvidas. Te enviaremos un enlace para confirmarlo.</small
-        >
-      </label>
+    {#if invitedEmail}
       <label class="check">
         <input type="checkbox" bind:checked={newsletter} />
         Quiero recibir el boletín con las novedades de Palique (puedes darte de baja cuando quieras)
@@ -191,7 +210,7 @@
         ¿Olvidaste tu contraseña?
       </button>
       <button type="button" class="link" onclick={() => go('register')} disabled={busy}>
-        ¿No tienes cuenta? Crea una
+        ¿Tienes una invitación? Crea tu cuenta
       </button>
     {:else}
       <button type="button" class="link" onclick={() => go('login')} disabled={busy}>

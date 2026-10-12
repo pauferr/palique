@@ -29,6 +29,7 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       DATA_DIR: /data
+      SIGNIN_LIMIT: "1000" # sign-in lookups per IP a minute (production: 30)
       # Newsletter on Brevo: leave empty to store choices without syncing.
       # Production also sends mail through Brevo's SMTP (SMTP_HOST=smtp-relay.brevo.com, port 587,
       # SMTP_USER/SMTP_PASS from Brevo > SMTP & API). Keep real keys out of git (.env file).
