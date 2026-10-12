@@ -6,8 +6,7 @@ import { createServer } from 'node:http'
 import tls from 'node:tls'
 import { brevo } from '../server/cuentas/src/brevo.ts'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
-import { lastMail } from './mailpit.ts'
+import { register } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -61,12 +60,9 @@ const address = `${user}@correo.test`
 const pushes: A.EmailStatus[] = []
 A.onEmail((e) => pushes.push(e))
 
-assert.equal((await A.login(user, 'check-password', { invite: adminInvite() })).ok, true)
-await assert.rejects(A.setNewsletter(true), /no-email/)
-
-await A.setEmail(address, false)
-const link = (await lastMail(address)).text.match(/http:\/\/localhost:8080\/verificar\?t=\S+/)![0]
-assert.equal((await fetch(link)).status, 200)
+// The account comes with its (invited) address; the newsletter is off until chosen.
+await register(user, 'check-password')
+assert.equal((await A.emailStatus()).newsletter, false)
 
 assert.equal((await A.setNewsletter(true)).newsletter, true)
 assert.equal((await A.emailStatus()).newsletter, true)
@@ -89,7 +85,7 @@ assert.equal(
 )
 const deadline = Date.now() + 5000
 while (!pushes.length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50))
-assert.deepEqual(pushes.at(-1), { address, verified: true, newsletter: false })
+assert.deepEqual(pushes.at(-1), { address, pending: '', newsletter: false })
 assert.equal((await A.emailStatus()).newsletter, false)
 
 // Other events (e.g. an open) change nothing.

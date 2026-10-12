@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
+import { register } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -13,7 +13,6 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const [a, b] = [`inva${id}`, `invb${id}`]
 const pass = 'check-password'
 const at = (user: string): string => `${user}@localhost`
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -34,10 +33,12 @@ function until<T>(get: () => T | undefined | false, label: string): Promise<T> {
   })
 }
 
-for (const user of [a, b]) {
-  assert.equal((await A.login(user, pass, { invite: adminInvite() })).ok, true)
+const accounts: string[] = []
+for (const name of ['inva', 'invb']) {
+  accounts.push(await register(`${name}${id}`, pass))
   await A.logout()
 }
+const [a, b] = accounts
 
 // B tracks whether it currently sees A online, and A's messages.
 let aOnline = false
@@ -70,7 +71,7 @@ const seesB = (): boolean => A.snapshot().contacts.find((c) => c.jid === at(b))?
 
 let B = await startB()
 assert.equal((await A.login(a, pass)).ok, true)
-await A.addContact(b)
+await A.addContact(`${b}@localhost`)
 await until(() => aOnline && seesB(), 'mutual and online')
 
 // Going invisible: B sees A leave, A still gets messages and sees B.

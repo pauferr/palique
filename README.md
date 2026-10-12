@@ -27,40 +27,40 @@ npm run build:linux  # package AppImage + .deb (use CI from macOS)
 Prosody runs in Docker (any engine works; OrbStack on macOS). Config lives in [server/prosody.cfg.lua](server/prosody.cfg.lua).
 
 ```bash
-docker compose up -d    # XMPP on localhost:5222, account service and Mailpit
-docker compose logs -f  # follow server logs
-docker compose down     # stop (accounts persist in the prosody-data volume)
+docker compose up -d --build # XMPP on localhost:5222, account service and Mailpit
+docker compose logs -f       # follow server logs
+docker compose down          # stop (accounts persist in the volumes)
+docker compose down -v       # stop and delete every account
 ```
 
-Registration is invite-only. Create an invite for the first account (then invite others from the app):
+Accounts are email addresses, and registration takes an invite sent by email. Invite the first accounts as the admin (no limit; after that each user can invite 3 people from the app):
 
 ```bash
-docker compose exec prosody prosodyctl shell invite create_account localhost
+docker compose exec cuentas node src/invitar.ts tere@correo.test
 ```
 
-Paste the code after `preauth=` (or the whole link) into the app's "Código de invitación" field.
+Open the invite in Mailpit (below) and paste its code into the app's "¿Tienes una invitación? Crea tu cuenta". Any address works: nothing really gets sent.
 
 Services in development:
 
 - Prosody (XMPP): `localhost:5222`, domain `localhost`.
-- Account service ([server/cuentas](server/cuentas)): email verification and invites by email; its pages at http://localhost:8080.
+- Account service ([server/cuentas](server/cuentas)): maps each email to its account, sends invites, email changes and password recovery; its pages at http://localhost:8080. It runs from a built image: after changing its code, `docker compose up -d --build cuentas`.
 - Mailpit: every email the account service sends lands in a fake inbox at http://localhost:8025 (nothing is really sent).
 
-Password recovery emails open the app through `palique://` links. In development on macOS those links don't reach the dev app (macOS ties them to the generic Electron binary); paste the code from the email instead, or test with a packaged build (`npm run build:unpack`). On Linux and Windows the dev app receives them.
+Invite and password recovery emails open the app through `palique://` links. In development on macOS those links don't reach the dev app (macOS ties them to the generic Electron binary); paste the code from the email instead, or test with a packaged build (`npm run build:unpack`). On Linux and Windows the dev app receives them.
 
-The account service limits recovery requests (one per username every 5 minutes, ten per address every 15 minutes, in memory). If repeated testing hits the limit, restart it with `docker compose restart cuentas`.
+The account service limits recovery requests (one per email every 5 minutes, ten per IP every 15 minutes) and sign-in lookups (30 per IP a minute; 1000 in development, `SIGNIN_LIMIT`), in memory. If repeated testing hits the limit, restart it with `docker compose restart cuentas`.
 
 TLS uses a dev-only self-signed certificate in [server/certs](server/certs); the app trusts it only when connecting to `localhost`.
 
 ```bash
-npm run check:auth      # registration/login check against the local server
+npm run check:auth      # sign-up with an invite, sign-in by email
 npm run check:roster    # contacts + presence check (uses a second test client)
 npm run check:chat      # messages, buzz, carbons and stranger filtering
 npm run check:avatar    # publish and fetch avatars
-npm run check:invites   # invite-only registration and per-user limit
-npm run check:email     # email verification through the account service and Mailpit
-npm run check:invite-email # invites by email (no leaks about registered addresses)
-npm run check:reset     # password recovery (request, email, new password)
+npm run check:invites   # invites by email, per-user limit, inviter becomes a contact
+npm run check:email     # changing the account's email (confirmed from the new inbox)
+npm run check:reset     # password recovery by email (request, email, new password)
 npm run check:newsletter # newsletter choice, Brevo client and unsubscribe webhook
 npm run check:invisible # invisible status (needs the server module)
 npm run check:history   # local sqlite history (no server needed)

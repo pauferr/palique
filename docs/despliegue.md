@@ -5,7 +5,7 @@ Guía para montar el servidor en **Oracle Cloud (Always Free)** con un subdomini
 Qué corre en el servidor (todo con Docker, archivos en `deploy/`):
 
 - **Prosody**: el servidor de mensajería (puerto 5222).
-- **Servicio de cuentas**: correos de verificación, invitaciones y recuperación de contraseña.
+- **Servicio de cuentas**: qué correo es de qué cuenta, invitaciones, cambios de correo y recuperación de contraseña.
 - **Caddy**: HTTPS para las páginas del servicio de cuentas. Consigue y renueva solo el certificado de Let's Encrypt, que también se pasa a Prosody.
 
 Tiempo aproximado: una hora la primera vez.
@@ -114,10 +114,10 @@ Arranca:
 ./setup.sh
 ```
 
-El script construye y arranca todo, espera al certificado de Let's Encrypt, se lo pasa a Prosody, programa su renovación semanal y al final te muestra el comando para crear la **primera invitación** (la de tu propia cuenta):
+El script construye y arranca todo, espera al certificado de Let's Encrypt, se lo pasa a Prosody, programa su renovación semanal y al final te muestra el comando para enviar las **primeras invitaciones** (la tuya también), cada una a un correo:
 
 ```bash
-docker compose exec prosody prosodyctl shell invite create_account palique-pruebas.duckdns.org
+docker compose exec cuentas node src/invitar.ts tu@correo.com
 ```
 
 Comprobación rápida: abre `https://palique-pruebas.duckdns.org` en el navegador. Debe salir una página de Palique que dice "Página no encontrada": significa que HTTPS y el servicio de cuentas funcionan.
@@ -137,7 +137,7 @@ npm version patch
 git push --follow-tags
 ```
 
-3. Cuando termine, publica el borrador en *Releases*, instala la app y crea tu cuenta con el código de la invitación del paso 7. A partir de ahí, invita a tu gente desde la propia app.
+3. Cuando termine, publica el borrador en *Releases*, instala la app y crea tu cuenta con la invitación que te llegó en el paso 7. A partir de ahí, cada usuario puede invitar a 3 personas desde la propia app.
 
 ---
 

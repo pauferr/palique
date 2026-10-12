@@ -7,6 +7,9 @@ import { exportHistory } from '../src/main/export.ts'
 import { openHistory } from '../src/main/history.ts'
 
 const me = 'tere@localhost'
+// JIDs are random ids: the export shows display names instead.
+const names: Record<string, string> = { [me]: 'Tere', 'lolo@localhost': 'Lolo' }
+const name = (jid: string): string => names[jid] ?? 'Sin nombre'
 const history = openHistory(join(mkdtempSync(join(tmpdir(), 'palique-')), 'history.sqlite'))
 const at = Date.UTC(2026, 9, 4, 11, 30)
 const save = (
@@ -47,27 +50,29 @@ assert.deepEqual(
 )
 
 // Plain text: one section per contact, multi-line bodies indented, buzz marked.
-const txt = exportHistory('txt', me, messages)
-assert.match(txt, /^Historial de Palique de tere@localhost/)
+const txt = exportHistory('txt', me, messages, name)
+assert.match(txt, /^Historial de Palique de Tere/)
 assert.match(
   txt,
-  /=== Conversación con lolo@localhost ===\n\[.+\] lolo: ¿Bajas\?\n\[.+\] tere: Voy\n {4}con el bocata\n\[.+\] lolo: \*zumbido\*/
+  /=== Conversación con Lolo ===\n\[.+\] Lolo: ¿Bajas\?\n\[.+\] Tere: Voy\n {4}con el bocata\n\[.+\] Lolo: \*zumbido\*/
 )
-assert.match(txt, /\] tere: \*guiño: burbuja\*/)
-assert.doesNotMatch(txt, /ajeno/)
+assert.match(txt, /\] Tere: \*guiño: burbuja\*/)
+assert.match(txt, /=== Conversación con Sin nombre ===/)
+assert.doesNotMatch(txt, /ajeno|@localhost/)
 
 // HTML: user text is escaped, never markup.
-const html = exportHistory('html', me, messages)
+const html = exportHistory('html', me, messages, name)
 assert.ok(html.startsWith('<!doctype html>'))
 assert.ok(!html.includes('<script>'))
 assert.ok(
   html.includes('&lt;script&gt;alert(&quot;hola&quot;)&lt;/script&gt; &amp; &quot;AsÍ&quot;')
 )
-assert.ok(html.includes('¡lolo ha enviado un zumbido!'))
-assert.ok(html.includes('¡tere ha enviado un guiño: burbuja!'))
+assert.ok(html.includes('¡Lolo ha enviado un zumbido!'))
+assert.ok(html.includes('¡Tere ha enviado un guiño: burbuja!'))
+assert.ok(!html.includes('@localhost'))
 
 // JSON: lossless, versioned.
-const json = JSON.parse(exportHistory('json', me, messages))
+const json = JSON.parse(exportHistory('json', me, messages, name))
 assert.equal(json.format, 'palique-history')
 assert.equal(json.version, 1)
 assert.equal(json.account, me)

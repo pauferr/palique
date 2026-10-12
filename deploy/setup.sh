@@ -47,8 +47,8 @@ job="0 4 * * 1 $(pwd)/certs.sh >> $(pwd)/certs.log 2>&1"
 cat <<EOF
 
 Palique is running on $PALIQUE_DOMAIN.
-Create the first invite (for your own account) with:
-  docker compose exec prosody prosodyctl shell invite create_account $PALIQUE_DOMAIN
+Invite the first accounts (yours too) by email with:
+  docker compose exec cuentas node src/invitar.ts you@example.com
 
 Brevo webhook URL (optional, newsletter unsubscribes):
   https://$PALIQUE_DOMAIN/brevo?token=$BREVO_WEBHOOK_TOKEN

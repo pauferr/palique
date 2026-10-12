@@ -7,7 +7,7 @@ import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
+import { register } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -15,15 +15,16 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const [a, b, stranger] = ['chata', 'chatb', 'chatx'].map((name) => `${name}${id}`)
 const pass = 'check-password'
 const CHATSTATES = 'http://jabber.org/protocol/chatstates'
 const at = (user: string): string => `${user}@localhost`
 
-for (const user of [a, b, stranger]) {
-  assert.equal((await A.login(user, pass, { invite: adminInvite() })).ok, true)
+const accounts: string[] = []
+for (const name of ['chata', 'chatb', 'chatx']) {
+  accounts.push(await register(`${name}${id}`, pass))
   await A.logout()
 }
+const [a, b, stranger] = accounts
 
 // A plain client that accepts subscriptions and records the messages it gets.
 async function start(user: string): Promise<{ xmpp: ReturnType<typeof client>; inbox: Element[] }> {
@@ -73,7 +74,7 @@ A.onTyping((contact, on) => typing.push(`${contact}:${on}`))
 
 const B = await start(b)
 assert.equal((await A.login(a, pass)).ok, true)
-await A.addContact(b)
+await A.addContact(`${b}@localhost`)
 await until(() => A.snapshot().contacts.find((c) => c.subscription === 'both'), 'mutual')
 
 // A → B

@@ -1,12 +1,12 @@
-// Email verification check: Prosody + account service + Mailpit (`docker compose up -d`).
+// Changing the account's email: Prosody + account service + Mailpit (`docker compose up -d`).
 // Run: npm run check:email
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
-import { lastMail } from './mailpit.ts'
+import { register } from './invite.ts'
+import { lastMail, mailCount } from './mailpit.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -14,34 +14,52 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const [a, b] = [`maila${id}`, `mailb${id}`]
+const [aName, bName] = [`maila${id}`, `mailb${id}`]
 const pass = 'check-password'
-const address = `${a}@correo.test`
+const email = `${aName}@correo.test`
+const newEmail = `nuevo.${aName}@correo.test`
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 const pushes: A.EmailStatus[] = []
 A.onEmail((e) => pushes.push(e))
 
-assert.equal((await A.login(b, pass, { invite: adminInvite() })).ok, true)
+const b = await register(bName, pass)
 await A.logout()
-assert.equal((await A.login(a, pass, { invite: adminInvite() })).ok, true)
+const a = await register(aName, pass)
 
-// Nothing yet; bad addresses are refused.
-assert.deepEqual(await A.emailStatus(), { address: '', verified: false, newsletter: false })
-await assert.rejects(A.setEmail('no-es-un-correo', false), /invalid/)
+// Every account starts with the invited address (verified: the invite reached it).
+assert.deepEqual(await A.emailStatus(), { address: email, pending: '', newsletter: false })
+await assert.rejects(A.changeEmail('no-es-un-correo'), /invalid/)
 
-// Setting it sends a link; it's pending until opened.
-assert.deepEqual(await A.setEmail(` ${address.toUpperCase()} `, true), {
-  address,
-  verified: false,
-  newsletter: true
+// Changing it sends a link to the new address; until then, the old one still signs in.
+assert.deepEqual(await A.changeEmail(` ${newEmail.toUpperCase()} `), {
+  address: email,
+  pending: newEmail,
+  newsletter: false
 })
-const mail = await lastMail(address)
-assert.equal(mail.subject, 'Confirma tu correo de Palique')
+const mail = await lastMail(newEmail)
+assert.equal(mail.subject, 'Confirma tu nuevo correo de Palique')
 const link = mail.text.match(/http:\/\/localhost:8080\/verificar\?t=\S+/)?.[0]
 assert.ok(link, 'verification link in the email')
+assert.equal(await A.accountFor(email), a)
+assert.notEqual(await A.accountFor(newEmail), a)
 
 // A resend is allowed only after a minute.
 await assert.rejects(A.resendVerification(), /wait/)
+
+// Someone else's address: same answer, nothing changes, and that inbox is told.
+const before = await mailCount(`${bName}@correo.test`)
+assert.deepEqual(await A.changeEmail(`${bName}@correo.test`), {
+  address: email,
+  pending: newEmail,
+  newsletter: false
+})
+assert.equal(await mailCount(`${bName}@correo.test`), before + 1)
+assert.equal(
+  (await lastMail(`${bName}@correo.test`)).subject,
+  'Este correo ya tiene cuenta en Palique'
+)
+assert.equal(await A.accountFor(`${bName}@correo.test`), b)
 
 // Someone else pretending to be the account service is ignored.
 const B = client({
@@ -56,25 +74,26 @@ await B.send(
   xml(
     'message',
     { to: `${a}@localhost` },
-    xml('email', { xmlns: 'urn:palique:cuentas:0', address: 'falso@x.test', verified: 'true' })
+    xml('email', { xmlns: 'urn:palique:cuentas:0', address: 'falso@x.test' })
   )
 )
 await B.stop()
-await new Promise((r) => setTimeout(r, 500))
+await sleep(500)
 assert.equal(pushes.length, 0, 'forged status ignored')
 
-// Opening the link verifies it and the app hears about it right away.
+// Opening the link switches the address and the app hears about it right away.
 const page = await fetch(link)
 assert.equal(page.status, 200)
-assert.match(await page.text(), /Correo confirmado/)
+assert.match(await page.text(), /Correo cambiado/)
 const deadline = Date.now() + 5000
-while (!pushes.length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50))
-assert.deepEqual(pushes, [{ address, verified: true, newsletter: true }])
-assert.equal((await A.emailStatus()).verified, true)
+while (!pushes.length && Date.now() < deadline) await sleep(50)
+assert.deepEqual(pushes, [{ address: newEmail, pending: '', newsletter: false }])
 assert.equal((await fetch(link)).status, 404, 'links work once')
 
-// Changing the address needs verifying again.
-assert.equal((await A.setEmail(`otro.${address}`, false)).verified, false)
+// Same account (same JID, contacts and history), new address to sign in with; the old
+// address is free again.
+assert.equal(await A.accountFor(newEmail), a)
+assert.notEqual(await A.accountFor(email), a)
 
 await A.logout()
 console.log('email check passed')

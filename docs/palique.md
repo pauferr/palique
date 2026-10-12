@@ -151,31 +151,37 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 
 ### Registro y autenticación
 
-**Decidido: registro desde la app solo por invitación, con usuario, contraseña y correo verificado.**
+**Decidido: la cuenta es el correo electrónico. Registro solo con invitación por correo.**
 
-- Registro desde el cliente mediante XEP-0077 (*In-Band Registration*). El nombre de usuario es el identificador que los contactos usan para añadirse.
-- Requisito de diseño: encapsular la autenticación en el cliente para poder añadir otros métodos sin rehacer el flujo.
+- Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) y es lo único que ven sus contactos: el correo nunca se les muestra.
+- Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie.
+- El nombre visible es XEP-0172: se publica en PEP (lo leen los contactos, como el avatar) y viaja en cada presencia y en las solicitudes de amistad, para que se vea antes de aceptar.
+- Iniciar sesión: la app pregunta al servicio de cuentas (HTTP) qué JID corresponde al correo y entra con él (SASL normal). A un correo sin cuenta le responde un JID inventado y siempre el mismo, así que falla igual que una contraseña mal escrita y no se sabe si la cuenta existe. Limitado por IP.
+- Registro desde el cliente mediante XEP-0077 (*In-Band Registration*). Requisito de diseño: encapsular la autenticación en el cliente para poder añadir otros métodos sin rehacer el flujo.
 
 **Invitaciones** (también es la principal medida contra el registro masivo):
-- Sin código de invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401). El cliente envía el código antes de registrarse (`<preauth xmlns="urn:xmpp:pars:0">`).
-- Cualquier usuario puede invitar desde la app ("Invitar a un amigo"), con límite: 5 invitaciones activas por usuario, que caducan a la semana. El límite lo aplica el servidor con un módulo propio (`server/modules/`), no la app.
+- Solo por correo. Sin invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401).
+- Al invitar, el servicio de cuentas elige el JID de la futura cuenta y pide a Prosody una invitación que solo puede crear esa cuenta (módulo propio en `server/modules/`). El correo trae un botón que abre Palique (`palique://registro?t=…`) y el código escrito. Caduca a la semana.
+- Como la invitación llegó a ese correo, la cuenta nace con el correo verificado. Al registrarse se elige el nombre visible y la contraseña; el correo no se escribe.
+- Los primeros usuarios los invita el administrador (`docker compose exec cuentas node src/invitar.ts correo`, sin límite). Cada usuario puede invitar a **3 personas**; las invitaciones que caducan sin usarse vuelven a contar. Más adelante se abrirá el registro.
 - Quien entra con una invitación queda añadido automáticamente como contacto de quien le invitó, en los dos sentidos.
-- La invitación se comparte copiando el código o **enviándola por correo** desde la app (lo envía el servicio de cuentas). Para no delatar quién tiene cuenta ni generar spam, quien invita siempre ve "Invitación enviada", y:
-  - Si la dirección ya pertenece a una cuenta (correo verificado), no se envía nada ni se gasta invitación.
+- Invitar es siempre una acción explícita, con confirmación. Contra el spam:
   - Una dirección recibe como mucho una invitación por semana, aunque la pidan personas distintas.
   - Cada correo de invitación lleva "No quiero recibir más invitaciones"; esas direcciones no vuelven a recibir ninguna.
-  - El límite de invitaciones se comprueba antes que la dirección, para que el aviso de límite tampoco revele nada.
-- Añadir por nombre de usuario a quien ya tiene cuenta sigue funcionando igual; las invitaciones son solo para quien aún no la tiene. Las solicitudes de amistad siempre se aceptan o rechazan; la única excepción es la invitación usada (ambos han dado su consentimiento).
+  - Si la dirección ya tiene cuenta, la app lo dice y propone añadirla como contacto.
+
+**Añadir contactos:** por correo. El servicio de cuentas dice qué JID tiene ese correo y la app envía la solicitud de amistad normal. Si nadie lo tiene, la app lo dice y ofrece enviar una invitación (no se envía sola). Quien conoce tu correo puede saber si estás en Palique, como en otras apps de mensajería; la búsqueda solo la hacen usuarios con sesión y está limitada. Las solicitudes siempre se aceptan o rechazan; la única excepción es la invitación usada (ambos han dado su consentimiento).
 
 **Correo electrónico:**
-- Obligatorio al registrarse y verificado con un enlace. Mientras no esté verificado, la app funciona con un aviso fijo ("Verifica tu correo", con opción de reenviar) y no se puede recuperar la contraseña.
-- Usos: recuperar la contraseña y, si el usuario lo acepta, recibir el boletín de novedades.
+- Usos: iniciar sesión, recuperar la contraseña y, si el usuario lo acepta, recibir el boletín de novedades.
+- Es único: no puede haber dos cuentas con el mismo correo.
+- Cambiarlo (en Opciones) envía un enlace a la dirección nueva; hasta que se abre, se sigue entrando con la antigua. Si la nueva ya es de otra cuenta, la app responde lo mismo y a ese buzón le llega un aviso.
 - Lo gestiona un servicio propio, el **servicio de cuentas** (`server/cuentas/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
-  - Se conecta a Prosody como componente XMPP (XEP-0114). La app le envía el correo a través de la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría asociar su correo a una cuenta ajena y robarla con la recuperación).
-  - Envía los correos de verificación y de recuperación.
+  - Se conecta a Prosody como componente XMPP (XEP-0114). Con sesión, la app le habla por la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría cambiar el correo de una cuenta ajena y robarla con la recuperación).
+  - Envía los correos de invitación, de cambio de correo y de recuperación.
   - Recuperación de contraseña, sin páginas web (por ahora):
-    - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" pide el usuario. La app lo envía al servicio por HTTP (con la sesión cerrada no hay conexión XMPP autenticada). El servicio responde siempre lo mismo, para no revelar si la cuenta existe o tiene correo, y limita las peticiones.
-    - Si la cuenta tiene el correo verificado, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y lo envía por correo.
+    - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" pide el correo. La app lo envía al servicio por HTTP (con la sesión cerrada no hay conexión XMPP autenticada). El servicio responde siempre lo mismo, para no revelar si la cuenta existe, y limita las peticiones.
+    - Si el correo es de una cuenta, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y lo envía por correo.
     - El correo trae un botón que abre Palique (`palique://recuperar?…`, registrado como protocolo de la app) y también el código escrito, porque algunos programas de correo no dejan pulsar enlaces que no sean web.
     - La app usa el código igual que una invitación (XEP-0401) para poner la nueva contraseña. No hace falta una cuenta de administrador.
 - Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
@@ -183,7 +189,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 **Boletín de novedades:**
 - Consentimiento explícito y separado al registrarse (casilla sin marcar por defecto), modificable en Opciones. Cada envío lleva enlace de baja.
 - Plataforma: **Brevo** (empresa europea, pensada para el RGPD). Brevo envía también los correos de verificación y recuperación en producción (SMTP).
-- El servicio de cuentas guarda la elección y la fecha del consentimiento, y sincroniza con una lista de Brevo solo las direcciones verificadas (la verificación hace de doble confirmación): al verificar, al cambiar la preferencia en Opciones y al cambiar de dirección (la antigua sale de la lista).
+- El servicio de cuentas guarda la elección y la fecha del consentimiento, y la sincroniza con una lista de Brevo (todas las direcciones están verificadas: la invitación o el cambio de correo llegaron a ellas): al cambiar la preferencia en Opciones y al cambiar de dirección (la antigua sale de la lista).
 - Cada boletín lleva el enlace de baja de Brevo. Un *webhook* de Brevo (bajas, rebotes graves, spam), protegido con un código secreto, desmarca el boletín en Palique y la app se entera al momento.
 - Preparado sin cuenta de Brevo: sin clave, las elecciones se guardan sin sincronizar, y `src/sync-brevo.ts` pone la lista al día cuando se añade la clave. Pasos en el README.
 
@@ -194,7 +200,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 **Decidido: historial de chat solo en local.**
 
 - En el servidor (lo que XMPP ya guarda por defecto): cuenta, lista de contactos, perfil (avatar, nombre, mensaje personal) y mensajes offline hasta que se entregan.
-- En el servicio de cuentas: correo, si está verificado y si acepta el boletín.
+- En el servicio de cuentas: correo (y a qué JID corresponde), si acepta el boletín, e invitaciones enviadas.
 - En el servidor NO se archivan conversaciones: `mod_mam` desactivado en Prosody. Argumento de privacidad comunicable al usuario.
 - En local: historial de chats (SQLite con el módulo `node:sqlite` que trae Electron, sin módulos nativos que recompilar; archivo `history.sqlite` en la carpeta de datos de la app) y preferencias de la app (sonidos, tema, opciones de guiños).
 - Cada conversación carga sus últimos 200 mensajes. Si varias personas usan Palique en el mismo equipo, cada cuenta tiene su propio historial.

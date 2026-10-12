@@ -10,21 +10,21 @@ const file = join(dir, 'settings.json')
 
 assert.deepEqual(
   openSettings(file).get(),
-  { theme: 'xp', winks: true, show: 'online' },
+  { theme: 'xp', winks: true, show: 'online', email: '' },
   'defaults on first run'
 )
 openSettings(file).set({ winks: false })
 openSettings(file).set({ show: 'invisible' })
 assert.deepEqual(
   openSettings(file).get(),
-  { theme: 'xp', winks: false, show: 'invisible' },
+  { theme: 'xp', winks: false, show: 'invisible', email: '' },
   'persists across restarts'
 )
 
 writeFileSync(file, '{ broken')
 assert.deepEqual(
   openSettings(file).get(),
-  { theme: 'xp', winks: true, show: 'online' },
+  { theme: 'xp', winks: true, show: 'online', email: '' },
   'corrupt file falls back to defaults'
 )
 

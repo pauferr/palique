@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
+import { register } from './invite.ts'
 import { lastMail, mailCount } from './mailpit.ts'
 
 tls.setDefaultCACertificates([
@@ -13,49 +13,44 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const [a, unverified] = [`rsta${id}`, `rstu${id}`]
-const mail = (user: string): string => `${user}@correo.test`
+const name = `rsta${id}`
+const email = `${name}@correo.test`
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-// A: verified email. U: email set but never confirmed.
-assert.equal((await A.login(a, 'old-password', { invite: adminInvite() })).ok, true)
-await A.setEmail(mail(a), false)
-const verify = (await lastMail(mail(a))).text.match(/http:\/\/localhost:8080\/verificar\?t=\S+/)![0]
-assert.equal((await fetch(verify)).status, 200)
-await A.logout()
-assert.equal((await A.login(unverified, 'old-password', { invite: adminInvite() })).ok, true)
-await A.setEmail(mail(unverified), false)
+const a = await register(name, 'old-password')
 await A.logout()
 
-// The request always "works"; only A gets an email, with an app link and the code.
-await A.requestPasswordReset(a.toUpperCase())
-await A.requestPasswordReset(unverified)
-await A.requestPasswordReset(`nadie${id}`)
+// The request always "works"; only the account's address gets an email, with an app link
+// (carrying the address) and the code.
+await A.requestPasswordReset(email)
+await A.requestPasswordReset(`nadie${id}@correo.test`)
 // It's sent after answering (so timing reveals nothing): wait for it.
 const deadline = Date.now() + 5000
-while ((await mailCount(mail(a))) < 2) {
+while ((await mailCount(email)) < 2) {
   assert.ok(Date.now() < deadline, 'recovery email arrives')
   await sleep(100)
 }
-const recovery = await lastMail(mail(a))
+const recovery = await lastMail(email)
 assert.equal(recovery.subject, 'Recupera tu contraseña de Palique')
-const link = recovery.text.match(/palique:\/\/recuperar\?u=([^&\s]+)&t=(\S+)/)
+const link = recovery.text.match(/palique:\/\/recuperar\?e=([^&\s]+)&t=(\S+)/)
 assert.ok(link, 'palique:// link in the email')
-assert.equal(decodeURIComponent(link[1]), a)
+assert.equal(decodeURIComponent(link[1]), email)
 const code = decodeURIComponent(link[2])
 assert.ok(
   recovery.text.replace(/\r/g, '').includes(`\n\n${code}\n\n`),
   'the code is also written out'
 )
 await sleep(500)
-assert.equal(await mailCount(mail(unverified)), 1, 'unverified: only the verification email')
+assert.equal(await mailCount(`nadie${id}@correo.test`), 0)
 
 // A second request within 5 minutes sends nothing new.
-await A.requestPasswordReset(a)
+await A.requestPasswordReset(email)
 await sleep(500)
-assert.equal(await mailCount(mail(a)), 2)
+assert.equal(await mailCount(email), 2)
 
-// The code sets a new password once; the old one stops working.
+// The code sets a new password once (the app finds the account by email); the old one
+// stops working.
+assert.equal(await A.accountFor(email), a)
 assert.deepEqual(await A.login(a, 'new-password', { invite: code }), {
   ok: true,
   jid: `${a}@localhost`

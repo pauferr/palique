@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
+import { register } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -14,8 +14,7 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const a = `rostera${id}`
-const b = `rosterb${id}`
+const [aName, bName, cName] = ['rostera', 'rosterb', 'rosterc'].map((n) => `${n}${id}`)
 const pass = 'check-password'
 
 // Resolves once the module's snapshot satisfies `test`.
@@ -38,7 +37,7 @@ const contact = (s: A.Snapshot): A.Contact | undefined =>
   s.contacts.find((c) => c.jid === `${b}@localhost`)
 
 // B: a plain client that accepts anything A asks (fresh one per session).
-assert.equal((await A.login(b, pass, { invite: adminInvite() })).ok, true)
+const b = await register(bName, pass)
 await A.logout()
 async function startB(...presence: ReturnType<typeof xml>[]): Promise<ReturnType<typeof client>> {
   const B = client({
@@ -63,12 +62,16 @@ async function startB(...presence: ReturnType<typeof xml>[]): Promise<ReturnType
 }
 let B = await startB(xml('show', {}, 'dnd'), xml('status', {}, 'currando'))
 
-// A adds B → mutual subscription, B's presence shows up.
-assert.equal((await A.login(a, pass, { invite: adminInvite() })).ok, true)
-await A.addContact(b)
+// A finds B by email and adds them → mutual subscription, B's presence and name show up.
+const a = await register(aName, pass)
+assert.equal(await A.lookupContact(`${bName}@correo.test`), `${b}@localhost`)
+assert.equal(await A.lookupContact(`nadie${id}@correo.test`), '')
+await assert.rejects(A.lookupContact('nada'), /invalid/)
+await A.addContact(`${b}@localhost`)
 let s = await until(
-  (s) => contact(s)?.subscription === 'both' && contact(s)?.show === 'dnd',
-  'mutual + presence'
+  (s) =>
+    contact(s)?.subscription === 'both' && contact(s)?.show === 'dnd' && contact(s)?.name === bName,
+  'mutual + presence + name'
 )
 assert.equal(contact(s)?.status, 'currando')
 
@@ -85,7 +88,7 @@ await until((s) => !contact(s), 'removed')
 // Incoming request: B asks to add A, A accepts.
 B = await startB()
 await B.send(xml('presence', { to: `${a}@localhost`, type: 'subscribe' }))
-await until((s) => s.requests.includes(`${b}@localhost`), 'request')
+await until((s) => s.requests.some((r) => r.jid === `${b}@localhost`), 'request')
 await A.acceptRequest(`${b}@localhost`)
 s = await until(
   (s) => contact(s)?.subscription === 'both' && contact(s)?.show === 'online',
@@ -94,11 +97,10 @@ s = await until(
 assert.deepEqual(s.requests, [])
 
 // Nobody gets in without consent: C asks, can't message meanwhile, and A rejects.
-const c = `rosterc${id}`
 const received: A.ChatMessage[] = []
 A.onMessage((m) => received.push(m))
 await A.logout()
-assert.equal((await A.login(c, pass, { invite: adminInvite() })).ok, true)
+const c = await register(cName, pass)
 await A.logout()
 await A.login(a, pass)
 const C = client({
@@ -116,8 +118,18 @@ await C.start()
 // Like a real client: roster first, or Prosody won't deliver the answer to C.
 await C.iqCaller.request(xml('iq', { type: 'get' }, xml('query', { xmlns: 'jabber:iq:roster' })))
 await C.send(xml('presence'))
-await C.send(xml('presence', { to: `${a}@localhost`, type: 'subscribe' }))
-await until((s) => s.requests.includes(`${c}@localhost`), 'request from C')
+// The request carries C's name: A can't read C's profile before accepting.
+await C.send(
+  xml(
+    'presence',
+    { to: `${a}@localhost`, type: 'subscribe' },
+    xml('nick', { xmlns: 'http://jabber.org/protocol/nick' }, 'Ce')
+  )
+)
+await until(
+  (s) => s.requests.some((r) => r.jid === `${c}@localhost` && r.name === 'Ce'),
+  'request from C, with name'
+)
 await C.send(
   xml('message', { to: `${a}@localhost`, type: 'chat', id: 'c1' }, xml('body', {}, 'hola'))
 )

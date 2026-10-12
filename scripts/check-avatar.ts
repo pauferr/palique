@@ -7,7 +7,7 @@ import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import * as A from '../src/main/xmpp.ts'
-import { adminInvite } from './invite.ts'
+import { register } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -15,7 +15,6 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const [a, b] = [`ava${id}`, `avb${id}`]
 const pass = 'check-password'
 const at = (user: string): string => `${user}@localhost`
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
@@ -45,10 +44,12 @@ function until<T>(get: () => T | undefined | false, label: string): Promise<T> {
   })
 }
 
-for (const user of [a, b]) {
-  assert.equal((await A.login(user, pass, { invite: adminInvite() })).ok, true)
+const accounts: string[] = []
+for (const name of ['ava', 'avb']) {
+  accounts.push(await register(`${name}${id}`, pass))
   await A.logout()
 }
+const [a, b] = accounts
 
 const B = client({
   service: 'xmpp://localhost:5222',
@@ -107,7 +108,7 @@ async function publishB(
 const contact = (): A.Contact | undefined => A.snapshot().contacts.find((c) => c.jid === at(b))
 
 assert.equal((await A.login(a, pass)).ok, true)
-await A.addContact(b)
+await A.addContact(`${b}@localhost`)
 await until(() => contact()?.subscription === 'both', 'mutual')
 assert.equal(contact()?.avatar, '', 'no avatar yet')
 
