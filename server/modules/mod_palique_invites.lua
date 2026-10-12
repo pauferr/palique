@@ -1,127 +1,78 @@
--- "Invite a friend" for Palique users, with a limit enforced here (not in the app).
--- iq set <invite xmlns='urn:palique:invite:0'/>  -> creates one, replies with its token
--- iq get <invite xmlns='urn:palique:invite:0'/>  -> lists the user's active invites
--- Invites are mod_invites contact invites that also allow registering: the new account
--- and the inviter become mutual contacts. Admins have no limit.
--- Trusted components (the account service, for invites by email) can do the same on a
--- user's behalf by sending the iq to the host with for='username'. Same limit.
--- They can also get a password reset code: iq set <reset for='username'/> (valid 1 hour,
--- single use; the app re-registers the same username with it, see mod_invites).
+-- Account invites and password resets, for the account service only (server/cuentas).
+-- Users never ask Prosody directly: invites go by email, and the account service keeps
+-- the per-user limit and the email <-> account mapping.
+-- Only components listed in palique_invites_trusted may use it, sending iqs to the host:
+--   iq set <account username='k3f9…' inviter='a7x2…'?/>  -> an invite to create exactly
+--     that account (valid 1 week, single use). The inviter, if any, and the new account
+--     become mutual contacts.
+--   iq set <reset for='username'/>  -> a password reset code (valid 1 hour, single use;
+--     the app re-registers the same username with it, see mod_invites).
 
 local st = require "prosody.util.stanza";
 local datetime = require "prosody.util.datetime";
-local jid_split = require "prosody.util.jid".split;
+local usermanager = require "prosody.core.usermanager";
+local rostermanager = require "prosody.core.rostermanager";
 
 local invites = module:depends("invites");
+local invites_register = module:depends("invites_register");
 
 local xmlns = "urn:palique:invite:0";
-local max_active = module:get_option_integer("palique_invites_per_user", 5);
 local trusted = module:get_option_set("palique_invites_trusted", {});
+local WEEK = 7 * 24 * 60 * 60;
 
-module:default_permission("prosody:admin", ":unlimited-invites");
-
-local function active_invites(username)
-	local jid = username .. "@" .. module.host;
-	local list = {};
-	for _, invite in invites.pending_account_invites() do
-		if invite.type == "roster" and invite.jid == jid then
-			list[#list + 1] = invite;
-		end
-	end
-	table.sort(list, function (a, b) return a.expires < b.expires; end);
-	return list;
+local function is_trusted(event)
+	return trusted:contains(event.stanza.attr.from);
 end
 
-local function invite_tag(invite)
-	return st.stanza("invite", {
-		xmlns = xmlns;
-		token = invite.token;
-		expires = datetime.datetime(invite.expires);
-	});
-end
-
-module:hook("iq-get/self/" .. xmlns .. ":invite", function (event)
+module:hook("iq-set/host/" .. xmlns .. ":account", function (event)
+	if not is_trusted(event) then return; end
 	local origin, stanza = event.origin, event.stanza;
-	local reply = st.reply(stanza):tag("invites", { xmlns = xmlns, max = tostring(max_active) });
-	for _, invite in ipairs(active_invites(origin.username)) do
-		reply:add_child(invite_tag(invite));
-	end
-	origin.send(reply);
-	return true;
-end);
-
-module:hook("iq-set/self/" .. xmlns .. ":invite", function (event)
-	local origin, stanza = event.origin, event.stanza;
-	local username, host = jid_split(origin.full_jid);
-	if host ~= module.host then return; end
-
-	if #active_invites(username) >= max_active and not module:may(":unlimited-invites", event) then
-		origin.send(st.error_reply(stanza, "wait", "resource-constraint",
-			"You already have " .. max_active .. " active invites"));
+	local request = stanza.tags[1];
+	local username, inviter = request.attr.username, request.attr.inviter;
+	if not username or usermanager.user_exists(username, module.host)
+	or (inviter and not usermanager.user_exists(inviter, module.host)) then
+		origin.send(st.error_reply(stanza, "cancel", "bad-request"));
 		return true;
 	end
-
-	local invite = invites.create_contact(username, true, { source = origin.full_jid });
+	local invite = invites.create_account(username, {
+		palique_username = username;
+		palique_inviter = inviter;
+	}, WEEK);
 	if not invite then
 		origin.send(st.error_reply(stanza, "wait", "internal-server-error"));
 		return true;
 	end
-	origin.send(st.reply(stanza):add_child(invite_tag(invite)));
-	return true;
-end);
-
--- On behalf of a user, for trusted components only.
-local function for_user(event)
-	local stanza = event.stanza;
-	if not trusted:contains(stanza.attr.from) then return nil; end
-	local username = stanza.tags[1].attr["for"];
-	if not username or not require "prosody.core.usermanager".user_exists(username, module.host) then
-		return false;
-	end
-	return username;
-end
-
-module:hook("iq-get/host/" .. xmlns .. ":invite", function (event)
-	local username = for_user(event);
-	if username == nil then return; end
-	if not username then
-		event.origin.send(st.error_reply(event.stanza, "cancel", "item-not-found"));
-		return true;
-	end
-	event.origin.send(st.reply(event.stanza):tag("invites", {
+	origin.send(st.reply(stanza):tag("account", {
 		xmlns = xmlns;
-		max = tostring(max_active);
-		active = tostring(#active_invites(username));
+		token = invite.token;
+		expires = datetime.datetime(invite.expires);
 	}));
 	return true;
 end);
 
-module:hook("iq-set/host/" .. xmlns .. ":invite", function (event)
-	local username = for_user(event);
-	if username == nil then return; end
-	local origin, stanza = event.origin, event.stanza;
-	if not username then
-		origin.send(st.error_reply(stanza, "cancel", "item-not-found"));
-		return true;
+-- mod_invites_register doesn't check the username of account invites: do it here.
+module:hook("user-registering", function (event)
+	local invite = event.validated_invite or (event.session and event.session.validated_invite);
+	local wanted = invite and invite.additional_data and invite.additional_data.palique_username;
+	if wanted and wanted ~= event.username then
+		event.allowed = false;
+		event.reason = "The chosen username is not valid with this invitation";
 	end
-	if #active_invites(username) >= max_active then
-		origin.send(st.error_reply(stanza, "wait", "resource-constraint"));
-		return true;
-	end
-	local invite = invites.create_contact(username, true, { source = stanza.attr.from });
-	if not invite then
-		origin.send(st.error_reply(stanza, "wait", "internal-server-error"));
-		return true;
-	end
-	origin.send(st.reply(stanza):add_child(invite_tag(invite)));
-	return true;
+end);
+
+module:hook("user-registered", function (event)
+	local invite = event.validated_invite or (event.session and event.session.validated_invite);
+	local inviter = invite and invite.additional_data and invite.additional_data.palique_inviter;
+	if not inviter or not usermanager.user_exists(inviter, module.host) then return; end
+	invites_register.subscribe_both(module.host, inviter, event.username);
+	rostermanager.roster_push(inviter, module.host, event.username .. "@" .. module.host);
 end);
 
 module:hook("iq-set/host/" .. xmlns .. ":reset", function (event)
-	local username = for_user(event);
-	if username == nil then return; end
+	if not is_trusted(event) then return; end
 	local origin, stanza = event.origin, event.stanza;
-	if not username then
+	local username = stanza.tags[1].attr["for"];
+	if not username or not usermanager.user_exists(username, module.host) then
 		origin.send(st.error_reply(stanza, "cancel", "item-not-found"));
 		return true;
 	end

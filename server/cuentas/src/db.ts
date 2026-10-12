@@ -1,8 +1,17 @@
 // What the account service remembers (SQLite). Chats never come here.
+// The email is how people sign in; the JID behind it is random and never changes, so
+// changing the email touches nothing else (contacts, history, avatars).
 import { randomBytes } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 
-export type Account = { jid: string; email: string; verified: boolean; newsletter: boolean }
+export type Account = {
+  jid: string
+  email: string
+  pending: string // new address waiting for its verification link, '' if none
+  newsletter: boolean
+}
+
+export type Invite = { token: string; email: string; jid: string; inviter: string | null }
 
 const WEEK = 7 * 24 * 60 * 60 * 1000
 const token = (): string => randomBytes(24).toString('base64url')
@@ -10,7 +19,7 @@ const token = (): string => randomBytes(24).toString('base64url')
 type AccountRow = {
   jid: string
   email: string
-  verified: number
+  pending_email: string | null
   newsletter: number
   token_sent_at: number | null
 }
@@ -20,70 +29,150 @@ export function openDb(file: string) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
       jid TEXT PRIMARY KEY,
-      email TEXT NOT NULL,
-      verified INTEGER NOT NULL DEFAULT 0,
+      email TEXT NOT NULL UNIQUE,  -- verified: the invite reached it
       newsletter INTEGER NOT NULL DEFAULT 0,
-      token TEXT UNIQUE,          -- pending email verification link
+      newsletter_at INTEGER,       -- when the choice was made (proof of consent)
+      pending_email TEXT,          -- changing the address: waits for its link
+      token TEXT UNIQUE,           -- that link
       token_sent_at INTEGER
     );
-    CREATE INDEX IF NOT EXISTS accounts_by_email ON accounts (email);
-    -- Invites sent by email: at most one per address per week, and a way out.
-    CREATE TABLE IF NOT EXISTS invite_emails (
-      email TEXT PRIMARY KEY,
-      sent_at INTEGER NOT NULL,
+    -- Invites by email. The account's JID is chosen when inviting: registering with the
+    -- token can only create that account. Until someone signs in with it, the address
+    -- is reserved for it.
+    CREATE TABLE IF NOT EXISTS invites (
+      token TEXT PRIMARY KEY,      -- the Prosody invite token
+      email TEXT NOT NULL,
+      jid TEXT NOT NULL,
+      inviter TEXT,                -- bare JID, NULL for the admin's invites
+      expires_at INTEGER NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
       optout_token TEXT NOT NULL UNIQUE
     );
+    CREATE INDEX IF NOT EXISTS invites_by_email ON invites (email);
+    CREATE INDEX IF NOT EXISTS invites_by_inviter ON invites (inviter);
     CREATE TABLE IF NOT EXISTS invite_optout (email TEXT PRIMARY KEY);
   `)
-  // Added later: when the newsletter choice was made (proof of consent).
-  const columns = (db.prepare('PRAGMA table_info(accounts)').all() as { name: string }[]).map(
-    (c) => c.name
-  )
-  if (!columns.includes('newsletter_at')) {
-    db.exec('ALTER TABLE accounts ADD COLUMN newsletter_at INTEGER')
-  }
 
   const toAccount = (row: AccountRow): Account => ({
     jid: row.jid,
     email: row.email,
-    verified: row.verified === 1,
+    pending: row.pending_email ?? '',
     newsletter: row.newsletter === 1
   })
   const get = (jid: string): AccountRow | undefined =>
     db.prepare('SELECT * FROM accounts WHERE jid = ?').get(jid) as AccountRow | undefined
+  const openInvite = (email: string): Invite | undefined =>
+    db
+      .prepare(
+        'SELECT token, email, jid, inviter FROM invites WHERE email = ? AND used = 0 AND expires_at > ?'
+      )
+      .get(email, Date.now()) as Invite | undefined
+
+  // Someone signed in with an invited JID: the account exists now, with the invited address.
+  function claim(jid: string): void {
+    if (get(jid)) return
+    const invite = db
+      .prepare('SELECT * FROM invites WHERE jid = ? AND used = 0')
+      .get(jid) as Invite | undefined
+    if (!invite) return
+    db.prepare('UPDATE invites SET used = 1 WHERE token = ?').run(invite.token)
+    db.prepare('INSERT OR IGNORE INTO accounts (jid, email) VALUES (?, ?)').run(jid, invite.email)
+  }
+
+  // An account, or an invite still waiting to be used, has this address.
+  const taken = (email: string): boolean =>
+    Boolean(
+      db.prepare('SELECT 1 FROM accounts WHERE email = ? OR pending_email = ?').get(email, email) ||
+      openInvite(email)
+    )
 
   return {
+    // Every request from a signed-in user goes through here first.
     account(jid: string): Account | undefined {
+      claim(jid)
       const row = get(jid)
       return row && toAccount(row)
     },
 
-    // New or changed address: needs (re)verifying. Returns the verification token.
-    setEmail(jid: string, email: string, newsletter: boolean): string {
-      const current = get(jid)
-      if (current && current.email === email && current.verified === 1) {
-        db.prepare('UPDATE accounts SET newsletter = ?, newsletter_at = ? WHERE jid = ?').run(
-          Number(newsletter),
-          Date.now(),
-          jid
+    // The JID to sign in with: the account's, or the one an open invite reserved.
+    signInJid(email: string): string | undefined {
+      const row = db.prepare('SELECT jid FROM accounts WHERE email = ?').get(email) as
+        { jid: string } | undefined
+      return row?.jid ?? openInvite(email)?.jid
+    },
+
+    // Existing accounts only (adding contacts, password recovery).
+    accountByEmail(email: string): Account | undefined {
+      const row = db.prepare('SELECT * FROM accounts WHERE email = ?').get(email) as
+        AccountRow | undefined
+      return row && toAccount(row)
+    },
+
+    taken,
+
+    // --- invites ---
+
+    // Invites that still count against the user's limit: used, or not expired yet.
+    invitesUsed(inviter: string): number {
+      const row = db
+        .prepare(
+          'SELECT count(*) AS n FROM invites WHERE inviter = ? AND (used = 1 OR expires_at > ?)'
         )
-        return ''
-      }
+        .get(inviter, Date.now()) as { n: number }
+      return row.n
+    },
+
+    // May this address get an invite email now? (not opted out, none in the last week)
+    mayInvite(email: string): boolean {
+      if (db.prepare('SELECT 1 FROM invite_optout WHERE email = ?').get(email)) return false
+      const sent = db
+        .prepare('SELECT 1 FROM invites WHERE email = ? AND expires_at > ?')
+        .get(email, Date.now())
+      return !sent
+    },
+
+    // Records an invite; returns the token for its "no more invites" link.
+    addInvite(invite: Invite, expiresAt = Date.now() + WEEK): string {
+      const optout = token()
+      db.prepare(
+        'INSERT INTO invites (token, email, jid, inviter, expires_at, optout_token) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(invite.token, invite.email, invite.jid, invite.inviter, expiresAt, optout)
+      return optout
+    },
+
+    // An unused, unexpired invite (the sign-up screen asks with its token).
+    invite(t: string): Invite | undefined {
+      return db
+        .prepare(
+          'SELECT token, email, jid, inviter FROM invites WHERE token = ? AND used = 0 AND expires_at > ?'
+        )
+        .get(t, Date.now()) as Invite | undefined
+    },
+
+    optOut(t: string): boolean {
+      const row = db.prepare('SELECT email FROM invites WHERE optout_token = ?').get(t) as
+        { email: string } | undefined
+      if (!row) return false
+      db.prepare('INSERT OR IGNORE INTO invite_optout (email) VALUES (?)').run(row.email)
+      return true
+    },
+
+    // --- changing the address ---
+
+    // Returns the verification token, or '' if the address is someone else's.
+    changeEmail(jid: string, email: string): string {
+      if (taken(email)) return ''
       const t = token()
       db.prepare(
-        `INSERT INTO accounts (jid, email, verified, newsletter, token, token_sent_at, newsletter_at)
-         VALUES (?, ?, 0, ?, ?, ?, ?)
-         ON CONFLICT (jid) DO UPDATE SET email = excluded.email, verified = 0,
-           newsletter = excluded.newsletter, token = excluded.token,
-           token_sent_at = excluded.token_sent_at, newsletter_at = excluded.newsletter_at`
-      ).run(jid, email, Number(newsletter), t, Date.now(), Date.now())
+        'UPDATE accounts SET pending_email = ?, token = ?, token_sent_at = ? WHERE jid = ?'
+      ).run(email, t, Date.now(), jid)
       return t
     },
 
-    // A fresh link for an unverified address, at most once a minute. '' if not allowed.
+    // A fresh link for the pending address, at most once a minute. '' if not allowed.
     resendToken(jid: string): string {
       const row = get(jid)
-      if (!row || row.verified === 1 || Date.now() - (row.token_sent_at ?? 0) < 60_000) return ''
+      if (!row?.pending_email || Date.now() - (row.token_sent_at ?? 0) < 60_000) return ''
       const t = token()
       db.prepare('UPDATE accounts SET token = ?, token_sent_at = ? WHERE jid = ?').run(
         t,
@@ -93,16 +182,24 @@ export function openDb(file: string) {
       return t
     },
 
-    // The account whose link this was, now verified; undefined if unknown or used.
-    verify(t: string): Account | undefined {
+    // The pending address becomes the account's. Undefined if the link is unknown or used
+    // (or, in a race, someone else got the address first).
+    verify(t: string): { account: Account; previous: string } | undefined {
       const row = db.prepare('SELECT * FROM accounts WHERE token = ?').get(t) as
         AccountRow | undefined
-      if (!row) return undefined
-      db.prepare('UPDATE accounts SET verified = 1, token = NULL WHERE jid = ?').run(row.jid)
-      return { ...toAccount(row), verified: true }
+      if (!row?.pending_email) return undefined
+      try {
+        db.prepare(
+          'UPDATE accounts SET email = pending_email, pending_email = NULL, token = NULL WHERE jid = ?'
+        ).run(row.jid)
+      } catch {
+        return undefined
+      }
+      return { account: toAccount(get(row.jid)!), previous: row.email }
     },
 
-    // The user's choice; undefined if they have no email on file.
+    // --- newsletter ---
+
     setNewsletter(jid: string, newsletter: boolean): Account | undefined {
       if (!get(jid)) return undefined
       db.prepare('UPDATE accounts SET newsletter = ?, newsletter_at = ? WHERE jid = ?').run(
@@ -113,7 +210,7 @@ export function openDb(file: string) {
       return toAccount(get(jid)!)
     },
 
-    // Unsubscribed through Brevo: every account using that address.
+    // Unsubscribed through Brevo.
     unsubscribeEmail(email: string): Account[] {
       const rows = db
         .prepare('SELECT * FROM accounts WHERE email = ? AND newsletter = 1')
@@ -125,42 +222,8 @@ export function openDb(file: string) {
       return rows.map((row) => ({ ...toAccount(row), newsletter: false }))
     },
 
-    verifiedAccounts(): Account[] {
-      return (db.prepare('SELECT * FROM accounts WHERE verified = 1').all() as AccountRow[]).map(
-        toAccount
-      )
-    },
-
-    isRegistered(email: string): boolean {
-      return Boolean(
-        db.prepare('SELECT 1 FROM accounts WHERE email = ? AND verified = 1').get(email)
-      )
-    },
-
-    // May this address get an invite email now? (not opted out, none in the last week)
-    mayInvite(email: string): boolean {
-      if (db.prepare('SELECT 1 FROM invite_optout WHERE email = ?').get(email)) return false
-      const sent = db.prepare('SELECT sent_at FROM invite_emails WHERE email = ?').get(email) as
-        { sent_at: number } | undefined
-      return !sent || Date.now() - sent.sent_at > WEEK
-    },
-
-    // Records an invite email; returns the token for its "no more invites" link.
-    invited(email: string): string {
-      const t = token()
-      db.prepare(
-        `INSERT INTO invite_emails (email, sent_at, optout_token) VALUES (?, ?, ?)
-         ON CONFLICT (email) DO UPDATE SET sent_at = excluded.sent_at, optout_token = excluded.optout_token`
-      ).run(email, Date.now(), t)
-      return t
-    },
-
-    optOut(t: string): boolean {
-      const row = db.prepare('SELECT email FROM invite_emails WHERE optout_token = ?').get(t) as
-        { email: string } | undefined
-      if (!row) return false
-      db.prepare('INSERT OR IGNORE INTO invite_optout (email) VALUES (?)').run(row.email)
-      return true
+    allAccounts(): Account[] {
+      return (db.prepare('SELECT * FROM accounts').all() as AccountRow[]).map(toAccount)
     }
   }
 }

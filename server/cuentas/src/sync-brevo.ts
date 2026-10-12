@@ -18,7 +18,7 @@ const db = openDb(`${process.env['DATA_DIR'] ?? '/data'}/cuentas.sqlite`)
 let subscribed = 0
 let removed = 0
 let failed = 0
-for (const account of db.verifiedAccounts()) {
+for (const account of db.allAccounts()) {
   try {
     if (account.newsletter) {
       await newsletter.subscribe(account.email)

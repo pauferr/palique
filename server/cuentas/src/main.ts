@@ -1,7 +1,10 @@
 // Palique account service: an XMPP component (so the server vouches for who's asking)
-// plus a small website for the links in its emails.
-import { timingSafeEqual } from 'node:crypto'
-import { createServer } from 'node:http'
+// plus a small website for the links in its emails and the signed-out app.
+// People sign in with their email; behind it, each account has a random JID that never
+// changes (so contacts and chats don't care if the email does). Only this service knows
+// which email goes with which JID.
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createServer, type IncomingMessage } from 'node:http'
 import { mkdirSync } from 'node:fs'
 import { component, xml } from '@xmpp/component'
 import { brevo } from './brevo.ts'
@@ -17,6 +20,8 @@ const env = (name: string, fallback?: string): string => {
 const NS = 'urn:palique:cuentas:0'
 const USER_DOMAIN = env('USER_DOMAIN', 'localhost') // accounts we serve: user@USER_DOMAIN
 const PUBLIC_URL = env('PUBLIC_URL', 'http://localhost:8080')
+const SECRET = env('XMPP_SECRET')
+const MAX_INVITES = 3 // per user (the admin's have no limit)
 
 mkdirSync(env('DATA_DIR', '/data'), { recursive: true })
 const db = openDb(`${env('DATA_DIR', '/data')}/cuentas.sqlite`)
@@ -36,20 +41,17 @@ const newsletter = brevo({
 })
 if (!newsletter) console.log('brevo not configured: newsletter choices are stored, not synced')
 
-// Only verified addresses go to the list (the verification link doubles as the opt-in
-// confirmation). Failures are logged; sync-brevo.ts can catch up.
-function syncNewsletter(account: Account | undefined): void {
-  if (!newsletter || !account?.verified) return
-  const action = account.newsletter
-    ? newsletter.subscribe(account.email)
-    : newsletter.unsubscribe(account.email)
+// Failures are logged; sync-brevo.ts can catch up.
+function syncNewsletter(email: string, subscribed: boolean): void {
+  if (!newsletter) return
+  const action = subscribed ? newsletter.subscribe(email) : newsletter.unsubscribe(email)
   action.catch((e) => console.error('brevo', e.message))
 }
 
 const xmpp = component({
   service: env('XMPP_SERVICE'),
   domain: env('XMPP_DOMAIN'),
-  password: env('XMPP_SECRET')
+  password: SECRET
 })
 xmpp.on('error', (e) => console.error('xmpp', e.message))
 xmpp.on('online', (address) => console.log('online as', address.toString()))
@@ -73,181 +75,212 @@ function user(from: { local: string; domain: string } | null): string | undefine
 
 const validEmail = (value: string): boolean =>
   value.length <= 254 && /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(value)
+const cleanEmail = (value: unknown): string =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+// JIDs look like "k3f9x2ab7q": 10 characters out of 32, from random bytes (or, for
+// addresses without an account, from the address itself, see /cuenta).
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567'
+const toLocalpart = (bytes: Buffer): string =>
+  [...bytes.subarray(0, 10)].map((b) => ALPHABET[b % 32]).join('')
+const newLocalpart = (): string => toLocalpart(randomBytes(10))
+const fakeLocalpart = (email: string): string =>
+  toLocalpart(createHmac('sha256', SECRET).update(email).digest())
+
+// --- talking to Prosody (server/modules/mod_palique_invites.lua) ------------------------
+
+const INVITES = 'urn:palique:invite:0'
+
+function prosodyIq(child: ReturnType<typeof xml>) {
+  return xmpp.iqCaller.request(xml('iq', { type: 'set', to: USER_DOMAIN }, child))
+}
+
+// --- signed-in users (over XMPP) --------------------------------------------------------
+
+const status = (account: Account | undefined) =>
+  xml('email', {
+    xmlns: NS,
+    address: account?.email ?? '',
+    pending: account?.pending ?? '',
+    newsletter: String(account?.newsletter ?? false)
+  })
 
 function sendVerification(email: string, token: string): Promise<unknown> {
   return send({
     to: email,
-    subject: 'Confirma tu correo de Palique',
+    subject: 'Confirma tu nuevo correo de Palique',
     paragraphs: [
-      '¡Hola! Pulsa el botón para confirmar que este correo es tuyo.',
-      'Lo usaremos para que puedas recuperar tu contraseña si la olvidas.'
+      '¡Hola! Has pedido usar este correo para entrar en Palique.',
+      'Pulsa el botón para confirmarlo. Hasta entonces, sigues entrando con el de antes.'
     ],
     link: { href: `${PUBLIC_URL}/verificar?t=${token}`, label: 'Confirmar mi correo' },
-    footer: 'Si no has creado una cuenta en Palique, ignora este mensaje.'
+    footer: 'Si no has sido tú, ignora este mensaje: no cambia nada.'
   })
 }
-
-const status = (jid: string) => {
-  const account = db.account(jid)
-  return xml('email', {
-    xmlns: NS,
-    address: account?.email ?? '',
-    verified: String(account?.verified ?? false),
-    newsletter: String(account?.newsletter ?? false)
-  })
-}
-
-// <email address='…' newsletter='true|false'/>: set (or change) the account's address.
-xmpp.iqCallee.set(NS, 'email', async (ctx) => {
-  const jid = user(ctx.from)
-  if (!jid) return stanzaError('forbidden')
-  const request = ctx.stanza.getChild('email', NS)!
-  const address = String(request.attrs.address ?? '')
-    .trim()
-    .toLowerCase()
-  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
-  const before = db.account(jid)
-  const token = db.setEmail(jid, address, request.attrs.newsletter === 'true')
-  if (token) {
-    // A new address: the old one leaves the list until the new one is verified.
-    if (before?.verified && before.newsletter && newsletter) {
-      newsletter.unsubscribe(before.email).catch((e) => console.error('brevo', e.message))
-    }
-    await sendVerification(address, token)
-  } else {
-    syncNewsletter(db.account(jid))
-  }
-  return status(jid)
-})
-
-// <newsletter subscribe='true|false'/>: the user's choice, any time (Options).
-xmpp.iqCallee.set(NS, 'newsletter', (ctx) => {
-  const jid = user(ctx.from)
-  if (!jid) return stanzaError('forbidden')
-  const wanted = ctx.stanza.getChild('newsletter', NS)!.attrs.subscribe === 'true'
-  const account = db.setNewsletter(jid, wanted)
-  if (!account) return stanzaError('item-not-found', 'no email on file')
-  syncNewsletter(account)
-  return status(jid)
-})
 
 xmpp.iqCallee.get(NS, 'email', (ctx) => {
   const jid = user(ctx.from)
-  return jid ? status(jid) : stanzaError('forbidden')
+  return jid ? status(db.account(jid)) : stanzaError('forbidden')
 })
 
-// <resend/>: another verification link (at most once a minute).
+// <email address='…'/>: change the address. It needs confirming from the new inbox. The
+// answer is the same if the address belongs to someone else (that inbox is told instead),
+// so nobody learns who has an account this way.
+xmpp.iqCallee.set(NS, 'email', async (ctx) => {
+  const jid = user(ctx.from)
+  const account = jid && db.account(jid)
+  if (!jid || !account) return stanzaError('forbidden')
+  const address = cleanEmail(ctx.stanza.getChild('email', NS)!.attrs.address)
+  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
+  if (address === account.email || address === account.pending) return status(account)
+  const token = db.changeEmail(jid, address)
+  if (token) await sendVerification(address, token)
+  else {
+    await send({
+      to: address,
+      subject: 'Este correo ya tiene cuenta en Palique',
+      paragraphs: [
+        'Alguien ha intentado usar este correo para su cuenta de Palique, pero ya pertenece a otra cuenta, así que no ha cambiado nada.',
+        'Si has sido tú, entra con este correo o usa otro distinto.'
+      ]
+    })
+  }
+  return status(db.account(jid))
+})
+
+// <resend/>: another link for the pending address (at most once a minute).
 xmpp.iqCallee.set(NS, 'resend', async (ctx) => {
   const jid = user(ctx.from)
-  if (!jid) return stanzaError('forbidden')
+  const account = jid && db.account(jid)
+  if (!jid || !account) return stanzaError('forbidden')
   const token = db.resendToken(jid)
   if (!token) return stanzaError('resource-constraint')
-  await sendVerification(db.account(jid)!.email, token)
+  await sendVerification(account.pending, token)
   return true
 })
 
-// --- invites by email ---------------------------------------------------------------
-
-const INVITES = 'urn:palique:invite:0' // server/modules/mod_palique_invites.lua
-
-// Ask Prosody (our trusted component may act for a user) about the user's invites.
-function invitesIq(type: 'get' | 'set', username: string) {
-  return xmpp.iqCaller.request(
-    xml('iq', { type, to: USER_DOMAIN }, xml('invite', { xmlns: INVITES, for: username }))
-  )
-}
-
-// <invite-email address='…'/>. The answer never says whether the address has an account:
-// "sent" is the reply either way. Registered, recently invited or opted-out addresses get
-// nothing and cost no invite. The limit is checked first so it can't leak that either.
-xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
+// <newsletter subscribe='true|false'/>: the user's choice, any time.
+xmpp.iqCallee.set(NS, 'newsletter', (ctx) => {
   const jid = user(ctx.from)
-  if (!jid) return stanzaError('forbidden')
-  const username = jid.split('@')[0]
-  const address = String(ctx.stanza.getChild('invite-email', NS)!.attrs.address ?? '')
-    .trim()
-    .toLowerCase()
-  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
-
-  const usage = (await invitesIq('get', username)).getChild('invites', INVITES)!
-  if (Number(usage.attrs.active) >= Number(usage.attrs.max)) {
-    return stanzaError('resource-constraint')
-  }
-  if (db.isRegistered(address) || !db.mayInvite(address)) return true
-
-  const invite = (await invitesIq('set', username)).getChild('invite', INVITES)!
-  const optout = db.invited(address)
-  await send({
-    to: address,
-    subject: `${username} te invita a Palique`,
-    paragraphs: [
-      `${username} quiere chatear contigo en Palique, una app de mensajería con zumbidos, guiños y sonidos de toda la vida.`,
-      `Para crear tu cuenta, abre Palique, pulsa «¿No tienes cuenta? Crea una» y pega este código de invitación: ${invite.attrs.token}`,
-      `El código caduca en una semana. Al entrar, ${username} ya estará en tus contactos.`
-    ],
-    footer: `¿No conoces a ${username} o no quieres más invitaciones? No recibirás ninguna más: ${PUBLIC_URL}/no-invitaciones?t=${optout}`
-  })
-  return true
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  const wanted = ctx.stanza.getChild('newsletter', NS)!.attrs.subscribe === 'true'
+  const account = db.setNewsletter(jid, wanted)!
+  syncNewsletter(account.email, account.newsletter)
+  return status(account)
 })
 
-// --- password recovery -----------------------------------------------------------------
+// <lookup address='…'/>: who has this address (adding a contact). Knowing someone's email
+// tells you whether they're on Palique, like other messengers; limited per user.
+const LOOKUP_WINDOW = 60 * 60_000
+const LOOKUP_MAX = 30
+const lookups = new Map<string, { since: number; count: number }>()
 
-// Asked over HTTP: the app is signed out, so there's no XMPP session to vouch for anyone.
-// The answer is always the same (it doesn't reveal whether the account or its email
-// exist) and requests are limited per username and per address.
-const RESET_GAP = 5 * 60_000 // per username
-const IP_WINDOW = 15 * 60_000
-const IP_MAX = 10
-const lastReset = new Map<string, number>()
-const ipRequests = new Map<string, { since: number; count: number }>()
-
-function allowReset(username: string, ip: string): boolean {
+function allowLookup(jid: string): boolean {
   const now = Date.now()
-  const seen = ipRequests.get(ip)
-  const window = seen && now - seen.since < IP_WINDOW ? seen : { since: now, count: 0 }
+  const seen = lookups.get(jid)
+  const window = seen && now - seen.since < LOOKUP_WINDOW ? seen : { since: now, count: 0 }
   window.count++
-  ipRequests.set(ip, window)
-  if (window.count > IP_MAX) return false
-  if (now - (lastReset.get(username) ?? 0) < RESET_GAP) return false
-  lastReset.set(username, now)
-  return true
+  lookups.set(jid, window)
+  return window.count <= LOOKUP_MAX
 }
 
-async function sendReset(username: string): Promise<void> {
-  const account = db.account(`${username}@${USER_DOMAIN}`)
-  if (!account?.verified) return
-  const res = await xmpp.iqCaller.request(
-    xml('iq', { type: 'set', to: USER_DOMAIN }, xml('reset', { xmlns: INVITES, for: username }))
+xmpp.iqCallee.get(NS, 'lookup', (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  const address = cleanEmail(ctx.stanza.getChild('lookup', NS)!.attrs.address)
+  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
+  if (!allowLookup(jid)) return stanzaError('resource-constraint')
+  return xml('lookup', { xmlns: NS, jid: db.accountByEmail(address)?.jid ?? '' })
+})
+
+// --- invites (by email only) ------------------------------------------------------------
+
+const inviteStatus = (jid: string) =>
+  xml('invites', { xmlns: NS, max: String(MAX_INVITES), used: String(db.invitesUsed(jid)) })
+
+xmpp.iqCallee.get(NS, 'invites', (ctx) => {
+  const jid = user(ctx.from)
+  return jid && db.account(jid) ? inviteStatus(jid) : stanzaError('forbidden')
+})
+
+// Picks the new account's JID, asks Prosody for an invite that can only create it, and
+// emails it. `inviter`: bare JID, null for the admin's.
+async function invite(email: string, inviter: string | null, inviterName: string): Promise<void> {
+  const local = newLocalpart()
+  const res = await prosodyIq(
+    xml('account', {
+      xmlns: INVITES,
+      username: local,
+      ...(inviter ? { inviter: inviter.split('@')[0] } : {})
+    })
   )
-  const token = res.getChild('reset', INVITES)!.attrs.token
+  const token = res.getChild('account', INVITES)!.attrs.token as string
+  const optout = db.addInvite({ token, email, jid: `${local}@${USER_DOMAIN}`, inviter })
+  const who = inviterName || 'Alguien'
   await send({
-    to: account.email,
-    subject: 'Recupera tu contraseña de Palique',
+    to: email,
+    subject: inviter ? `${who} te invita a Palique` : 'Te invitamos a Palique',
     paragraphs: [
-      `Has pedido cambiar la contraseña de tu cuenta «${username}».`,
-      'Pulsa el botón para abrir Palique y elegir una nueva. Si el botón no funciona, abre Palique, pulsa «¿Olvidaste tu contraseña?» y luego «Ya tengo un código», y pega este código:',
-      token
+      `${inviter ? `${who} quiere` : 'Queremos'} chatear contigo en Palique, una app de mensajería con zumbidos, guiños y sonidos de toda la vida.`,
+      'Pulsa el botón para abrir Palique y crear tu cuenta. Si el botón no funciona, abre Palique, pulsa «¿Tienes una invitación? Crea tu cuenta» y pega este código:',
+      token,
+      `Entrarás con este correo (${email}). La invitación caduca en una semana.${inviter ? ` Al entrar, ${who} ya estará en tus contactos.` : ''}`
     ],
     link: {
-      href: `palique://recuperar?u=${encodeURIComponent(username)}&t=${encodeURIComponent(token)}`,
-      label: 'Abrir Palique y elegir contraseña'
+      href: `palique://registro?t=${encodeURIComponent(token)}`,
+      label: 'Abrir Palique y crear mi cuenta'
     },
-    footer:
-      'El código caduca en una hora y solo sirve una vez. Si no lo has pedido tú, ignora este correo: tu contraseña no cambia.'
+    footer: `¿No quieres más invitaciones? No recibirás ninguna más: ${PUBLIC_URL}/no-invitaciones?t=${optout}`
   })
 }
+
+// <invite-email address='…' name='…'/>: the user explicitly invites someone. `name` is
+// the inviter's display name, for the email. Errors: 'resource-constraint' (no invites
+// left), 'conflict' (that address already has an account: add them instead).
+// Addresses invited in the last week, or that opted out, silently get nothing and cost
+// nothing.
+xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  const request = ctx.stanza.getChild('invite-email', NS)!
+  const address = cleanEmail(request.attrs.address)
+  if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
+  if (db.invitesUsed(jid) >= MAX_INVITES) return stanzaError('resource-constraint')
+  if (db.accountByEmail(address)) return stanzaError('conflict')
+  if (db.mayInvite(address) && !db.taken(address)) {
+    await invite(address, jid, String(request.attrs.name ?? '').trim().slice(0, 64))
+  }
+  return inviteStatus(jid)
+})
+
+// --- signed out (over HTTP) -------------------------------------------------------------
 
 // Behind a reverse proxy (production: Caddy) every request comes from the proxy, which
 // passes the real client in X-Forwarded-For. Take the last entry: the one the proxy added
 // (earlier ones could be made up by the client).
 const TRUST_PROXY = process.env['TRUST_PROXY'] === 'true'
-function clientIp(req: import('node:http').IncomingMessage): string {
+function clientIp(req: IncomingMessage): string {
   const forwarded = String(req.headers['x-forwarded-for'] ?? '')
   const last = forwarded.split(',').at(-1)?.trim()
   return (TRUST_PROXY && last) || req.socket.remoteAddress || ''
 }
 
-function readJson(req: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
+// At most `max` requests per IP every `windowMs` (in memory).
+function ipLimit(max: number, windowMs: number): (ip: string) => boolean {
+  const seen = new Map<string, { since: number; count: number }>()
+  return (ip) => {
+    const now = Date.now()
+    const entry = seen.get(ip)
+    const window = entry && now - entry.since < windowMs ? entry : { since: now, count: 0 }
+    window.count++
+    seen.set(ip, window)
+    return window.count <= max
+  }
+}
+
+function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     let body = ''
     req.on('data', (chunk) => {
@@ -264,11 +297,46 @@ function readJson(req: import('node:http').IncomingMessage): Promise<Record<stri
   })
 }
 
-// --- website for the email links -----------------------------------------------------
+// Password recovery. The answer is always the same (it doesn't reveal whether the
+// address has an account); requests are limited per address and per IP.
+const RESET_GAP = 5 * 60_000 // per address
+const lastReset = new Map<string, number>()
+const resetIps = ipLimit(10, 15 * 60_000)
 
-const pushStatus = (jid: string): void => {
-  xmpp.send(xml('message', { to: jid }, status(jid))).catch(() => {})
+function allowReset(email: string, ip: string): boolean {
+  if (!resetIps(ip)) return false
+  const now = Date.now()
+  if (now - (lastReset.get(email) ?? 0) < RESET_GAP) return false
+  lastReset.set(email, now)
+  return true
 }
+
+async function sendReset(email: string): Promise<void> {
+  const account = db.accountByEmail(email)
+  if (!account) return
+  const username = account.jid.split('@')[0]
+  const res = await prosodyIq(xml('reset', { xmlns: INVITES, for: username }))
+  const token = res.getChild('reset', INVITES)!.attrs.token
+  await send({
+    to: email,
+    subject: 'Recupera tu contraseña de Palique',
+    paragraphs: [
+      'Has pedido cambiar la contraseña de tu cuenta de Palique.',
+      'Pulsa el botón para abrir Palique y elegir una nueva. Si el botón no funciona, abre Palique, pulsa «¿Olvidaste tu contraseña?» y luego «Ya tengo un código», y pega este código:',
+      token
+    ],
+    link: {
+      href: `palique://recuperar?u=${encodeURIComponent(username)}&t=${encodeURIComponent(token)}`,
+      label: 'Abrir Palique y elegir contraseña'
+    },
+    footer:
+      'El código caduca en una hora y solo sirve una vez. Si no lo has pedido tú, ignora este correo: tu contraseña no cambia.'
+  })
+}
+
+// Signing in: the app asks which JID goes with the email. Unknown addresses get a made-up
+// one that's always the same, so the sign-in just fails like a wrong password.
+const signInIps = ipLimit(30, 60_000)
 
 // Brevo's webhook (configure it with ?token=BREVO_WEBHOOK_TOKEN): someone left the list
 // from a newsletter's own link, or the address bounced or complained. Mirror it here.
@@ -281,6 +349,10 @@ function sameSecret(given: string): boolean {
   return WEBHOOK_TOKEN !== '' && a.length === b.length && timingSafeEqual(a, b)
 }
 
+const pushStatus = (account: Account): void => {
+  xmpp.send(xml('message', { to: account.jid }, status(account))).catch(() => {})
+}
+
 function page(title: string, message: string): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Palique</title></head>
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#eaf0fb;font-family:'Noto Sans',Verdana,sans-serif;color:#1b2a4a">
@@ -290,45 +362,82 @@ function page(title: string, message: string): string {
 </main></body></html>`
 }
 
+const isLoopback = (req: IncomingMessage): boolean =>
+  ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '')
+
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', PUBLIC_URL)
+  const json = (code: number, body: unknown): void => {
+    res.writeHead(code, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(body))
+  }
+
+  if (req.method === 'POST' && url.pathname === '/cuenta') {
+    if (!signInIps(clientIp(req))) return json(429, { error: 'wait' })
+    const email = cleanEmail((await readJson(req)).email)
+    if (!validEmail(email)) return json(400, { error: 'invalid' })
+    const jid = db.signInJid(email)
+    return json(200, { username: jid ? jid.split('@')[0] : fakeLocalpart(email) })
+  }
+  // The sign-up screen, with the invite's token: which account it creates.
+  if (req.method === 'POST' && url.pathname === '/registro') {
+    if (!signInIps(clientIp(req))) return json(429, { error: 'wait' })
+    const invite = db.invite(String((await readJson(req)).token ?? ''))
+    if (!invite) return json(404, { error: 'invalid-invite' })
+    return json(200, { email: invite.email, username: invite.jid.split('@')[0] })
+  }
+  if (req.method === 'POST' && url.pathname === '/recuperar') {
+    const email = cleanEmail((await readJson(req)).email)
+    if (validEmail(email) && allowReset(email, clientIp(req))) {
+      sendReset(email).catch((e) => console.error('reset', e.message))
+    }
+    return json(202, { ok: true })
+  }
+  // The admin's invites (src/invitar.ts), only from inside the container.
+  if (req.method === 'POST' && url.pathname === '/admin/invitar' && isLoopback(req)) {
+    const email = cleanEmail((await readJson(req)).email)
+    if (!validEmail(email)) return json(400, { error: 'invalid' })
+    if (db.taken(email)) return json(409, { error: 'taken' })
+    try {
+      await invite(email, null, '')
+      return json(200, { ok: true })
+    } catch (e) {
+      return json(500, { error: (e as Error).message })
+    }
+  }
   if (req.method === 'POST' && url.pathname === '/brevo') {
     if (!sameSecret(url.searchParams.get('token') ?? '')) {
       res.writeHead(403)
       return res.end()
     }
     const event = await readJson(req)
-    const email = String(event.email ?? '')
-      .trim()
-      .toLowerCase()
+    const email = cleanEmail(event.email)
     if (LEAVE_EVENTS.has(String(event.event)) && email) {
-      for (const account of db.unsubscribeEmail(email)) pushStatus(account.jid)
+      for (const account of db.unsubscribeEmail(email)) pushStatus(account)
     }
     res.writeHead(200)
     return res.end()
   }
-  if (req.method === 'POST' && url.pathname === '/recuperar') {
-    const username = String((await readJson(req)).username ?? '')
-      .trim()
-      .toLowerCase()
-    const ip = clientIp(req)
-    if (/^[a-z0-9._-]{1,64}$/.test(username) && allowReset(username, ip)) {
-      sendReset(username).catch((e) => console.error('reset', e.message))
-    }
-    res.writeHead(202, { 'content-type': 'application/json' })
-    return res.end('{"ok":true}')
-  }
+
   const reply = (code: number, title: string, message: string): void => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
     res.end(page(title, message))
   }
   if (req.method === 'GET' && url.pathname === '/verificar') {
-    const account = db.verify(url.searchParams.get('t') ?? '')
-    if (!account) return reply(404, 'Enlace no válido', 'Este enlace ya se usó o no existe.')
-    syncNewsletter(account)
+    const result = db.verify(url.searchParams.get('t') ?? '')
+    if (!result) return reply(404, 'Enlace no válido', 'Este enlace ya se usó o no existe.')
+    const { account, previous } = result
+    if (account.newsletter) {
+      syncNewsletter(previous, false)
+      syncNewsletter(account.email, true)
+    }
     // Let the app know right away (it also asks on every sign-in).
-    pushStatus(account.jid)
-    return reply(200, 'Correo confirmado', 'Gracias. Ya puedes volver a Palique.')
+    pushStatus(account)
+    return reply(
+      200,
+      'Correo cambiado',
+      `A partir de ahora entras en Palique con ${account.email}.`
+    )
   }
   if (req.method === 'GET' && url.pathname === '/no-invitaciones') {
     if (!db.optOut(url.searchParams.get('t') ?? '')) {
