@@ -127,16 +127,7 @@ Comprobación rápida: abre `https://palique-pruebas.duckdns.org` en el navegado
 1. En GitHub: repositorio → *Settings → Secrets and variables → Actions → Variables → New repository variable*:
    - `XMPP_DOMAIN` = `palique-pruebas.duckdns.org`
    - `ACCOUNTS_URL` = `https://palique-pruebas.duckdns.org`
-2. Publica una versión (en tu Mac):
-
-```bash
-npm version patch
-```
-
-```bash
-git push --follow-tags
-```
-
+2. Publica una versión: *Actions → Release → Run workflow* con **publish** activado. El número de versión sale solo de los commits.
 3. Cuando termine, publica el borrador en *Releases*, instala la app y crea tu cuenta con la invitación que te llegó en el paso 7. A partir de ahí, cada usuario puede invitar a 3 personas desde la propia app.
 
 ---
