@@ -2,6 +2,7 @@ appId: com.palique.app
 productName: Palique
 directories:
   buildResources: build
+afterPack: build/after-pack.mjs
 files:
   - '!**/.vscode/*'
   - '!src/*'

@@ -16,7 +16,7 @@ It brings back the social side of desktop messaging that MSN and AIM had. Being 
 
 1. **Get an invite.** For now, you can only join if someone invites you. The invite arrives by email.
 2. **Install the app** from the [Releases](https://github.com/pauferr/palique/releases) page (macOS, Linux and Windows). The builds aren't signed yet:
-   - On macOS, open it the first time with right click → *Open*.
+   - On macOS, the first time it won't open: go to *System Settings → Privacy & Security* and press *Open Anyway*.
    - On Windows, choose *More info → Run anyway*.
 3. **Create your account.** Press the button in the invite email, or open Palique, choose *¿Tienes una invitación? Crea tu cuenta* and paste the code. Pick the name your contacts will see and a password. You'll sign in with the email the invite was sent to.
 4. **Add your friends** by their email. If someone isn't on Palique yet, you can invite them (you have 3 invites). Whoever joins with your invite is already in your contacts.

@@ -205,7 +205,7 @@ The workflow **never runs on push**: releasing is a manual decision.
   - **draft** on (the default): you publish it yourself from *Releases*. Off: it's published straight away.
 - **Try a build without releasing:** same workflow with **publish** off. The installers are downloadable as artifacts (kept 7 days).
 - **Server the build talks to:** set at build time from repository variables `XMPP_DOMAIN` and `ACCOUNTS_URL` (`MAIN_VITE_*`). Unset means `localhost`.
-- **Unsigned builds:** macOS asks to open with right click → Open, and Windows shows a SmartScreen warning.
+- **Unsigned builds:** the mac app is only ad-hoc signed (`build/after-pack.mjs`), so the first time macOS needs *System Settings → Privacy & Security → Open Anyway*. Windows shows a SmartScreen warning.
 
 ## Production
 
