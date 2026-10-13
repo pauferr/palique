@@ -24,6 +24,8 @@ type AccountRow = {
   token_sent_at: number | null
 }
 
+// Its return type is inferred on purpose: it is `Db`, below.
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function openDb(file: string) {
   const db = new DatabaseSync(file)
   db.exec(`

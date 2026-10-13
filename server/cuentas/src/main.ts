@@ -56,7 +56,7 @@ const xmpp = component({
 xmpp.on('error', (e) => console.error('xmpp', e.message))
 xmpp.on('online', (address) => console.log('online as', address.toString()))
 
-function stanzaError(condition: string, text?: string) {
+function stanzaError(condition: string, text?: string): ReturnType<typeof xml> {
   const error = xml(
     'error',
     { type: 'modify' },
@@ -108,7 +108,7 @@ xmpp.on('stanza', (stanza) => {
 
 // --- signed-in users (over XMPP) --------------------------------------------------------
 
-const status = (account: Account | undefined) =>
+const status = (account: Account | undefined): ReturnType<typeof xml> =>
   xml('email', {
     xmlns: NS,
     address: account?.email ?? '',
