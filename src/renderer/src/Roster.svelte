@@ -306,6 +306,7 @@
   <form onsubmit={add}>
     <input
       type="email"
+      spellcheck="false"
       bind:value={address}
       required
       maxlength="254"
@@ -324,6 +325,7 @@
       <form class="send" onsubmit={emailInvite}>
         <input
           type="email"
+          spellcheck="false"
           bind:value={inviteEmail}
           required
           maxlength="254"

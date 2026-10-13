@@ -105,6 +105,7 @@
     <form class="change" onsubmit={changeEmail}>
       <input
         type="email"
+        spellcheck="false"
         bind:value={newEmail}
         required
         maxlength="254"

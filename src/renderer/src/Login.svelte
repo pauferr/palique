@@ -150,20 +150,27 @@
       {:else}
         <label>
           Código de invitación
-          <input bind:value={invite} required autocomplete="off" />
+          <input spellcheck="false" bind:value={invite} required autocomplete="off" />
         </label>
       {/if}
     {:else}
       <label>
         Correo electrónico
-        <input type="email" bind:value={email} autocomplete="email" required maxlength="254" />
+        <input
+          type="email"
+          spellcheck="false"
+          bind:value={email}
+          autocomplete="email"
+          required
+          maxlength="254"
+        />
       </label>
     {/if}
 
     {#if mode === 'reset'}
       <label>
         Código del correo
-        <input bind:value={code} required autocomplete="one-time-code" />
+        <input spellcheck="false" bind:value={code} required autocomplete="one-time-code" />
       </label>
     {/if}
 
