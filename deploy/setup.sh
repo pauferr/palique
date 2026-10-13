@@ -42,7 +42,8 @@ fi
 
 # Weekly certificate hand-over to Prosody (idempotent).
 job="0 4 * * 1 $(pwd)/certs.sh >> $(pwd)/certs.log 2>&1"
-( crontab -l 2>/dev/null | grep -v "/certs.sh" ; echo "$job" ) | crontab -
+# No crontab yet, or no old job: grep finds nothing, which must not stop the script.
+( crontab -l 2>/dev/null | grep -v "/certs.sh" || true; echo "$job" ) | crontab -
 
 cat <<EOF
 
