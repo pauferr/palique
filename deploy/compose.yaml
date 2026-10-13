@@ -33,6 +33,7 @@ services:
       SMTP_USER: ${SMTP_USER:?set SMTP_USER in .env}
       SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in .env}
       MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       BREVO_LIST_ID: ${BREVO_LIST_ID:-}
       BREVO_WEBHOOK_TOKEN: ${BREVO_WEBHOOK_TOKEN:-}

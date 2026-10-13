@@ -15,6 +15,7 @@ export function mailer(options: {
   host: string
   port: number
   from: string
+  replyTo?: string
   user?: string
   pass?: string
 }) {
@@ -43,6 +44,7 @@ ${mail.footer ? `<div style="padding:10px 20px;font-size:12px;color:#5b6f94;bord
 </div></body></html>`
     return transport.sendMail({
       from: options.from,
+      replyTo: options.replyTo,
       to: mail.to,
       subject: mail.subject,
       text,

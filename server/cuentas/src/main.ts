@@ -29,6 +29,7 @@ const send = mailer({
   host: env('SMTP_HOST'),
   port: Number(env('SMTP_PORT', '587')),
   from: env('MAIL_FROM', 'Palique <no-responder@palique.localhost>'),
+  replyTo: process.env['MAIL_REPLY_TO'] || undefined,
   user: process.env['SMTP_USER'],
   pass: process.env['SMTP_PASS']
 })
