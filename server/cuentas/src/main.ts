@@ -9,7 +9,7 @@ import { mkdirSync } from 'node:fs'
 import { component, xml } from '@xmpp/component'
 import { brevo } from './brevo.ts'
 import { openDb, type Account } from './db.ts'
-import { mailer } from './mail.ts'
+import { BUTTERFLY, escape, mailer } from './mail.ts'
 
 const env = (name: string, fallback?: string): string => {
   const value = process.env[name] ?? fallback
@@ -122,11 +122,11 @@ function sendVerification(email: string, token: string): Promise<unknown> {
     to: email,
     subject: 'Confirma tu nuevo correo de Palique',
     paragraphs: [
-      '¡Hola! Has pedido usar este correo para entrar en Palique.',
-      'Pulsa el botón para confirmarlo. Hasta entonces, sigues entrando con el de antes.'
+      '¡Correo nuevo! Has pedido entrar en Palique con esta dirección.',
+      'Pulsa el botón para confirmarla. Hasta que lo hagas, seguirás entrando con la de antes.'
     ],
     link: { href: `${PUBLIC_URL}/verificar?t=${token}`, label: 'Confirmar mi correo' },
-    footer: 'Si no has sido tú, ignora este mensaje: no cambia nada.'
+    footer: 'Si no has sido tú, ignora este correo y aquí no ha pasado nada.'
   })
 }
 
@@ -136,8 +136,9 @@ xmpp.iqCallee.get(NS, 'email', (ctx) => {
 })
 
 // <email address='…'/>: change the address. It needs confirming from the new inbox. The
-// answer is the same if the address belongs to someone else (that inbox is told instead),
-// so nobody learns who has an account this way.
+// answer is the same if the address belongs to someone else (nothing is sent then), so
+// nobody learns who has an account this way. The email goes out in the background, so
+// both answers take the same time too.
 xmpp.iqCallee.set(NS, 'email', async (ctx) => {
   const jid = user(ctx.from)
   const account = jid && db.account(jid)
@@ -146,17 +147,7 @@ xmpp.iqCallee.set(NS, 'email', async (ctx) => {
   if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
   if (address === account.email || address === account.pending) return status(account)
   const token = db.changeEmail(jid, address)
-  if (token) await sendVerification(address, token)
-  else {
-    await send({
-      to: address,
-      subject: 'Este correo ya tiene cuenta en Palique',
-      paragraphs: [
-        'Alguien ha intentado usar este correo para su cuenta de Palique, pero ya pertenece a otra cuenta, así que no ha cambiado nada.',
-        'Si has sido tú, entra con este correo o usa otro distinto.'
-      ]
-    })
-  }
+  if (token) sendVerification(address, token).catch((e) => console.error('verify', e.message))
   return status(db.account(jid))
 })
 
@@ -231,18 +222,28 @@ async function invite(email: string, inviter: string | null, inviterName: string
   const who = inviterName || 'Alguien'
   await send({
     to: email,
-    subject: inviter ? `${who} te invita a Palique` : 'Te invitamos a Palique',
+    subject: inviter
+      ? `${who} quiere agregarte en Palique`
+      : '¡Tienes una invitación para Palique!',
+    sender: inviter ? who : undefined,
     paragraphs: [
-      `${inviter ? `${who} quiere` : 'Queremos'} chatear contigo en Palique, una app de mensajería con zumbidos, guiños y sonidos de toda la vida.`,
-      'Pulsa el botón para abrir Palique y crear tu cuenta. Si el botón no funciona, abre Palique, pulsa «¿Tienes una invitación? Crea tu cuenta» y pega este código:',
-      token,
-      `Entrarás con este correo (${email}). La invitación caduca en una semana.${inviter ? ` Al entrar, ${who} ya estará en tus contactos.` : ''}`
+      inviter
+        ? '¡Ey! Quiero tenerte en mi lista de contactos de Palique 🙂'
+        : '¡Ey! Te hemos guardado un sitio 🙂❤️',
+      '¿Te acuerdas de llegar a casa, encender el ordenador y mirar quién estaba conectado? Palique va de eso: tu lista de contactos, zumbidos, guiños y el sonidito cuando alguien se conecta.',
+      'Abre Palique, pulsa «¿Tienes una invitación? Crea tu cuenta» y pega este código:'
     ],
+    code: token,
     link: {
       href: `palique://registro?t=${encodeURIComponent(token)}`,
       label: 'Abrir Palique y crear mi cuenta'
     },
-    footer: `¿No quieres más invitaciones? No recibirás ninguna más: ${PUBLIC_URL}/no-invitaciones?t=${optout}`
+    note: `Entrarás con esta dirección (${email}). La invitación caduca en una semana, así que no lo dejes para luego.${inviter ? ` Cuando entres, ${who} ya estará en tu lista.` : ''}`,
+    footer: '¿Prefieres que no te invitemos más?',
+    footerLink: {
+      href: `${PUBLIC_URL}/no-invitaciones?t=${optout}`,
+      label: 'No quiero más invitaciones'
+    }
   })
 }
 
@@ -335,18 +336,18 @@ async function sendReset(email: string): Promise<void> {
   const token = res.getChild('reset', INVITES)!.attrs.token
   await send({
     to: email,
-    subject: 'Recupera tu contraseña de Palique',
+    subject: '¿Se te ha olvidado la contraseña de Palique?',
     paragraphs: [
-      'Has pedido cambiar la contraseña de tu cuenta de Palique.',
-      'Pulsa el botón para abrir Palique y elegir una nueva. Si el botón no funciona, abre Palique, pulsa «¿Olvidaste tu contraseña?» y luego «Ya tengo un código», y pega este código:',
-      token
+      'Tranqui, nos ha pasado a todos 😉',
+      'Abre Palique, pulsa «¿Olvidaste tu contraseña?», luego «Ya tengo un código» y pega este:'
     ],
+    code: token,
     link: {
       href: `palique://recuperar?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
       label: 'Abrir Palique y elegir contraseña'
     },
-    footer:
-      'El código caduca en una hora y solo sirve una vez. Si no lo has pedido tú, ignora este correo: tu contraseña no cambia.'
+    note: 'El código caduca en una hora y solo vale una vez.',
+    footer: 'Si no lo has pedido tú, pasa de este correo: tu contraseña sigue igual.'
   })
 }
 
@@ -370,13 +371,19 @@ const pushStatus = (account: Account): void => {
   xmpp.send(xml('message', { to: account.jid }, status(account))).catch(() => {})
 }
 
+// Same look as the emails: a conversation window with the butterfly colors on top.
 function page(title: string, message: string): string {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Palique</title></head>
-<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#eaf0fb;font-family:'Noto Sans',Verdana,sans-serif;color:#1b2a4a">
-<main style="width:min(420px,100% - 32px);background:#fff;border:1px solid #c6d5ee;border-radius:8px;overflow:hidden">
-<div style="padding:14px 20px;background:linear-gradient(#e3edfd,#c3d7f7);color:#0b3c9e;font-size:22px;font-weight:bold;font-style:italic">Palique</div>
-<div style="padding:16px 20px"><h1 style="font-size:18px;color:#0b3c9e;margin:0 0 8px">${title}</h1><p>${message}</p></div>
-</main></body></html>`
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${escape(title)} · Palique</title>
+<style>
+:root{--bg:#f7f7f6;--card:#fff;--line:#e7e7e5;--fg:#18181b;--muted:#71717a;--acc:#2563eb;--tint:#eef3ff;--tint-line:#c9d8fd}
+@media (prefers-color-scheme:dark){:root{--bg:#0c0c0d;--card:#18181b;--line:#2a2a2e;--fg:#f4f4f5;--muted:#a1a1aa;--acc:#6b9bff;--tint:#1b2540;--tint-line:#2f3b5c}}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+main{width:min(420px,100% - 32px);background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stripe{height:5px;background:linear-gradient(90deg,${BUTTERFLY.map((c, i) => `${c} ${i * 25}% ${(i + 1) * 25}%`).join(',')})}
+.bar{padding:10px 20px;background:var(--tint);border-bottom:1px solid var(--tint-line);font-size:13px;font-weight:700;color:var(--acc)}.bar span{color:#22c55e}
+.body{padding:20px 28px 26px}h1{font-size:20px;margin:0 0 6px}p{margin:0;color:var(--muted)}
+</style></head>
+<body><main><div class="stripe"></div><div class="bar"><span>&#9679;</span>&nbsp;palique</div><div class="body"><h1>${escape(title)}</h1><p>${escape(message)}</p></div></main></body></html>`
 }
 
 const isLoopback = (req: IncomingMessage): boolean =>
@@ -442,7 +449,7 @@ createServer(async (req, res) => {
   }
   if (req.method === 'GET' && url.pathname === '/verificar') {
     const result = db.verify(url.searchParams.get('t') ?? '')
-    if (!result) return reply(404, 'Enlace no válido', 'Este enlace ya se usó o no existe.')
+    if (!result) return reply(404, 'Enlace no válido', 'Este enlace ya se ha usado o no existe.')
     const { account, previous } = result
     if (account.newsletter) {
       syncNewsletter(previous, false)
@@ -453,16 +460,16 @@ createServer(async (req, res) => {
     return reply(
       200,
       'Correo cambiado',
-      `A partir de ahora entras en Palique con ${account.email}.`
+      `¡Hecho! A partir de ahora entrarás en Palique con ${account.email}.`
     )
   }
   if (req.method === 'GET' && url.pathname === '/no-invitaciones') {
     if (!db.optOut(url.searchParams.get('t') ?? '')) {
       return reply(404, 'Enlace no válido', 'Este enlace no existe.')
     }
-    return reply(200, 'Hecho', 'No volverás a recibir invitaciones a Palique en esta dirección.')
+    return reply(200, 'Listo', 'Vale, no te invitaremos más a Palique en esta dirección.')
   }
-  reply(404, 'Página no encontrada', 'Aquí no hay nada.')
+  reply(404, 'Página no encontrada', 'Por aquí no hay nada.')
 }).listen(Number(env('HTTP_PORT', '8080')), () => console.log('http ready'))
 
 // Prosody may not be up yet (or restarting): keep trying instead of crashing. Later

@@ -68,7 +68,7 @@ assert.deepEqual(await A.inviteStatus(), { max: 3, used: 0 })
 // New address: an invite email with a working code, costing one invite.
 assert.deepEqual(await A.inviteByEmail(` ${mail(newbieName).toUpperCase()} `), { max: 3, used: 1 })
 const invite = await lastMail(mail(newbieName))
-assert.equal(invite.subject, `${aName} te invita a Palique`)
+assert.equal(invite.subject, `${aName} quiere agregarte en Palique`)
 const code = inviteCode(invite.text)
 const optout = invite.text.match(/http:\/\/localhost:8080\/no-invitaciones\?t=\S+/)?.[0]
 assert.ok(optout, 'opt-out link in the email')

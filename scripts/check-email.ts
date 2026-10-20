@@ -47,18 +47,15 @@ assert.notEqual(await A.accountFor(newEmail), a)
 // A resend is allowed only after a minute.
 await assert.rejects(A.resendVerification(), /wait/)
 
-// Someone else's address: same answer, nothing changes, and that inbox is told.
+// Someone else's address: same answer, nothing changes, and nothing is sent.
 const before = await mailCount(`${bName}@correo.test`)
 assert.deepEqual(await A.changeEmail(`${bName}@correo.test`), {
   address: email,
   pending: newEmail,
   newsletter: false
 })
-assert.equal(await mailCount(`${bName}@correo.test`), before + 1)
-assert.equal(
-  (await lastMail(`${bName}@correo.test`)).subject,
-  'Este correo ya tiene cuenta en Palique'
-)
+await new Promise((r) => setTimeout(r, 1000))
+assert.equal(await mailCount(`${bName}@correo.test`), before)
 assert.equal(await A.accountFor(`${bName}@correo.test`), b)
 
 // Someone else pretending to be the account service is ignored.
