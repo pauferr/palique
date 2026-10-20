@@ -38,7 +38,7 @@ modules_disabled = { "s2s" }
 allow_registration = true
 registration_invite_only = true
 invite_expiry = "1 week"
-palique_invites_trusted = { "cuentas." .. ENV_PALIQUE_DOMAIN }
+palique_invites_trusted = { "accounts." .. ENV_PALIQUE_DOMAIN }
 
 c2s_require_encryption = true
 -- Let's Encrypt certificate copied here from Caddy by deploy/certs.sh.
@@ -62,5 +62,5 @@ component_interfaces = { "*" }
 
 VirtualHost (ENV_PALIQUE_DOMAIN)
 
-Component ("cuentas." .. ENV_PALIQUE_DOMAIN)
-	component_secret = ENV_CUENTAS_SECRET
+Component ("accounts." .. ENV_PALIQUE_DOMAIN)
+	component_secret = ENV_ACCOUNTS_SECRET

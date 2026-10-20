@@ -18,8 +18,8 @@ const CHATSTATES = 'http://jabber.org/protocol/chatstates' // "is typing" (XEP-0
 const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from the bundled catalog
 
 const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
-const ACCOUNTS = 'urn:palique:cuentas:0' // account service, server/cuentas
-export const ACCOUNTS_JID = process.env['PALIQUE_ACCOUNTS_JID'] ?? `cuentas.${DOMAIN}`
+const ACCOUNTS = 'urn:palique:accounts:0' // account service, server/accounts
+export const ACCOUNTS_JID = process.env['PALIQUE_ACCOUNTS_JID'] ?? `accounts.${DOMAIN}`
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
@@ -31,6 +31,25 @@ export const NICK_MAX = 64
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)
+
+// Wink ids were Spanish up to 0.4; old history (and old apps) still have those.
+const LEGACY_WINKS: Record<string, string> = {
+  burbuja: 'bubble',
+  ola: 'wave',
+  ovni: 'ufo',
+  rebote: 'bounce',
+  globo: 'water-balloon',
+  cerdo: 'pig',
+  burla: 'tease',
+  beso: 'kiss',
+  carcajada: 'laugh',
+  enamorado: 'in-love',
+  enfadado: 'angry',
+  llorando: 'crying',
+  chulo: 'cool'
+}
+export const winkId = (id: string): string =>
+  Object.hasOwn(LEGACY_WINKS, id) ? LEGACY_WINKS[id] : id
 
 export type AuthError =
   | 'conflict' // the invite's account already exists
@@ -271,8 +290,8 @@ function handleMessage(stanza: Element): void {
   if (!roster.has(bare)) return
 
   const buzz = Boolean(message.getChild('attention', ATTENTION))
-  const winkId = message.getChild('wink', WINK)?.attrs.id
-  const wink = isWinkId(winkId) ? winkId : ''
+  const received = message.getChild('wink', WINK)?.attrs.id
+  const wink = isWinkId(received) ? winkId(received) : ''
   // A wink's body is only the fallback text for other XMPP clients.
   const body = wink ? '' : (message.getChildText('body') ?? '')
   // Our own typing on other devices doesn't matter. Any other chat state, or the
@@ -790,15 +809,15 @@ async function accountsPost<T>(path: string, body: Record<string, string>): Prom
 // The JID localpart to sign in with. Addresses without an account get one too (that
 // just fails to sign in), so this never tells whether an address is registered.
 export async function accountFor(email: string): Promise<string> {
-  return (await accountsPost<{ username: string }>('/cuenta', { email })).username
+  return (await accountsPost<{ username: string }>('/account', { email })).username
 }
 
 // Which account an invite creates. Rejects with 'invalid-invite' if it's wrong or used.
 export function inviteInfo(token: string): Promise<{ email: string; username: string }> {
-  return accountsPost('/registro', { token })
+  return accountsPost('/signup', { token })
 }
 
 // The service answers the same whether or not the address has an account.
 export async function requestPasswordReset(email: string): Promise<void> {
-  await accountsPost('/recuperar', { email })
+  await accountsPost('/recover', { email })
 }

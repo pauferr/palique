@@ -70,7 +70,7 @@ assert.deepEqual(await A.inviteByEmail(` ${mail(newbieName).toUpperCase()} `), {
 const invite = await lastMail(mail(newbieName))
 assert.equal(invite.subject, `${aName} quiere agregarte en Palique`)
 const code = inviteCode(invite.text)
-const optout = invite.text.match(/http:\/\/localhost:8080\/no-invitaciones\?t=\S+/)?.[0]
+const optout = invite.text.match(/http:\/\/localhost:8080\/no-invites\?t=\S+/)?.[0]
 assert.ok(optout, 'opt-out link in the email')
 
 // Same address again this week: nothing goes out and no invite is used.
@@ -84,7 +84,7 @@ await assert.rejects(A.inviteByEmail('nada'), /invalid/)
 
 // Opting out works (and the link only means something once known).
 assert.equal((await fetch(optout)).status, 200)
-assert.equal((await fetch('http://localhost:8080/no-invitaciones?t=inventado')).status, 404)
+assert.equal((await fetch('http://localhost:8080/no-invites?t=inventado')).status, 404)
 
 // The emailed code creates the account; inviter and newbie become contacts, by name.
 await A.logout()

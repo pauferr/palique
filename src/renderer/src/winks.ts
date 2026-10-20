@@ -5,20 +5,4 @@ export const winks: Record<string, string> = Object.fromEntries(
   Object.entries(files).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -5), url])
 )
 
-const labels: Record<string, string> = {
-  burbuja: 'Burbuja',
-  ola: 'Ola',
-  ovni: 'Ovni',
-  rebote: 'Rebote', // retired; kept so old conversations still name it
-  globo: 'Globo de agua',
-  cerdo: 'Cerdo bailón',
-  burla: 'Crío burlón',
-  beso: 'Beso',
-  carcajada: 'Carcajada',
-  enamorado: 'Enamorado',
-  enfadado: 'Enfadado',
-  llorando: 'Llorando',
-  chulo: 'Chulo'
-}
-
-export const winkLabel = (id: string): string => labels[id] ?? id
+export { winkLabel } from './wink-labels'

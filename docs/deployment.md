@@ -106,7 +106,7 @@ cp .env.example .env
 nano .env
 ```
 
-Rellena `PALIQUE_DOMAIN` (tu subdominio), `ACME_EMAIL` (tu correo), `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM` (el remitente verificado en Brevo). Las claves de Brevo para el boletín son opcionales. `CUENTAS_SECRET` y `BREVO_WEBHOOK_TOKEN` se generan solos.
+Rellena `PALIQUE_DOMAIN` (tu subdominio), `ACME_EMAIL` (tu correo), `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM` (el remitente verificado en Brevo). Las claves de Brevo para el boletín son opcionales. `ACCOUNTS_SECRET` y `BREVO_WEBHOOK_TOKEN` se generan solos.
 
 Arranca:
 
@@ -117,7 +117,7 @@ Arranca:
 El script construye y arranca todo, espera al certificado de Let's Encrypt, se lo pasa a Prosody, programa su renovación semanal y al final te muestra el comando para enviar las **primeras invitaciones** (la tuya también), cada una a un correo:
 
 ```bash
-docker compose exec cuentas node src/invitar.ts tu@correo.com
+docker compose exec accounts node src/invite.ts tu@correo.com
 ```
 
 Comprobación rápida: abre `https://palique-pruebas.duckdns.org` en el navegador. Debe salir una página de Palique que dice "Página no encontrada": significa que HTTPS y el servicio de cuentas funcionan.
@@ -148,12 +148,32 @@ cd ~/palique/deploy && docker compose logs -f
 
 (o solo uno: `docker compose logs -f prosody`, `cuentas` o `caddy`).
 
-**Copia de seguridad.** Las cuentas y listas de contactos están en el volumen `palique_prosody-data`; los correos y preferencias, en `palique_cuentas-data`:
+**Copia de seguridad.** Las cuentas y listas de contactos están en el volumen `palique_prosody-data`; los correos y preferencias, en `palique_accounts-data`:
 
 ```bash
 docker run --rm -v palique_prosody-data:/v -v ~/copias:/c alpine tar czf /c/prosody-$(date +%F).tgz -C /v .
-docker run --rm -v palique_cuentas-data:/v -v ~/copias:/c alpine tar czf /c/cuentas-$(date +%F).tgz -C /v .
+docker run --rm -v palique_accounts-data:/v -v ~/copias:/c alpine tar czf /c/accounts-$(date +%F).tgz -C /v .
 ```
+
+## Actualizar a los nombres en inglés (servidor de la 0.4)
+
+A partir de la versión siguiente a la 0.4, el servicio de cuentas se llama `accounts` (servicio de Docker, volumen, base de datos y secreto). Un servidor instalado antes necesita estos pasos **una sola vez**, en `deploy/`:
+
+```bash
+git pull
+docker compose down
+# Copiar los datos al volumen nuevo y renombrar la base de datos (con sus archivos -wal/-shm si los hay).
+docker volume create palique_accounts-data
+docker run --rm -v palique_cuentas-data:/from -v palique_accounts-data:/to alpine \
+  sh -c 'cp -a /from/. /to/ && cd /to && for f in cuentas.sqlite*; do mv "$f" "accounts${f#cuentas}"; done'
+sed -i 's/^CUENTAS_SECRET=/ACCOUNTS_SECRET=/' .env
+docker compose up -d --build --remove-orphans
+docker compose logs accounts
+```
+
+Comprueba que alguien puede iniciar sesión con la app nueva. Después ya puedes borrar el volumen viejo: `docker volume rm palique_cuentas-data`.
+
+Avisa a los usuarios: las apps 0.4 no podrán entrar hasta actualizarse. Los enlaces de las invitaciones enviadas antes ya no abren la app, pero el código del correo se puede pegar a mano mientras no caduque (una semana).
 
 ## Si algo falla
 
@@ -161,5 +181,5 @@ docker run --rm -v palique_cuentas-data:/v -v ~/copias:/c alpine tar czf /c/cuen
 |---|---|
 | `setup.sh` no consigue el certificado | DuckDNS apunta a la IP correcta (`dig`), y los puertos 80 y 443 están abiertos en **los dos** cortafuegos. Log: `docker compose logs caddy`. |
 | La app dice "No se puede conectar con el servidor" | Puerto 5222 abierto en los dos cortafuegos; la app se compiló con `XMPP_DOMAIN`. |
-| No llegan los correos | Remitente verificado en Brevo y `MAIL_FROM` igual a ese remitente; mira la carpeta de spam. Log: `docker compose logs cuentas`. |
+| No llegan los correos | Remitente verificado en Brevo y `MAIL_FROM` igual a ese remitente; mira la carpeta de spam. Log: `docker compose logs accounts`. |
 | Los enlaces de los correos no abren nada | `ACCOUNTS_URL` debe ser `https://` + tu dominio. |

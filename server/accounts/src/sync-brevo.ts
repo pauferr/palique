@@ -1,6 +1,6 @@
 // Puts the Brevo list in line with everyone's choice (e.g. right after adding the API key,
 // or after a Brevo outage). Safe to run any time:
-//   docker compose exec cuentas node --disable-warning=ExperimentalWarning src/sync-brevo.ts
+//   docker compose exec accounts node --disable-warning=ExperimentalWarning src/sync-brevo.ts
 import { brevo } from './brevo.ts'
 import { openDb } from './db.ts'
 
@@ -14,7 +14,7 @@ if (!newsletter) {
   process.exit(1)
 }
 
-const db = openDb(`${process.env['DATA_DIR'] ?? '/data'}/cuentas.sqlite`)
+const db = openDb(`${process.env['DATA_DIR'] ?? '/data'}/accounts.sqlite`)
 let subscribed = 0
 let removed = 0
 let failed = 0

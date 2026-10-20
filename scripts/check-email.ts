@@ -39,7 +39,7 @@ assert.deepEqual(await A.changeEmail(` ${newEmail.toUpperCase()} `), {
 })
 const mail = await lastMail(newEmail)
 assert.equal(mail.subject, 'Confirma tu nuevo correo de Palique')
-const link = mail.text.match(/http:\/\/localhost:8080\/verificar\?t=\S+/)?.[0]
+const link = mail.text.match(/http:\/\/localhost:8080\/verify\?t=\S+/)?.[0]
 assert.ok(link, 'verification link in the email')
 assert.equal(await A.accountFor(email), a)
 assert.notEqual(await A.accountFor(newEmail), a)
@@ -71,7 +71,7 @@ await B.send(
   xml(
     'message',
     { to: `${a}@localhost` },
-    xml('email', { xmlns: 'urn:palique:cuentas:0', address: 'falso@x.test' })
+    xml('email', { xmlns: 'urn:palique:accounts:0', address: 'falso@x.test' })
   )
 )
 await B.stop()

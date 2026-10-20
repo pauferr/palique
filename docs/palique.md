@@ -102,7 +102,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Diseño extensible: el formato del mensaje debe permitir añadir packs descargables en el futuro sin cambios.
 - Descartado (por ahora) contenido enviado por el usuario: riesgo de contenido desagradable o con destellos (epilepsia fotosensible), transferencia y validación de archivos, latencia.
 - Protocolo: elemento propio `<wink xmlns="urn:palique:wink:0" id="…"/>` dentro de un mensaje de chat, con un texto alternativo en `<body>` para quien use otro cliente XMPP. El identificador se valida (`[a-z0-9-]`, máximo 64 caracteres); si no es válido, el mensaje se muestra como texto. Un identificador desconocido (p. ej. de un pack que no tienes) solo aparece en la conversación.
-- Catálogo provisional del MVP: `burbuja`, `rebote` y `ola` (formas de colores generadas por síntesis, hasta tener los definitivos).
+- Catálogo provisional del MVP: `bubble`, `bounce` y `wave` (hoy *Burbuja*, *Rebote* y *Ola*; los ids son en inglés) (formas de colores generadas por síntesis, hasta tener los definitivos).
 - Protecciones obligatorias desde el MVP:
   - Opción para desactivar los guiños a pantalla completa (Opciones → Guiños). Desactivados, solo aparecen como texto en la conversación.
   - Límite por contacto (ver "Antispam"): un guiño cada 30 segundos, al enviar y al recibir.
@@ -161,9 +161,9 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 
 **Invitaciones** (también es la principal medida contra el registro masivo):
 - Solo por correo. Sin invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401).
-- Al invitar, el servicio de cuentas elige el JID de la futura cuenta y pide a Prosody una invitación que solo puede crear esa cuenta (módulo propio en `server/modules/`). El correo trae un botón que abre Palique (`palique://registro?t=…`) y el código escrito. Caduca a la semana.
+- Al invitar, el servicio de cuentas elige el JID de la futura cuenta y pide a Prosody una invitación que solo puede crear esa cuenta (módulo propio en `server/modules/`). El correo trae un botón que abre Palique (`palique://signup?t=…`) y el código escrito. Caduca a la semana.
 - Como la invitación llegó a ese correo, la cuenta nace con el correo verificado. Al registrarse se elige el nombre visible y la contraseña; el correo no se escribe.
-- Los primeros usuarios los invita el administrador (`docker compose exec cuentas node src/invitar.ts correo`, sin límite). Cada usuario puede invitar a **3 personas**; las invitaciones que caducan sin usarse vuelven a contar. Más adelante se abrirá el registro.
+- Los primeros usuarios los invita el administrador (`docker compose exec accounts node src/invite.ts correo`, sin límite). Cada usuario puede invitar a **3 personas**; las invitaciones que caducan sin usarse vuelven a contar. Más adelante se abrirá el registro.
 - Quien entra con una invitación queda añadido automáticamente como contacto de quien le invitó, en los dos sentidos.
 - Invitar es siempre una acción explícita, con confirmación. Contra el spam:
   - Una dirección recibe como mucho una invitación por semana, aunque la pidan personas distintas.
@@ -176,13 +176,13 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Usos: iniciar sesión, recuperar la contraseña y, si el usuario lo acepta, recibir el boletín de novedades.
 - Es único: no puede haber dos cuentas con el mismo correo.
 - Cambiarlo (en Opciones) envía un enlace a la dirección nueva; hasta que se abre, se sigue entrando con la antigua. Si la nueva ya es de otra cuenta, la app responde lo mismo y a ese buzón le llega un aviso.
-- Lo gestiona un servicio propio, el **servicio de cuentas** (`server/cuentas/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
+- Lo gestiona un servicio propio, el **servicio de cuentas** (`server/accounts/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
   - Se conecta a Prosody como componente XMPP (XEP-0114). Con sesión, la app le habla por la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría cambiar el correo de una cuenta ajena y robarla con la recuperación).
   - Envía los correos de invitación, de cambio de correo y de recuperación.
   - Recuperación de contraseña, sin páginas web (por ahora):
     - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" pide el correo. La app lo envía al servicio por HTTP (con la sesión cerrada no hay conexión XMPP autenticada). El servicio responde siempre lo mismo, para no revelar si la cuenta existe, y limita las peticiones.
     - Si el correo es de una cuenta, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y lo envía por correo.
-    - El correo trae un botón que abre Palique (`palique://recuperar?…`, registrado como protocolo de la app) y también el código escrito, porque algunos programas de correo no dejan pulsar enlaces que no sean web.
+    - El correo trae un botón que abre Palique (`palique://reset?…`, registrado como protocolo de la app) y también el código escrito, porque algunos programas de correo no dejan pulsar enlaces que no sean web.
     - La app usa el código igual que una invitación (XEP-0401) para poner la nueva contraseña. No hace falta una cuenta de administrador.
 - Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
 

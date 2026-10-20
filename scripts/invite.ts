@@ -8,7 +8,7 @@ import { lastMail } from './mailpit.ts'
 
 // Emails an admin invite to `email` and returns its code (read from Mailpit).
 export async function adminInvite(email: string): Promise<string> {
-  execFileSync('docker', ['compose', 'exec', '-T', 'cuentas', 'node', 'src/invitar.ts', email], {
+  execFileSync('docker', ['compose', 'exec', '-T', 'accounts', 'node', 'src/invite.ts', email], {
     cwd: fileURLToPath(new URL('..', import.meta.url)),
     encoding: 'utf8'
   })
@@ -17,7 +17,7 @@ export async function adminInvite(email: string): Promise<string> {
 
 // The code in an invite email.
 export function inviteCode(text: string): string {
-  const token = text.match(/palique:\/\/registro\?t=([\w-]+)/)?.[1]
+  const token = text.match(/palique:\/\/signup\?t=([\w-]+)/)?.[1]
   if (!token) throw new Error(`no invite in: ${text}`)
   return token
 }

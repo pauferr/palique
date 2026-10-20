@@ -657,7 +657,7 @@ function enter(c, t, x = W / 2, y = H / 2 + 10, size = 1) {
 
 const WINKS = [
   {
-    id: 'globo',
+    id: 'water-balloon',
     name: 'Globo de agua',
     desc: 'Un chaval con gorra coge impulso, te lanza un globo de agua y ¡splash! contra la pantalla; luego chorrea y se ríe.',
     draw(c, t) {
@@ -746,7 +746,7 @@ const WINKS = [
     }
   },
   {
-    id: 'cerdo',
+    id: 'pig',
     name: 'Cerdo bailón',
     desc: 'Se encienden luces de discoteca, baja una bola de espejos y un cerdo mueve las caderas con mucha intención.',
     draw(c, t) {
@@ -807,7 +807,7 @@ const WINKS = [
     }
   },
   {
-    id: 'burla',
+    id: 'tease',
     name: 'Crío burlón',
     desc: 'Un crío con la gorra del revés se pone las manos en las orejas, menea los dedos y te saca la lengua. ¡Nananá!',
     draw(c, t) {
@@ -876,7 +876,7 @@ const WINKS = [
     }
   },
   {
-    id: 'beso',
+    id: 'kiss',
     name: 'Beso',
     desc: 'Guiña un ojo, pone morritos y te lanza un corazón que se acerca hasta reventar en corazoncitos.',
     draw(c, t) {
@@ -915,7 +915,7 @@ const WINKS = [
     }
   },
   {
-    id: 'carcajada',
+    id: 'laugh',
     name: 'Carcajada',
     desc: 'Se parte de risa: bota y se balancea, le saltan las lágrimas y aparecen «JA» por todas partes.',
     draw(c, t) {
@@ -966,7 +966,7 @@ const WINKS = [
     }
   },
   {
-    id: 'enamorado',
+    id: 'in-love',
     name: 'Enamorado',
     desc: 'Se le ponen los ojos de corazón, que laten, se ruboriza y suben corazones a su alrededor.',
     draw(c, t) {
@@ -1001,7 +1001,7 @@ const WINKS = [
     }
   },
   {
-    id: 'enfadado',
+    id: 'angry',
     name: 'Enfadado',
     desc: 'Frunce el ceño, se va poniendo rojo desde la barbilla, echa humo por la cabeza y tiembla de rabia.',
     draw(c, t) {
@@ -1035,7 +1035,7 @@ const WINKS = [
     }
   },
   {
-    id: 'llorando',
+    id: 'crying',
     name: 'Llorando',
     desc: 'Pone cara de pena y rompe a llorar a chorros; debajo se le va formando un charco.',
     draw(c, t) {
@@ -1069,7 +1069,7 @@ const WINKS = [
     }
   },
   {
-    id: 'chulo',
+    id: 'cool',
     name: 'Chulo',
     desc: 'Entra sonriendo, le caen unas gafas de sol que encajan con un rebote y un destello. El (H) de toda la vida.',
     draw(c, t) {
@@ -1158,7 +1158,7 @@ function makeSound(ac, out) {
   return { tone, noise }
 }
 const SOUNDS = {
-  globo({ tone, noise }) {
+  'water-balloon'({ tone, noise }) {
     noise(0.75, 0.6, { from: 300, to: 2400, q: 2, gain: 0.25, attack: 0.4 })
     tone(140, 1.4, 0.25, { to: 50, gain: 0.5 })
     noise(1.4, 0.8, { type: 'lowpass', from: 5000, to: 300, gain: 0.7 })
@@ -1169,7 +1169,7 @@ const SOUNDS = {
       tone(i % 2 ? 620 : 700, s, 0.1, { type: 'square', gain: 0.05, lp: 1800 })
     )
   },
-  cerdo({ tone, noise }) {
+  pig({ tone, noise }) {
     for (let b = 0.4; b < 3.4; b += 0.5) tone(150, b, 0.25, { to: 45, gain: 0.55 })
     for (let h = 0.65; h < 3.4; h += 0.5)
       noise(h, 0.06, { type: 'highpass', from: 7000, gain: 0.18 })
@@ -1179,7 +1179,7 @@ const SOUNDS = {
     for (const s of [1.3, 1.5, 2.7, 2.9])
       tone(320, s, 0.16, { to: 190, type: 'sawtooth', gain: 0.14, lp: 1200 })
   },
-  burla({ tone, noise }) {
+  tease({ tone, noise }) {
     ;[
       [784, 0.8],
       [659, 1.1],
@@ -1190,7 +1190,7 @@ const SOUNDS = {
     noise(2.5, 0.6, { from: 160, q: 4, gain: 0.5 })
     tone(90, 2.5, 0.6, { type: 'sawtooth', gain: 0.12, lp: 600 })
   },
-  beso({ tone, noise }) {
+  kiss({ tone, noise }) {
     tone(500, 0.6, 0.12, { to: 900, gain: 0.08 })
     noise(1.05, 0.1, { from: 1300, q: 3, gain: 0.5 })
     tone(380, 1.05, 0.18, { to: 900, gain: 0.18 })
@@ -1199,7 +1199,7 @@ const SOUNDS = {
       tone(f, 2.4 + i * 0.07, 0.6, { type: 'triangle', gain: 0.12 })
     )
   },
-  carcajada({ tone }) {
+  laugh({ tone }) {
     for (let i = 0; i < 12; i++)
       tone(330 - i * 7, 0.6 + i * 0.18, 0.13, {
         type: 'square',
@@ -1208,7 +1208,7 @@ const SOUNDS = {
         to: 300 - i * 7
       })
   },
-  enamorado({ tone }) {
+  'in-love'({ tone }) {
     for (const s of [0.6, 1.4, 2.2]) {
       tone(70, s, 0.18, { to: 45, gain: 0.6 })
       tone(70, s + 0.2, 0.18, { to: 45, gain: 0.45 })
@@ -1217,14 +1217,14 @@ const SOUNDS = {
       tone(f, 0.75 + i * 0.28, 0.7, { type: 'triangle', gain: 0.08 })
     )
   },
-  enfadado({ tone, noise }) {
+  angry({ tone, noise }) {
     const o = tone(70, 0.5, 2.3, { type: 'sawtooth', gain: 0.22, lp: 500, attack: 0.6 })
     noise(1.0, 2.1, { type: 'highpass', from: 4000, gain: 0.12, attack: 0.3 })
     for (let i = 0; i < 6; i++)
       tone(110, 2.2 + i * 0.07, 0.07, { type: 'sawtooth', gain: 0.2, lp: 900 })
     void o
   },
-  llorando({ tone }) {
+  crying({ tone }) {
     for (const [s, d] of [
       [0.8, 1.0],
       [1.9, 1.1]
@@ -1241,7 +1241,7 @@ const SOUNDS = {
     }
     ;[1.2, 1.6, 2.1, 2.5, 2.9].forEach((s) => tone(1000, s, 0.1, { to: 1700, gain: 0.08 }))
   },
-  chulo({ tone, noise }) {
+  cool({ tone, noise }) {
     noise(0, 0.45, { from: 600, to: 2000, q: 1.5, gain: 0.18, attack: 0.3 })
     tone(1600, 0.7, 0.42, { to: 600, gain: 0.1, type: 'sine' })
     noise(1.15, 0.05, { type: 'highpass', from: 3000, gain: 0.4 })
@@ -1253,7 +1253,7 @@ const SOUNDS = {
 // ---------- The first three winks (once placeholders), now made here too ----------
 WINKS.push(
   {
-    id: 'burbuja',
+    id: 'bubble',
     name: 'Burbuja',
     desc: 'Una sirena sentada en una roca sopla por un aro y llena la pantalla de pompas de jabón irisadas, que acaban explotando.',
     draw(c, t) {
@@ -1283,7 +1283,7 @@ WINKS.push(
     }
   },
   {
-    id: 'ovni',
+    id: 'ufo',
     name: 'Ovni',
     desc: 'Llega un ovni con sus lucecitas, enciende el rayo y se lleva a una vaca que pastaba tan tranquila. Luego sale disparado.',
     draw(c, t) {
@@ -1350,7 +1350,7 @@ WINKS.push(
     }
   },
   {
-    id: 'ola',
+    id: 'wave',
     name: 'Ola',
     desc: 'Entra una ola con espuma y rumor de mar, y un surfista la cabalga haciendo los cuernos rockeros con la mano.',
     draw(c, t) {
@@ -1506,7 +1506,7 @@ function surfer(c, t, rock) {
   c.restore()
 }
 
-SOUNDS.burbuja = ({ tone }) => {
+SOUNDS.bubble = ({ tone }) => {
   // A harp glissando as she appears, a bloop per bubble and soft pops.
   ;[523, 587, 659, 784, 880, 1047, 1175, 1319].forEach((f, i) =>
     tone(f, 0.05 + i * 0.06, 0.8, { type: 'triangle', gain: 0.06 })
@@ -1518,7 +1518,7 @@ SOUNDS.burbuja = ({ tone }) => {
     if (end < 3.5) tone(1200, end, 0.05, { to: 400, type: 'triangle', gain: 0.12 })
   }
 }
-SOUNDS.ovni = ({ tone }) => {
+SOUNDS.ufo = ({ tone }) => {
   // Theremin-like wobble while it flies, a hum for the beam, the cow, and the zip away.
   const o = tone(700, 0, 0.9, { gain: 0.08, to: 500, attack: 0.2 })
   const lfo = o.context.createOscillator()
@@ -1533,7 +1533,7 @@ SOUNDS.ovni = ({ tone }) => {
   tone(150, 1.3, 0.8, { type: 'sawtooth', gain: 0.18, lp: 700, to: 105, attack: 0.08 })
   tone(300, 2.9, 0.45, { to: 2400, gain: 0.1 })
 }
-SOUNDS.ola = ({ noise, tone }) => {
+SOUNDS.wave = ({ noise, tone }) => {
   noise(0, 3.5, { type: 'lowpass', from: 500, to: 1400, gain: 0.35, attack: 1.2 })
   noise(0.6, 2.6, { from: 2500, q: 0.7, gain: 0.08, attack: 1 })
   tone(90, 0.2, 3.2, { gain: 0.08, attack: 1.2 })

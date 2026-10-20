@@ -17,14 +17,14 @@ const env = (name: string, fallback?: string): string => {
   return value
 }
 
-const NS = 'urn:palique:cuentas:0'
+const NS = 'urn:palique:accounts:0'
 const USER_DOMAIN = env('USER_DOMAIN', 'localhost') // accounts we serve: user@USER_DOMAIN
 const PUBLIC_URL = env('PUBLIC_URL', 'http://localhost:8080')
 const SECRET = env('XMPP_SECRET')
 const MAX_INVITES = 3 // per user (the admin's have no limit)
 
 mkdirSync(env('DATA_DIR', '/data'), { recursive: true })
-const db = openDb(`${env('DATA_DIR', '/data')}/cuentas.sqlite`)
+const db = openDb(`${env('DATA_DIR', '/data')}/accounts.sqlite`)
 const send = mailer({
   host: env('SMTP_HOST'),
   port: Number(env('SMTP_PORT', '587')),
@@ -125,7 +125,7 @@ function sendVerification(email: string, token: string): Promise<unknown> {
       '¡Correo nuevo! Has pedido entrar en Palique con esta dirección.',
       'Pulsa el botón para confirmarla. Hasta que lo hagas, seguirás entrando con la de antes.'
     ],
-    link: { href: `${PUBLIC_URL}/verificar?t=${token}`, label: 'Confirmar mi correo' },
+    link: { href: `${PUBLIC_URL}/verify?t=${token}`, label: 'Confirmar mi correo' },
     footer: 'Si no has sido tú, ignora este correo y aquí no ha pasado nada.'
   })
 }
@@ -235,13 +235,13 @@ async function invite(email: string, inviter: string | null, inviterName: string
     ],
     code: token,
     link: {
-      href: `palique://registro?t=${encodeURIComponent(token)}`,
+      href: `palique://signup?t=${encodeURIComponent(token)}`,
       label: 'Abrir Palique y crear mi cuenta'
     },
     note: `Entrarás con esta dirección (${email}). La invitación caduca en una semana, así que no lo dejes para luego.${inviter ? ` Cuando entres, ${who} ya estará en tu lista.` : ''}`,
     footer: '¿Prefieres que no te invitemos más?',
     footerLink: {
-      href: `${PUBLIC_URL}/no-invitaciones?t=${optout}`,
+      href: `${PUBLIC_URL}/no-invites?t=${optout}`,
       label: 'No quiero más invitaciones'
     }
   })
@@ -343,7 +343,7 @@ async function sendReset(email: string): Promise<void> {
     ],
     code: token,
     link: {
-      href: `palique://recuperar?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
+      href: `palique://reset?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
       label: 'Abrir Palique y elegir contraseña'
     },
     note: 'El código caduca en una hora y solo vale una vez.',
@@ -396,7 +396,7 @@ createServer(async (req, res) => {
     res.end(JSON.stringify(body))
   }
 
-  if (req.method === 'POST' && url.pathname === '/cuenta') {
+  if (req.method === 'POST' && url.pathname === '/account') {
     if (!signInIps(clientIp(req))) return json(429, { error: 'wait' })
     const email = cleanEmail((await readJson(req)).email)
     if (!validEmail(email)) return json(400, { error: 'invalid' })
@@ -404,21 +404,21 @@ createServer(async (req, res) => {
     return json(200, { username: jid ? jid.split('@')[0] : fakeLocalpart(email) })
   }
   // The sign-up screen, with the invite's token: which account it creates.
-  if (req.method === 'POST' && url.pathname === '/registro') {
+  if (req.method === 'POST' && url.pathname === '/signup') {
     if (!signInIps(clientIp(req))) return json(429, { error: 'wait' })
     const invite = db.invite(String((await readJson(req)).token ?? ''))
     if (!invite) return json(404, { error: 'invalid-invite' })
     return json(200, { email: invite.email, username: invite.jid.split('@')[0] })
   }
-  if (req.method === 'POST' && url.pathname === '/recuperar') {
+  if (req.method === 'POST' && url.pathname === '/recover') {
     const email = cleanEmail((await readJson(req)).email)
     if (validEmail(email) && allowReset(email, clientIp(req))) {
       sendReset(email).catch((e) => console.error('reset', e.message))
     }
     return json(202, { ok: true })
   }
-  // The admin's invites (src/invitar.ts), only from inside the container.
-  if (req.method === 'POST' && url.pathname === '/admin/invitar' && isLoopback(req)) {
+  // The admin's invites (src/invite.ts), only from inside the container.
+  if (req.method === 'POST' && url.pathname === '/admin/invite' && isLoopback(req)) {
     const email = cleanEmail((await readJson(req)).email)
     if (!validEmail(email)) return json(400, { error: 'invalid' })
     if (db.taken(email)) return json(409, { error: 'taken' })
@@ -447,7 +447,7 @@ createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
     res.end(page(title, message))
   }
-  if (req.method === 'GET' && url.pathname === '/verificar') {
+  if (req.method === 'GET' && url.pathname === '/verify') {
     const result = db.verify(url.searchParams.get('t') ?? '')
     if (!result) return reply(404, 'Enlace no válido', 'Este enlace ya se ha usado o no existe.')
     const { account, previous } = result
@@ -463,7 +463,7 @@ createServer(async (req, res) => {
       `¡Hecho! A partir de ahora entrarás en Palique con ${account.email}.`
     )
   }
-  if (req.method === 'GET' && url.pathname === '/no-invitaciones') {
+  if (req.method === 'GET' && url.pathname === '/no-invites') {
     if (!db.optOut(url.searchParams.get('t') ?? '')) {
       return reply(404, 'Enlace no válido', 'Este enlace no existe.')
     }

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import tls from 'node:tls'
-import { brevo } from '../server/cuentas/src/brevo.ts'
+import { brevo } from '../server/accounts/src/brevo.ts'
 import * as A from '../src/main/xmpp.ts'
 import { register } from './invite.ts'
 

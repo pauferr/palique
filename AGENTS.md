@@ -8,7 +8,7 @@ A desktop instant messenger in the spirit of MSN Messenger and AIM: Electron + S
 
 - **App:** Electron 39, Svelte 5 (runes), TypeScript, built with electron-vite. Node 22+ to develop; CI uses Node 24.
 - **Messaging:** XMPP with `@xmpp/client`. Server: Prosody 13 (Docker image `prosodyim/prosody:13.0`).
-- **Account service** (`server/cuentas`): TypeScript run directly by Node 24 (`node:sqlite`, no framework, no build step), `@xmpp/component`, nodemailer.
+- **Account service** (`server/accounts`): TypeScript run directly by Node 24 (`node:sqlite`, no framework, no build step), `@xmpp/component`, nodemailer.
 - **Email:** Mailpit in development, Brevo (SMTP + newsletter list) in production.
 - **Platforms:** macOS and Linux first; unsigned Windows installer exists.
 
@@ -30,12 +30,12 @@ src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks 
 server/
   prosody.cfg.lua  development Prosody config
   modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible
-  cuentas/         account service (own package.json, Dockerfile)
+  accounts/        account service (own package.json, Dockerfile)
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
 scripts/           check-*.ts: runnable checks (see Checks), invite.ts, mailpit.ts helpers
   winks/           wink sources (canvas drawing + synthesized sound) and record.ts (see Winks)
-docs/              palique.md (plan and decisions), despliegue.md (deployment guide)
+docs/              palique.md (plan and decisions), deployment.md (deployment guide)
 compose.yaml       local server stack
 ```
 
@@ -58,32 +58,32 @@ compose.yaml       local server stack
 - **Sign-in:** the app asks the account service `POST /cuenta {email}` → `{username}` and does normal SASL with it. Unknown addresses get a made-up, stable localpart (HMAC of the email), so a wrong address fails exactly like a wrong password.
 - **Registration is invite-only, by email:**
   1. Someone invites an address (the admin, without limit, or a user, 3 each; expired unused invites stop counting).
-  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email carries `palique://registro?t=TOKEN` and the code.
-  3. The app gets `POST /registro {token}` → `{email, username}`, registers with XEP-0401 preauth + XEP-0077, and publishes the nick.
+  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email carries `palique://signup?t=TOKEN` and the code.
+  3. The app gets `POST /signup {token}` → `{email, username}`, registers with XEP-0401 preauth + XEP-0077, and publishes the nick.
   4. Prosody announces the new account to the service and makes inviter and invitee mutual contacts.
 - **Adding contacts:** by email. Iq `lookup` to the account service → JID or nothing. If nothing, the user may explicitly invite them.
 - **Changing the email:** a link goes to the new address. Until it's opened, the old one still signs in. If the new one is taken, the app gets the same answer and that inbox is told instead.
-- **Password recovery:** `POST /recuperar {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails `palique://recuperar?e=EMAIL&t=TOKEN` plus the code. The app re-registers the same account with it.
+- **Password recovery:** `POST /recover {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails `palique://reset?e=EMAIL&t=TOKEN` plus the code. The app re-registers the same account with it.
 
-### Account service (`server/cuentas`)
+### Account service (`server/accounts`)
 
-- **XMPP:** connects to Prosody as a component (XEP-0114) at `cuentas.<domain>`. Signed-in users talk to it over XMPP, so Prosody vouches for who's asking. Namespace `urn:palique:cuentas:0`:
+- **XMPP:** connects to Prosody as a component (XEP-0114) at `accounts.<domain>`. Signed-in users talk to it over XMPP, so Prosody vouches for who's asking. Namespace `urn:palique:accounts:0`:
   - `email` get/set: status, or change the address
   - `resend`, `newsletter`
   - `lookup`
   - `invites` get, `invite-email` set
 - **HTTP**, for the signed-out app and email links:
-  - `POST /cuenta`, `/registro`, `/recuperar`
-  - `GET /verificar`, `/no-invitaciones`
+  - `POST /account`, `/signup`, `/recover`
+  - `GET /verify`, `/no-invites`
   - `POST /brevo` (webhook)
-  - `POST /admin/invitar`, only from loopback, used by `src/invitar.ts`
-- **Storage:** SQLite at `$DATA_DIR/cuentas.sqlite`, with tables `accounts` (email unique), `invites` and `invite_optout`.
+  - `POST /admin/invite`, only from loopback, used by `src/invite.ts`
+- **Storage:** SQLite at `$DATA_DIR/accounts.sqlite`, with tables `accounts` (email unique), `invites` and `invite_optout`.
 - **Rate limits** are in memory, so a restart clears them:
   - recovery: one per email every 5 minutes, and 10 per IP every 15 minutes
   - sign-in lookups: 30 per IP a minute (`SIGNIN_LIMIT`; 1000 in development)
   - contact lookups: 30 per user an hour
   - resends: one a minute
-- It runs from a **built image** (code is copied, not mounted): after changing it, `docker compose up -d --build cuentas`.
+- It runs from a **built image** (code is copied, not mounted): after changing it, `docker compose up -d --build accounts`.
 
 ### Prosody
 
@@ -106,7 +106,7 @@ compose.yaml       local server stack
 | XEP-0172 | display name (nick) in PEP and presence |
 | XEP-0186 | invisible |
 | `urn:palique:wink:0` | winks (Palique only; body is a text fallback) |
-| `urn:palique:cuentas:0` | account service |
+| `urn:palique:accounts:0` | account service |
 | `urn:palique:invite:0` | account service ↔ Prosody |
 
 ## Development
@@ -119,7 +119,7 @@ npm run dev                    # app with hot reload (renderer only; restart for
 
 - Docker: any engine works (OrbStack on macOS).
 - **Logs and reset:** `docker compose logs -f` follows the server logs. `docker compose down -v` deletes every account.
-- **First accounts:** `docker compose exec cuentas node src/invitar.ts tere@correo.test`. Open the email in Mailpit (http://localhost:8025) and paste its code into "¿Tienes una invitación? Crea tu cuenta". Any address works; nothing is really sent.
+- **First accounts:** `docker compose exec accounts node src/invite.ts tere@correo.test`. Open the email in Mailpit (http://localhost:8025) and paste its code into "¿Tienes una invitación? Crea tu cuenta". Any address works; nothing is really sent.
 - **Second instance** to chat with yourself (the dev server must be running):
 
   ```bash
@@ -128,7 +128,7 @@ npm run dev                    # app with hot reload (renderer only; restart for
 
 - **`palique://` links in development on macOS** don't reach the dev app, because macOS ties them to the generic Electron binary. Paste the code instead, or use a packaged build (`npm run build:unpack`). On Linux and Windows the dev app receives them.
 - **TLS:** a dev-only self-signed certificate (`server/certs`). The app trusts it only when the domain is `localhost`.
-- **Rate limits:** if repeated testing hits one, `docker compose restart cuentas`.
+- **Rate limits:** if repeated testing hits one, `docker compose restart accounts`.
 
 ```bash
 npm run typecheck    # tsc (main/preload) + svelte-check
@@ -177,7 +177,7 @@ Add or update the matching check with any change to that logic. Before committin
   - **No AI attribution:** no `Co-Authored-By` trailers or "generated with" lines.
 - **Style:**
   - Prettier settings: single quotes, no semicolons, width 100, no trailing commas. The Svelte plugin is on.
-  - Format only code: `npx prettier --write src scripts server/cuentas/src`. Running it on `.` rewrites Markdown and YAML that aren't kept in Prettier style.
+  - Format only code: `npx prettier --write src scripts server/accounts/src`. Running it on `.` rewrites Markdown and YAML that aren't kept in Prettier style.
 - **Comments:** short and about *why*, in the existing tone. Keep them current when the code changes.
 - **Simplicity:**
   - Prefer the standard library and platform features. Avoid new dependencies.
@@ -220,9 +220,9 @@ The workflow **never runs on push**: releasing is a manual decision.
 ## Production
 
 - **Stack:** Prosody, the account service and Caddy (HTTPS, Let's Encrypt) via Docker from `deploy/`.
-- **Guide:** a free test server on Oracle Cloud + DuckDNS + Brevo, in [docs/despliegue.md](docs/despliegue.md).
-- **First accounts:** `docker compose exec cuentas node src/invitar.ts you@example.com`.
-- **Backups:** volumes `palique_prosody-data` (accounts, rosters) and `palique_cuentas-data` (emails, invites, preferences).
+- **Guide:** a free test server on Oracle Cloud + DuckDNS + Brevo, in [docs/deployment.md](docs/deployment.md).
+- **First accounts:** `docker compose exec accounts node src/invite.ts you@example.com`.
+- **Backups:** volumes `palique_prosody-data` (accounts, rosters) and `palique_accounts-data` (emails, invites, preferences).
 
 ### Newsletter (Brevo)
 
@@ -230,7 +230,7 @@ Choices are stored by the account service and synced to a Brevo list. Without Br
 
 1. In Brevo, create a contact list (note its ID) and an API key (*SMTP & API → API keys*).
 2. Put `BREVO_API_KEY`, `BREVO_LIST_ID` and `BREVO_WEBHOOK_TOKEN` in a git-ignored `.env` next to the compose file.
-3. Run `docker compose up -d cuentas`, then `docker compose exec cuentas node --disable-warning=ExperimentalWarning src/sync-brevo.ts`.
+3. Run `docker compose up -d accounts`, then `docker compose exec accounts node --disable-warning=ExperimentalWarning src/sync-brevo.ts`.
 4. Add a Brevo webhook for *unsubscribed*, *hard bounce* and *spam* to `https://<domain>/brevo?token=<BREVO_WEBHOOK_TOKEN>`.
 
 Production also sends mail through Brevo's SMTP relay (`smtp-relay.brevo.com:587`).

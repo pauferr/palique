@@ -7,6 +7,8 @@ export type ExportResult = 'saved' | 'canceled' | 'empty'
 
 // Display names by JID (the JIDs themselves are random ids).
 type Names = (jid: string) => string
+// Wink names by id (the ids are English, the names Spanish).
+type WinkNames = (id: string) => string
 
 function stamp(at: number): string {
   return new Date(at).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })
@@ -19,14 +21,19 @@ function byContact(messages: ChatMessage[]): Map<string, ChatMessage[]> {
   return groups
 }
 
-function toText(account: string, messages: ChatMessage[], name: Names): string {
+function toText(
+  account: string,
+  messages: ChatMessage[],
+  name: Names,
+  winkName: WinkNames
+): string {
   const sections = [...byContact(messages)].map(([contact, list]) => {
     const lines = list.map((m) => {
       const who = m.mine ? name(account) : name(contact)
       const what = m.buzz
         ? '*zumbido*'
         : m.wink
-          ? `*guiño: ${m.wink}*`
+          ? `*guiño: ${winkName(m.wink)}*`
           : m.body.replaceAll('\n', '\n    ')
       return `[${stamp(m.at)}] ${who}: ${what}`
     })
@@ -41,13 +48,18 @@ const escape = (text: string): string =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   )
 
-function toHtml(account: string, messages: ChatMessage[], name: Names): string {
+function toHtml(
+  account: string,
+  messages: ChatMessage[],
+  name: Names,
+  winkName: WinkNames
+): string {
   const sections = [...byContact(messages)].map(([contact, list]) => {
     const items = list.map((m) => {
       const who = escape(m.mine ? name(account) : name(contact))
       const time = `<time>${escape(stamp(m.at))}</time>`
       if (m.wink) {
-        return `<li class="buzz">${time} ¡${who} ha enviado un guiño: ${escape(m.wink)}!</li>`
+        return `<li class="buzz">${time} ¡${who} ha enviado un guiño: ${escape(winkName(m.wink))}!</li>`
       }
       return m.buzz
         ? `<li class="buzz">${time} ¡${who} ha enviado un zumbido!</li>`
@@ -93,9 +105,10 @@ export function exportHistory(
   format: ExportFormat,
   account: string,
   messages: ChatMessage[],
-  name: Names
+  name: Names,
+  winkName: WinkNames = (id) => id
 ): string {
-  if (format === 'html') return toHtml(account, messages, name)
-  if (format === 'txt') return toText(account, messages, name)
+  if (format === 'html') return toHtml(account, messages, name, winkName)
+  if (format === 'txt') return toText(account, messages, name, winkName)
   return toJson(account, messages)
 }

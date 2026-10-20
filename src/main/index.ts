@@ -29,6 +29,7 @@ import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
+import { winkLabel } from '../renderer/src/wink-labels'
 import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
@@ -56,6 +57,7 @@ import {
   ownShow,
   ownStatus,
   rejectRequest,
+  winkId,
   removeContact,
   sendBuzz,
   sendMessage,
@@ -86,7 +88,7 @@ if (process.defaultApp && process.argv[1]) {
 
 let pendingLink: AuthLink | null = null
 
-// Only palique://registro?t=… and palique://recuperar?e=…&t=… with sane values; anything
+// Only palique://signup?t=… and palique://reset?e=…&t=… with sane values; anything
 // else is ignored.
 function parseLink(value: string | undefined): AuthLink | null {
   if (!value?.startsWith('palique://')) return null
@@ -95,8 +97,8 @@ function parseLink(value: string | undefined): AuthLink | null {
     const token = url.searchParams.get('t') ?? ''
     const email = url.searchParams.get('e') ?? ''
     if (!/^[\w-]{8,64}$/.test(token)) return null
-    if (url.hostname === 'registro') return { kind: 'invite', token, email: '' }
-    if (url.hostname === 'recuperar' && email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email)) {
+    if (url.hostname === 'signup') return { kind: 'invite', token, email: '' }
+    if (url.hostname === 'reset' && email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email)) {
       return { kind: 'reset', token, email }
     }
     return null
@@ -336,7 +338,7 @@ const EXPORT_TYPES = [
 ]
 
 async function exportChats(win: BrowserWindow | null): Promise<ExportResult> {
-  const messages = account ? history.all(account) : []
+  const messages = account ? history.all(account).map(currentWink) : []
   if (!messages.length) return 'empty'
   const day = new Date().toISOString().slice(0, 10)
   const save = { defaultPath: `palique-conversaciones-${day}.html`, filters: EXPORT_TYPES }
@@ -349,7 +351,7 @@ async function exportChats(win: BrowserWindow | null): Promise<ExportResult> {
   const state = snapshot()
   const name = (jid: string): string =>
     jid === account ? state.name : (state.contacts.find((c) => c.jid === jid)?.name ?? jid)
-  await writeFile(filePath, exportHistory(format, account, messages, name), 'utf8')
+  await writeFile(filePath, exportHistory(format, account, messages, name, winkLabel), 'utf8')
   return 'saved'
 }
 
@@ -440,6 +442,10 @@ const sentBuzzes = cooldown(BUZZ_INTERVAL)
 const gotWinks = cooldown(WINK_INTERVAL)
 const gotBuzzes = cooldown(BUZZ_INTERVAL)
 const notified = cooldown(NOTIFY_INTERVAL)
+
+// History may hold winks saved with their old Spanish ids.
+const currentWink = (message: ChatMessage): ChatMessage =>
+  message.wink ? { ...message, wink: winkId(message.wink) } : message
 
 // Stored by the server while we were offline (or just old): delivered quietly. They wait
 // in the contact list at sign-in, with no sounds, flashing or a toast storm.
@@ -719,7 +725,7 @@ app.whenReady().then(() => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })
   ipcMain.handle('chat:history', (_, contact: string) =>
-    account ? history.load(account, String(contact)) : []
+    account ? history.load(account, String(contact)).map(currentWink) : []
   )
   ipcMain.handle('chat:send', async (_, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)

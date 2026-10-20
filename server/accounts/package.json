@@ -1,5 +1,5 @@
 {
-  "name": "palique-cuentas",
+  "name": "palique-accounts",
   "version": "0.1.0",
   "private": true,
   "description": "Palique account service: email verification, invites by email, password recovery",

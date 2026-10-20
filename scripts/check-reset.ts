@@ -32,7 +32,7 @@ while ((await mailCount(email)) < 2) {
 }
 const recovery = await lastMail(email)
 assert.equal(recovery.subject, '¿Se te ha olvidado la contraseña de Palique?')
-const link = recovery.text.match(/palique:\/\/recuperar\?e=([^&\s]+)&t=(\S+)/)
+const link = recovery.text.match(/palique:\/\/reset\?e=([^&\s]+)&t=(\S+)/)
 assert.ok(link, 'palique:// link in the email')
 assert.equal(decodeURIComponent(link[1]), email)
 const code = decodeURIComponent(link[2])

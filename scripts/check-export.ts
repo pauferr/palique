@@ -26,7 +26,7 @@ save('2', 'lolo@localhost', true, 'Voy\ncon el bocata')
 save('1', 'lolo@localhost', false, '¿Bajas?')
 save('3', 'lolo@localhost', false, '', true)
 save('4', 'chusa@localhost', false, '<script>alert("hola")</script> & "AsÍ"')
-save('5', 'lolo@localhost', true, '', false, 'burbuja')
+save('5', 'lolo@localhost', true, '', false, 'bubble')
 history.save('fina@localhost', {
   id: 'x',
   with: 'lolo@localhost',
@@ -50,25 +50,27 @@ assert.deepEqual(
 )
 
 // Plain text: one section per contact, multi-line bodies indented, buzz marked.
-const txt = exportHistory('txt', me, messages, name)
+// Winks show by their Spanish name, not their id.
+const winkName = (id: string): string => (id === 'bubble' ? 'Burbuja' : id)
+const txt = exportHistory('txt', me, messages, name, winkName)
 assert.match(txt, /^Historial de Palique de Tere/)
 assert.match(
   txt,
   /=== Conversación con Lolo ===\n\[.+\] Lolo: ¿Bajas\?\n\[.+\] Tere: Voy\n {4}con el bocata\n\[.+\] Lolo: \*zumbido\*/
 )
-assert.match(txt, /\] Tere: \*guiño: burbuja\*/)
+assert.match(txt, /\] Tere: \*guiño: Burbuja\*/)
 assert.match(txt, /=== Conversación con Sin nombre ===/)
 assert.doesNotMatch(txt, /ajeno|@localhost/)
 
 // HTML: user text is escaped, never markup.
-const html = exportHistory('html', me, messages, name)
+const html = exportHistory('html', me, messages, name, winkName)
 assert.ok(html.startsWith('<!doctype html>'))
 assert.ok(!html.includes('<script>'))
 assert.ok(
   html.includes('&lt;script&gt;alert(&quot;hola&quot;)&lt;/script&gt; &amp; &quot;AsÍ&quot;')
 )
 assert.ok(html.includes('¡Lolo ha enviado un zumbido!'))
-assert.ok(html.includes('¡Tere ha enviado un guiño: burbuja!'))
+assert.ok(html.includes('¡Tere ha enviado un guiño: Burbuja!'))
 assert.ok(!html.includes('@localhost'))
 
 // JSON: lossless, versioned.

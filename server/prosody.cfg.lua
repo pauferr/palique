@@ -45,7 +45,7 @@ modules_disabled = { "s2s" }
 allow_registration = true
 registration_invite_only = true
 invite_expiry = "1 week"
-palique_invites_trusted = { "cuentas.localhost" } -- the account service (server/cuentas)
+palique_invites_trusted = { "accounts.localhost" } -- the account service (server/accounts)
 
 -- TLS required here too, with the dev-only cert in server/certs.
 c2s_require_encryption = true
@@ -60,12 +60,12 @@ http_interfaces = { "*" }
 
 pidfile = "/var/run/prosody/prosody.pid"
 
--- Account service (server/cuentas) connects as an XMPP component (XEP-0114).
+-- Account service (server/accounts) connects as an XMPP component (XEP-0114).
 component_ports = { 5347 }
 component_interfaces = { "*" }
 
 VirtualHost "localhost"
 
--- Account service (server/cuentas).
-Component "cuentas.localhost"
-	component_secret = "dev-only-cuentas-secret" -- dev only; same as in compose.yaml
+-- Account service (server/accounts).
+Component "accounts.localhost"
+	component_secret = "dev-only-accounts-secret" -- dev only; same as in compose.yaml

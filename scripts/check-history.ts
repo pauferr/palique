@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openHistory } from '../src/main/history.ts'
+import { winkId } from '../src/main/xmpp.ts'
 
 const file = join(mkdtempSync(join(tmpdir(), 'palique-')), 'history.sqlite')
 const msg = (
@@ -55,8 +56,8 @@ assert.equal(latest[0].id, 'bulk50')
 assert.equal(latest.at(-1)?.id, 'bulk249')
 
 // Winks are stored too.
-history.save('tere@localhost', msg('w1', 99_999, { wink: 'burbuja', body: '' }))
-assert.equal(history.load('tere@localhost', 'lolo@localhost').at(-1)?.wink, 'burbuja')
+history.save('tere@localhost', msg('w1', 99_999, { wink: 'bubble', body: '' }))
+assert.equal(history.load('tere@localhost', 'lolo@localhost').at(-1)?.wink, 'bubble')
 
 // A database from before winks existed gets the new column, keeping old messages.
 const old = join(mkdtempSync(join(tmpdir(), 'palique-')), 'history.sqlite')
@@ -70,7 +71,12 @@ const migrated = openHistory(old)
 assert.deepEqual(migrated.load('tere@localhost', 'lolo@localhost'), [
   msg('old', 1, { body: 'antiguo' })
 ])
-migrated.save('tere@localhost', msg('new', 2, { wink: 'ola', body: '' }))
-assert.equal(openHistory(old).load('tere@localhost', 'lolo@localhost')[1].wink, 'ola')
+migrated.save('tere@localhost', msg('new', 2, { wink: 'wave', body: '' }))
+assert.equal(openHistory(old).load('tere@localhost', 'lolo@localhost')[1].wink, 'wave')
+
+// Winks saved with their old Spanish ids (up to 0.4) read as the English ones.
+assert.equal(winkId('burbuja'), 'bubble')
+assert.equal(winkId('in-love'), 'in-love')
+assert.equal(winkId('constructor'), 'constructor', 'only real entries, not inherited ones')
 
 console.log('history check passed')

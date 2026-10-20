@@ -1,4 +1,4 @@
--- Account invites and password resets, for the account service only (server/cuentas).
+-- Account invites and password resets, for the account service only (server/accounts).
 -- Users never ask Prosody directly: invites go by email, and the account service keeps
 -- the per-user limit and the email <-> account mapping.
 -- Only components listed in palique_invites_trusted may use it, sending iqs to the host:

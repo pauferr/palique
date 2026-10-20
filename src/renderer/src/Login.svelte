@@ -35,7 +35,7 @@
   let canRemember = $state(false)
 
   const address = (): string => email.trim().toLowerCase()
-  // The invite code can be pasted bare or as the whole link (palique://registro?t=CODE).
+  // The invite code can be pasted bare or as the whole link (palique://signup?t=CODE).
   const inviteCode = (): string => invite.trim().match(/[?&]t=([^&\s]+)/)?.[1] ?? invite.trim()
   const submitLabel = $derived({
     login: 'Iniciar sesión',

@@ -10,7 +10,7 @@ if [ ! -f .env ]; then
 fi
 
 # Secrets nobody has to type: generated once and kept in .env.
-for name in CUENTAS_SECRET BREVO_WEBHOOK_TOKEN; do
+for name in ACCOUNTS_SECRET BREVO_WEBHOOK_TOKEN; do
   if ! grep -q "^$name=." .env; then
     value=$(openssl rand -hex 24)
     if grep -q "^$name=" .env; then
@@ -34,7 +34,7 @@ for _ in $(seq 1 60); do
   sleep 5
 done
 if ! docker compose exec -T caddy test -f "$src"; then
-  echo "No certificate after 5 minutes. Check DNS and ports 80/443 (docs/despliegue.md)," >&2
+  echo "No certificate after 5 minutes. Check DNS and ports 80/443 (docs/deployment.md)," >&2
   echo "and Caddy's log: docker compose logs caddy" >&2
   exit 1
 fi
@@ -49,7 +49,7 @@ cat <<EOF
 
 Palique is running on $PALIQUE_DOMAIN.
 Invite the first accounts (yours too) by email with:
-  docker compose exec cuentas node src/invitar.ts you@example.com
+  docker compose exec accounts node src/invite.ts you@example.com
 
 Brevo webhook URL (optional, newsletter unsubscribes):
   https://$PALIQUE_DOMAIN/brevo?token=$BREVO_WEBHOOK_TOKEN
