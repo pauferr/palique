@@ -136,7 +136,7 @@ npm run lint         # eslint
 npm run format       # prettier (code only, see Conventions)
 npm run build        # typecheck + build
 npm run build:mac    # package .dmg
-npm run build:linux  # AppImage + .deb (use CI from macOS)
+npm run build:linux  # AppImage (use CI from macOS)
 ```
 
 ## Winks
@@ -191,9 +191,11 @@ Add or update the matching check with any change to that logic. Before committin
 
 GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) builds each OS on its own machine:
 
-- **macOS:** `.dmg` (arm64 and x64) plus `.zip`
-- **Linux:** `.AppImage` and `.deb`
+- **macOS:** `.dmg` (arm64 and x64)
+- **Linux:** `.AppImage`
 - **Windows:** unsigned `.exe`
+
+Only installers go up: no auto-update files (`latest*.yml`, blockmaps) until there's an updater.
 
 **Versions are semver, worked out from the commits** since the last release by [scripts/next-version.ts](scripts/next-version.ts). That's one more reason to keep commit messages in Conventional Commits.
 

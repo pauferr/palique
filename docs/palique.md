@@ -30,7 +30,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 - Proceso principal: Node con TypeScript (ventanas, bandeja, conexión XMPP, SQLite).
 - Frontend: **Svelte** con TypeScript, compilado con Vite (plantilla electron-vite). Poco código, buen rendimiento y transiciones/animaciones integradas, adecuado para una UI muy personalizada. Sin SvelteKit: no hace falta enrutado de servidor. Descartados: React (más verboso), Solid (comunidad más pequeña), JS/TS sin framework (no escala con la UI).
 - Comunicación entre ventanas y proceso principal: IPC mediante preload + `contextBridge` (con `contextIsolation` activado).
-- Empaquetado: electron-builder (AppImage/deb en Linux, dmg en macOS).
+- Empaquetado: electron-builder (AppImage en Linux, dmg en macOS, exe en Windows).
 
 **Motivos de la elección**
 

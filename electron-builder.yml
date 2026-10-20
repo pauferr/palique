@@ -30,9 +30,6 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-    # Not downloaded by users: the format future auto-updates use.
-    - target: zip
-      arch: [arm64, x64]
   artifactName: ${name}-${version}-mac-${arch}.${ext}
 
 linux:
@@ -40,8 +37,6 @@ linux:
   category: Network
   target:
     - target: AppImage
-      arch: [x64]
-    - target: deb
       arch: [x64]
   artifactName: ${name}-${version}-linux-${arch}.${ext}
 
@@ -51,7 +46,11 @@ win:
     - target: nsis
       arch: [x64]
   artifactName: ${name}-${version}-windows-${arch}.${ext}
+# Only the installers: no blockmaps until there's an auto-updater to use them.
+dmg:
+  writeUpdateInfo: false
 nsis:
+  differentialPackage: false
   oneClick: false
   allowToChangeInstallationDirectory: true
 
