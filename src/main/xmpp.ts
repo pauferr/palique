@@ -147,9 +147,10 @@ function send(stanza: Element): Promise<void> {
 }
 
 // Display names come from the network: one line, no control characters, not too long.
+// Joiners and tag characters stay: emoji like 👨‍👩‍👧 and some flags are built with them.
 export const cleanNick = (value: unknown): string =>
   String(value ?? '')
-    .replace(/[\p{Cc}\p{Cf}]/gu, '')
+    .replace(/(?![\u200d\u{e0020}-\u{e007f}])[\p{Cc}\p{Cf}]/gu, '')
     .trim()
     .slice(0, NICK_MAX)
 
@@ -214,7 +215,8 @@ function handlePresence(stanza: Element): void {
     case undefined:
       entry?.resources.set(from.getResource(), {
         show: parseShow(stanza),
-        status: stanza.getChildText('status') ?? ''
+        // From the network: one line, as long as ours can be.
+        status: (stanza.getChildText('status') ?? '').replace(/\p{Cc}/gu, ' ').slice(0, 140)
       })
       break
     case 'unavailable':

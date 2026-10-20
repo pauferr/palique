@@ -4,6 +4,7 @@
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
+  import { emojify } from './emoticons'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -26,6 +27,12 @@
   let avatarError = $state('')
   let presenceError = $state('')
   let status = $state('')
+  // Name and personal message show their emoticons until clicked, then become inputs.
+  let editing: '' | 'nick' | 'personal' = $state('')
+  const focus = (input: HTMLInputElement): void => input.focus()
+  const commitOnEnter = (event: KeyboardEvent): void => {
+    if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur()
+  }
 
   // Two groups like MSN, alphabetical inside each.
   let sorted = $derived(
@@ -178,7 +185,7 @@
   }
 
   function remove(contact: Contact): void {
-    if (confirm(`¿Eliminar a ${contact.name} de tus contactos?`)) {
+    if (confirm(`¿Eliminar a ${emojify(contact.name)} de tus contactos?`)) {
       window.api.removeContact(contact.jid)
     }
   }
@@ -204,14 +211,22 @@
     />
     <div class="identity">
       <div class="line">
-        <input
-          class="nick"
-          value={roster.name}
-          onchange={rename}
-          maxlength="64"
-          aria-label="Tu nombre"
-          title="Cambiar tu nombre"
-        />
+        {#if editing === 'nick'}
+          <input
+            class="nick"
+            value={roster.name}
+            onchange={rename}
+            onblur={() => (editing = '')}
+            onkeydown={commitOnEnter}
+            use:focus
+            maxlength="64"
+            aria-label="Tu nombre"
+          />
+        {:else}
+          <button class="nick" onclick={() => (editing = 'nick')} title="Cambiar tu nombre"
+            ><Emoticons text={roster.name} /></button
+          >
+        {/if}
         <select
           bind:this={statusSelect}
           value={roster.show}
@@ -224,14 +239,27 @@
           <option value="invisible">(Invisible)</option>
         </select>
       </div>
-      <input
-        class="personal"
-        bind:value={status}
-        onchange={() => updatePresence(roster.show)}
-        maxlength="140"
-        placeholder="Escribe un mensaje personal"
-        aria-label="Mensaje personal"
-      />
+      {#if editing === 'personal'}
+        <input
+          class="personal"
+          bind:value={status}
+          onchange={() => updatePresence(roster.show)}
+          onblur={() => (editing = '')}
+          onkeydown={commitOnEnter}
+          use:focus
+          maxlength="140"
+          placeholder="Escribe un mensaje personal"
+          aria-label="Mensaje personal"
+        />
+      {:else}
+        <button
+          class="personal"
+          class:empty={!status}
+          onclick={() => (editing = 'personal')}
+          title="Cambiar tu mensaje personal"
+          >{#if status}<Emoticons text={status} />{:else}Escribe un mensaje personal{/if}</button
+        >
+      {/if}
     </div>
   </header>
 
@@ -247,7 +275,7 @@
   <div class="list">
     {#each roster.requests as request (request.jid)}
       <div class="request">
-        <span><strong>{request.name}</strong> quiere añadirte</span>
+        <span><strong><Emoticons text={request.name} /></strong> quiere añadirte</span>
         <button onclick={() => window.api.acceptRequest(request.jid)}>Aceptar</button>
         <button onclick={() => window.api.rejectRequest(request.jid)}>Rechazar</button>
       </div>
@@ -270,7 +298,7 @@
                   />
                 </span>
                 <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                  {contact.name}
+                  <Emoticons text={contact.name} />
                   {#if contact.pending}
                     <small>- Esperando a que te acepte</small>
                   {:else if contact.status}
@@ -281,7 +309,7 @@
                   class="remove"
                   onclick={() => remove(contact)}
                   title="Eliminar contacto"
-                  aria-label="Eliminar a {contact.name}">×</button
+                  aria-label="Eliminar a {emojify(contact.name)}">×</button
                 >
               </li>
             {/each}
@@ -391,6 +419,10 @@
   /* Our name reads as bold text until you click it. */
   .nick {
     flex: 1;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     min-width: 0;
     padding: 0 2px;
     border-color: transparent;
@@ -412,11 +444,27 @@
 
   /* Reads as text until you click it, like MSN's personal message. */
   .personal {
+    text-align: left;
     border-color: transparent;
     box-shadow: none;
     background: transparent;
     color: var(--text-muted);
     font-style: italic;
+  }
+
+  /* Same box as the input they turn into, so nothing jumps on click. */
+  button.nick,
+  button.personal {
+    border-width: var(--field-border-width);
+    border-radius: var(--radius);
+  }
+
+  button.personal {
+    padding: 3px 5px;
+  }
+
+  .personal.empty {
+    opacity: 0.7;
   }
 
   .nick:hover,

@@ -49,3 +49,9 @@ export function parseEmoticons(text: string): Part[] {
   if (last < text.length) parts.push({ text: text.slice(last) })
   return parts
 }
+
+// For plain-text places (window titles, notifications, dialogs).
+export const emojify = (text: string): string =>
+  parseEmoticons(text)
+    .map((p) => ('emoji' in p ? p.emoji : p.text))
+    .join('')

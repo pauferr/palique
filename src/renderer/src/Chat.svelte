@@ -5,7 +5,7 @@
   import messageSound from './assets/sounds/message.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
-  import { EMOTICONS } from './emoticons'
+  import { EMOTICONS, emojify } from './emoticons'
   import { winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
@@ -24,7 +24,7 @@
   // Their display name can change while the window is open.
   const name = $derived(contact?.name ?? '')
   $effect(() => {
-    if (name) document.title = name
+    if (name) document.title = emojify(name)
   })
   let draft = $state('')
   let shaking = $state(false)
@@ -189,7 +189,7 @@
   <header>
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
-      <span>Para: <strong>{name}</strong></span>
+      <span>Para: <strong><Emoticons text={name} /></strong></span>
       <small
         >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
             contact?.show ?? 'offline'
@@ -203,17 +203,19 @@
     {#each messages as message (message.id)}
       <li class:mine={message.mine}>
         {#if message.buzz}
-          <em>{message.mine ? '¡Has enviado un zumbido!' : `¡${name} te ha enviado un zumbido!`}</em
+          <em
+            >{#if message.mine}¡Has enviado un zumbido!{:else}¡<Emoticons text={name} /> te ha enviado
+              un zumbido!{/if}</em
           >
         {:else if message.wink}
           <em
-            >{message.mine ? 'Has enviado el guiño' : `${name} te ha enviado el guiño`} «{winkLabel(
-              message.wink
-            )}»</em
+            >{#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} /> te ha enviado el guiño{/if}
+            «{winkLabel(message.wink)}»</em
           >
         {:else}
           <span class="meta"
-            >{message.mine ? 'Tú dices' : `${name} dice`}: <time>{time(message.at)}</time></span
+            >{#if message.mine}Tú dices{:else}<Emoticons text={name} /> dice{/if}:
+            <time>{time(message.at)}</time></span
           >
           <p><Emoticons text={message.body} /></p>
         {/if}
@@ -221,7 +223,9 @@
     {/each}
   </ol>
 
-  <p class="typing" aria-live="polite">{theyType ? `${name} está escribiendo…` : ''}</p>
+  <p class="typing" aria-live="polite">
+    {#if theyType}<Emoticons text={name} /> está escribiendo…{/if}
+  </p>
 
   <div class="compose">
     <div class="toolbar">

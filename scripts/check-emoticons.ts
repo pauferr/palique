@@ -1,6 +1,6 @@
 // Emoticon parsing check (no server needed). Run: npm run check:emoticons
 import assert from 'node:assert/strict'
-import { parseEmoticons } from '../src/renderer/src/emoticons.ts'
+import { emojify, parseEmoticons } from '../src/renderer/src/emoticons.ts'
 
 // Shown as emoji, spaces kept around them.
 const show = (text: string): string =>
@@ -19,5 +19,9 @@ assert.equal(show('<b>:)</b>'), '<b>[🙂]</b>', 'text is left as text')
 
 // The original code is kept, e.g. for tooltips.
 assert.deepEqual(parseEmoticons('ok (y)'), [{ text: 'ok ' }, { emoji: '👍', code: '(y)' }])
+
+// Plain text for window titles and notifications.
+assert.equal(emojify('(L) Tere :)'), '❤️ Tere 🙂')
+assert.equal(emojify('Tere'), 'Tere')
 
 console.log('emoticons check passed')
