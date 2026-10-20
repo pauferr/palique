@@ -122,9 +122,10 @@ app.on('open-url', (event, url) => {
 // …Linux and Windows as an argument, at launch or to the already running instance.
 pendingLink ??= parseLink(process.argv.find((arg) => arg.startsWith('palique://')))
 
-// Native Wayland clients can't stay on top in every compositor (GNOME refuses),
-// which would break the full-screen wink overlay. XWayland handles it everywhere.
-if (process.platform === 'linux') app.commandLine.appendSwitch('ozone-platform', 'x11')
+// On Wayland a window can't force itself above the rest in every compositor (GNOME
+// refuses), so winks play inside the conversation instead of full screen. (Forcing
+// XWayland for the overlay left no window at all where there's no XWayland, like niri.)
+const wayland = process.platform === 'linux' && Boolean(process.env['WAYLAND_DISPLAY'])
 
 // The local Prosody uses a dev-only self-signed cert: trust exactly that one, keep verification on.
 if (DOMAIN === 'localhost') {
@@ -157,6 +158,9 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  // If rendering fails (e.g. the GPU process keeps crashing) 'ready-to-show' may never
+  // come: show the window anyway rather than run with nothing on screen.
+  setTimeout(() => mainWindow?.isVisible() || mainWindow?.show(), 3000)
   // Closing the contact list keeps Palique running (tray, notifications), like MSN.
   mainWindow.on('close', (event) => {
     if (quitting) return
@@ -446,11 +450,14 @@ function playWink(message: ChatMessage): void {
   // Only in an open conversation (otherwise it waits there, and can be replayed from it).
   // The wink video has sound, so not while busy either.
   const show = settings.get().winks && !isLate(message) && ownShow() !== 'dnd'
-  if (show && chats.has(message.with)) showWink(message.wink)
+  const chat = chats.get(message.with)
+  if (show && chat) showWink(message.wink, chat)
 }
 
-// Transparent, click-through window over the whole primary display.
-function showWink(id: string): void {
+// Transparent, click-through window over the whole primary display. On Wayland, inside
+// the conversation window instead (see `wayland`).
+function showWink(id: string, chat: BrowserWindow | null): void {
+  if (wayland && chat) return chat.webContents.send('chat:wink-play', id)
   const win = new BrowserWindow({
     ...screen.getPrimaryDisplay().bounds,
     show: false,
@@ -708,8 +715,8 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('chat:unread', () => Object.fromEntries(unread))
   // Clicking a wink in a conversation plays it again, even with full-screen winks off.
-  ipcMain.on('chat:replay-wink', (_, wink: string) => {
-    if (isWinkId(wink)) showWink(wink)
+  ipcMain.on('chat:replay-wink', (event, wink: string) => {
+    if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })
   ipcMain.handle('chat:history', (_, contact: string) =>
     account ? history.load(account, String(contact)) : []

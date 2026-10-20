@@ -95,7 +95,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 ### Animaciones a pantalla completa
 - Ventana transparente, siempre encima y que deje pasar los clics (`transparent`, `alwaysOnTop`, `setIgnoreMouseEvents`).
 - macOS y X11: sin complicaciones.
-- Wayland: los clientes Wayland nativos no pueden ponerse siempre encima en todos los compositores (GNOME no lo permite). Solución: arrancar Electron en XWayland (`--ozone-platform=x11`), donde la superposición funciona también en GNOME. Hay que validarlo pronto.
+- Wayland: los clientes Wayland nativos no pueden ponerse siempre encima en todos los compositores (GNOME no lo permite). Primero se forzó XWayland (`--ozone-platform=x11`), pero dejaba la app sin ventana donde no hay XWayland (niri) y tampoco se veía en KDE (issues #1 y #2). Decisión: Wayland nativo, y en Wayland el guiño se reproduce dentro de la ventana de la conversación en vez de a pantalla completa.
 - Nombre en la app: "guiños" (como en MSN).
 - **Transmisión: catálogo predefinido.** Las animaciones vienen incluidas en la app; el mensaje solo lleva un identificador (p. ej. `tarta-cumple`). Mensaje ligero, reproducción instantánea y contenido controlado.
 - **Formato: vídeo WebM (VP9 con canal alfa) con el sonido incluido (Opus).** Chromium lo reproduce con `<video>` sin librerías, y cualquier animador lo exporta (After Effects, Blender). Admite cualquier estilo, incluido el trazo tembloroso. El nombre del archivo es el identificador del guiño (`assets/winks/<id>.webm`).
@@ -259,7 +259,7 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 | Riesgo | Impacto | Mitigación |
 |--------|---------|------------|
 | Efecto red: nadie con quien hablar | Alto | Definir los primeros usuarios (grupo de amigos). Interoperabilidad XMPP para hablar con quien ya use otro cliente. |
-| Animaciones a pantalla completa en Wayland | Alto | Forzar XWayland. Prototipo temprano en el entorno propio. Fallback: animación dentro de la ventana. |
+| Animaciones a pantalla completa en Wayland | Alto | Forzar XWayland rompía niri y KDE. Aplicado el fallback: en Wayland, animación dentro de la ventana de la conversación. |
 | Desarrollo en macOS sin equipo Linux disponible | Alto | Validar en Linux (equipo propio o VM) en cuanto sea posible, empezando por los guiños. No dar por buena ninguna función de ventana probada solo en macOS. |
 | Zumbido sin mover ventana en Wayland | Bajo | Aceptado. Sacudida interna + aviso en barra de tareas. |
 

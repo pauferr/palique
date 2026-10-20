@@ -96,6 +96,12 @@ const api = {
     return () => ipcRenderer.off('chat:incoming', listener)
   },
   replayWink: (wink: string): void => ipcRenderer.send('chat:replay-wink', wink),
+  // On Wayland winks play inside the conversation window (no full-screen overlay).
+  onWinkPlay: (callback: (wink: string) => void): (() => void) => {
+    const listener = (_: unknown, wink: string): void => callback(wink)
+    ipcRenderer.on('chat:wink-play', listener)
+    return () => ipcRenderer.off('chat:wink-play', listener)
+  },
   getChatHistory: (contact: string): Promise<ChatMessage[]> =>
     ipcRenderer.invoke('chat:history', contact),
   onChatMessage: (callback: (message: ChatMessage, quiet: boolean) => void): (() => void) => {

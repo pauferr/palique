@@ -35,6 +35,8 @@
   let emoticonsOpen = $state(false)
   let input: HTMLTextAreaElement
   let theyType = $state(false)
+  // A wink playing inside this window (on Wayland, where there's no full-screen overlay).
+  let playing = $state('')
   let list: HTMLElement
   let composing = false
   let idle: ReturnType<typeof setTimeout> | undefined
@@ -91,6 +93,9 @@
     })
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
+    const offWink = window.api.onWinkPlay((id) => {
+      if (Object.hasOwn(winks, id)) playing = id
+    })
     window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     // History never triggers effects; live messages (even the one that opened this window)
     // come through onChatMessage. Keep them after the history, without duplicates.
@@ -104,6 +109,7 @@
       offMessage()
       offTyping()
       offRoster()
+      offWink()
     }
   })
 
@@ -188,6 +194,19 @@
 </script>
 
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
+  {#if playing}
+    <!-- Decorative animation with no dialogue: nothing to caption. A click closes it. -->
+    <!-- svelte-ignore a11y_media_has_caption, a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="wink-layer" onclick={() => (playing = '')}>
+      <video
+        src={winks[playing]}
+        aria-hidden="true"
+        autoplay
+        onended={() => (playing = '')}
+        onerror={() => (playing = '')}
+      ></video>
+    </div>
+  {/if}
   <header>
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
@@ -454,6 +473,21 @@
     background: var(--list-bg);
     border: 1px solid var(--line);
     box-shadow: var(--popup-shadow);
+  }
+
+  .wink-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 15%);
+  }
+
+  .wink-layer video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   /* The wink's name in the conversation: looks like text, plays it again. */
