@@ -26,6 +26,7 @@ import {
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
+import { emojify } from '../renderer/src/emoticons'
 import { THEMES, openSettings, type Settings, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
@@ -206,8 +207,9 @@ function notify(title: string, body: string, onClick: () => void): void {
   notification.show()
 }
 
+// Native titles can't hold images, so emoticon codes become plain emoji.
 const contactName = (jid: string): string =>
-  snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre'
+  emojify(snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre')
 
 function notifyMessage(message: ChatMessage): void {
   const body = message.buzz
@@ -238,7 +240,8 @@ function announceArrivals(state: Snapshot): void {
     for (const jid of cameOnline(previous, state)) {
       // Someone flapping online/offline gets announced once a minute at most.
       if (arrivals.take(jid)) continue
-      mainWindow?.webContents.send('contact:online', jid)
+      // Busy: no arrival sound either (the toast is already muted in notify()).
+      if (ownShow() !== 'dnd') mainWindow?.webContents.send('contact:online', jid)
       notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
     }
   }
@@ -327,17 +330,18 @@ async function exportChats(win: BrowserWindow | null, format: ExportFormat): Pro
 // Incoming messages open the conversation without stealing focus, and flash it
 // (taskbar on Linux, dock bounce on macOS).
 // `quiet`: show it in the conversation without shaking, sounds, flashing or toasts.
+// Busy (dnd): no sounds, shaking or toasts, but the window still flashes.
 function deliver(message: ChatMessage, quiet = false): void {
   if (account) history.save(account, message)
   const win = openChat(message.with, false)
+  const silent = quiet || (!message.mine && ownShow() === 'dnd')
   const queue = pending.get(message.with)
-  if (queue) queue.push([message, quiet])
-  else win.webContents.send('chat:message', message, quiet)
+  if (queue) queue.push([message, silent])
+  else win.webContents.send('chat:message', message, silent)
   if (message.mine || quiet || win.isFocused()) return
   win.flashFrame(true)
-  // Offline messages arriving at sign-in already open their windows; no toast storm.
   // A burst of messages from one contact gets one toast.
-  if (!isLate(message) && !notified.take(message.with)) notifyMessage(message)
+  if (!notified.take(message.with)) notifyMessage(message)
 }
 
 // Anti-spam. Buzzes and winks are limited per contact both ways: we can't send more
@@ -349,12 +353,14 @@ const gotWinks = cooldown(WINK_INTERVAL)
 const gotBuzzes = cooldown(BUZZ_INTERVAL)
 const notified = cooldown(NOTIFY_INTERVAL)
 
-// Stored by the server while we were offline (or just old): no effects, no toasts.
+// Stored by the server while we were offline (or just old): delivered quietly. Their
+// windows open at sign-in, so there's no need for sounds, flashing or a toast storm.
 const isLate = (message: ChatMessage): boolean =>
   Boolean(message.delayed) || Date.now() - message.at > 60_000
 
 function playWink(message: ChatMessage): void {
-  if (settings.get().winks && !isLate(message)) showWink(message.wink)
+  // The wink video has sound, so not while busy either.
+  if (settings.get().winks && !isLate(message) && ownShow() !== 'dnd') showWink(message.wink)
 }
 
 // Transparent, click-through window over the whole primary display.
@@ -528,7 +534,7 @@ app.whenReady().then(() => {
   onMessage((message) => {
     const effect = !message.mine && (message.buzz || message.wink)
     if (effect && (message.buzz ? gotBuzzes : gotWinks).take(message.with)) return
-    deliver(message, message.buzz && isLate(message))
+    deliver(message, isLate(message))
     // Our own winks sent from another device aren't replayed here.
     if (message.wink && !message.mine) playWink(message)
   })
