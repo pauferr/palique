@@ -1249,3 +1249,597 @@ const SOUNDS = {
     tone(3136, 1.75, 0.6, { type: 'triangle', gain: 0.08 })
   }
 }
+
+// ---------- The first three winks (once placeholders), now made here too ----------
+WINKS.push(
+  {
+    id: 'burbuja',
+    name: 'Burbuja',
+    desc: 'Una sirena sentada en una roca sopla por un aro y llena la pantalla de pompas de jabón irisadas, que acaban explotando.',
+    draw(c, t) {
+      const fade = 1 - seg(t, DUR - 0.3, DUR)
+      const inM = back(seg(t, 0, 0.5))
+      const mx = 130
+      const my = H - 60 + (1 - inM) * 220
+      // Bubbles: each starts at the wand when blown, floats up and right, pops at its end.
+      const wand = [mx + 62, my - 128]
+      for (let i = 0; i < 9; i++) {
+        const born = 0.8 + i * 0.22
+        const life = 1.4 + (i % 3) * 0.4
+        const p = seg(t, born, born + life)
+        if (p <= 0) continue
+        const bx = wand[0] + p * (150 + (i % 4) * 60) + Math.sin(t * 3 + i) * 12
+        const by = wand[1] - p * (120 + (i % 3) * 50)
+        const r = (10 + (i % 4) * 7) * Math.min(1, p * 4)
+        if (p < 1) bubble(c, bx, by, r, t, fade)
+        const pop = seg(t, born + life, born + life + 0.3)
+        if (pop > 0 && pop < 1) sparkle(c, bx, by, 0.6, (1 - pop) * fade)
+      }
+      c.save()
+      c.globalAlpha = fade
+      c.translate(mx, my)
+      mermaid(c, t, seg(t, 0.7, 2.9))
+      c.restore()
+    }
+  },
+  {
+    id: 'ovni',
+    name: 'Ovni',
+    desc: 'Llega un ovni con sus lucecitas, enciende el rayo y se lleva a una vaca que pastaba tan tranquila. Luego sale disparado.',
+    draw(c, t) {
+      const fade = 1 - seg(t, DUR - 0.25, DUR)
+      const ground = H - 40
+      // Ship: flies in, hovers, then zips away up-right.
+      const arrive = ease(seg(t, 0, 0.7))
+      const leave = seg(t, 2.9, 3.4)
+      const ux = lerp(-90, W / 2, arrive) + leave ** 2 * 420 + Math.sin(t * 3) * 6 * (1 - leave)
+      const uy = lerp(40, 90, arrive) - leave ** 2 * 260 + Math.sin(t * 4) * 5
+      // Beam
+      const beam = seg(t, 0.8, 1.0) * (1 - seg(t, 2.6, 2.8))
+      if (beam > 0) {
+        c.save()
+        c.globalAlpha = 0.55 * beam * fade
+        const g = c.createLinearGradient(0, uy, 0, ground)
+        g.addColorStop(0, 'rgb(190 255 140 / 0.9)')
+        g.addColorStop(1, 'rgb(190 255 140 / 0.15)')
+        c.fillStyle = g
+        c.beginPath()
+        c.moveTo(ux - 26, uy + 14)
+        c.lineTo(ux + 26, uy + 14)
+        c.lineTo(ux + 95, ground + 12)
+        c.lineTo(ux - 95, ground + 12)
+        c.closePath()
+        c.fill()
+        for (let i = 0; i < 6; i++) {
+          const p = (t * 1.5 + i / 6) % 1
+          c.fillStyle = 'rgb(255 255 255 / 0.7)'
+          c.beginPath()
+          c.arc(ux + Math.sin(i * 2.1 + t * 3) * 50 * (1 - p), lerp(ground, uy + 20, p), 2.5, 0, 7)
+          c.fill()
+        }
+        c.restore()
+      }
+      // Cow: grazing, then lifted, spinning, shrinking into the ship.
+      const lift = ease(seg(t, 1.1, 2.6))
+      if (lift < 1) {
+        c.save()
+        c.globalAlpha = fade
+        c.translate(lerp(W / 2, ux, lift), lerp(ground - 34, uy + 20, lift))
+        c.rotate(Math.sin(t * 5) * 0.5 * lift)
+        c.scale(1 - lift * 0.75, 1 - lift * 0.75)
+        cow(c, t, lift)
+        c.restore()
+      }
+      if (t > 1.3 && t < 2.3)
+        text(
+          c,
+          '¡MUUU!',
+          W / 2 + 120,
+          ground - 120 - lift * 40,
+          28,
+          '#5d4037',
+          fade * (1 - seg(t, 2.0, 2.3)),
+          0.12
+        )
+      c.save()
+      c.globalAlpha = fade
+      c.translate(ux, uy)
+      c.rotate(Math.sin(t * 2) * 0.06 - leave * 0.3)
+      ufo(c, t)
+      c.restore()
+    }
+  },
+  {
+    id: 'ola',
+    name: 'Ola',
+    desc: 'Entra una ola con espuma y rumor de mar, y un surfista la cabalga haciendo los cuernos rockeros con la mano.',
+    draw(c, t) {
+      const fade = 1 - seg(t, DUR - 0.4, DUR)
+      const reveal = ease(seg(t, 0, 0.9))
+      const swell = Math.sin(seg(t, 0, DUR) * Math.PI)
+      const mid = H / 2 + 30
+      const amp = 22 + swell * 26
+      const waveY = (x, k = 0) =>
+        mid + Math.sin(x / 48 - t * 4 + k) * amp + Math.sin(x / 23 + t * 2.5) * 6
+      const right = W * reveal
+      c.save()
+      c.globalAlpha = fade
+      const g = c.createLinearGradient(0, mid - amp, 0, mid + 90)
+      g.addColorStop(0, 'rgb(80 220 240 / 0.95)')
+      g.addColorStop(1, 'rgb(30 100 220 / 0.0)')
+      c.fillStyle = g
+      c.beginPath()
+      c.moveTo(0, waveY(0))
+      for (let x = 0; x <= right; x += 6) c.lineTo(x, waveY(x))
+      c.lineTo(right, mid + 110)
+      c.lineTo(0, mid + 110)
+      c.closePath()
+      c.fill()
+      // Crest line and foam dots riding it.
+      c.lineWidth = 5
+      c.strokeStyle = 'rgb(255 255 255 / 0.85)'
+      c.beginPath()
+      for (let x = 0; x <= right; x += 6) x ? c.lineTo(x, waveY(x)) : c.moveTo(x, waveY(x))
+      c.stroke()
+      c.fillStyle = '#fff'
+      for (let i = 0; i < 14; i++) {
+        const fx = ((i * 37 + t * 90) % (W + 40)) - 20
+        if (fx < right) {
+          c.beginPath()
+          c.arc(fx, waveY(fx) - 8 - (i % 3) * 5, 3 + (i % 2) * 2, 0, 7)
+          c.fill()
+        }
+      }
+      c.restore()
+      // The surfer rides the crest, tilting with it, and throws the horns.
+      const ride = seg(t, 0.3, 3.4)
+      if (ride > 0 && ride < 1) {
+        const sx = lerp(-60, W + 60, ride)
+        const slope = Math.atan2(waveY(sx + 6) - waveY(sx - 6), 12)
+        c.save()
+        c.globalAlpha = fade
+        c.translate(sx, waveY(sx) - 4)
+        c.rotate(slope * 0.8)
+        c.scale(0.62, 0.62)
+        surfer(c, t, seg(t, 1.2, 1.5))
+        c.restore()
+        if (t > 1.5 && t < 2.8)
+          text(
+            c,
+            '¡YEAH!',
+            sx + 40,
+            waveY(sx) - 150,
+            30,
+            '#ff6d00',
+            fade * (1 - seg(t, 2.5, 2.8)),
+            -0.15
+          )
+      }
+    }
+  }
+)
+
+// A rock hand: fist with the index and little fingers up. Fingers point up (-y).
+function hornHand(c) {
+  c.fillStyle = SKIN
+  c.strokeStyle = SKIN_DARK
+  c.lineWidth = 2.5
+  // Index and little finger up and apart, leaning outwards.
+  for (const [fx, tilt] of [
+    [-11, -0.18],
+    [11, 0.18]
+  ]) {
+    c.save()
+    c.translate(fx, -8)
+    c.rotate(tilt)
+    c.beginPath()
+    c.roundRect(-5, -32, 10, 32, 5)
+    c.fill()
+    c.stroke()
+    c.restore()
+  }
+  c.beginPath()
+  c.ellipse(0, -2, 16, 14, 0, 0, 7)
+  c.fill()
+  c.stroke()
+  // Folded middle fingers and the thumb across them.
+  c.beginPath()
+  c.moveTo(-5, -14)
+  c.lineTo(-5, -9)
+  c.moveTo(5, -14)
+  c.lineTo(5, -9)
+  c.stroke()
+  c.beginPath()
+  c.roundRect(-10, -6, 20, 8, 4)
+  c.fill()
+  c.stroke()
+}
+
+function surfer(c, t, rock) {
+  const SUIT = '#263238'
+  // Board
+  c.fillStyle = '#ff7043'
+  c.beginPath()
+  c.ellipse(0, 0, 78, 10, 0, 0, 7)
+  c.fill()
+  c.fillStyle = '#fff'
+  c.fillRect(-60, -2, 120, 4)
+  // Legs, knees a bit bent
+  c.strokeStyle = SUIT
+  c.lineCap = 'round'
+  c.lineWidth = 14
+  c.beginPath()
+  c.moveTo(-22, -6)
+  c.lineTo(-16, -34)
+  c.lineTo(-12, -60)
+  c.moveTo(20, -6)
+  c.lineTo(10, -34)
+  c.lineTo(10, -60)
+  c.stroke()
+  // Wetsuit torso with a stripe
+  c.fillStyle = SUIT
+  c.beginPath()
+  c.roundRect(-20, -122, 40, 68, 14)
+  c.fill()
+  c.fillStyle = '#26c6da'
+  c.fillRect(-20, -100, 40, 6)
+  // Left arm out for balance
+  arm(c, -18, -110, 1.9 + Math.sin(t * 5) * 0.15, 46, SUIT)
+  // Head (the kid's, cap backwards)
+  c.save()
+  c.translate(0, -160)
+  c.scale(0.5, 0.5)
+  kidHead(c, {
+    backwards: true,
+    cap: '#ff9800',
+    eyes: rock > 0.5 ? 'happy' : 'open',
+    mouth: rock > 0.5 ? 'laugh' : 'grin'
+  })
+  c.restore() // Right arm, drawn over the head: from down to raised to the side, with the horns.
+  const angle = lerp(-0.9, -2.35, ease(rock)) + Math.sin(t * 9) * 0.08 * rock
+  arm(c, 18, -110, angle, 50, SUIT, false)
+  c.save()
+  c.translate(18 - Math.sin(angle) * 58, -110 + Math.cos(angle) * 58)
+  c.rotate(angle + Math.PI)
+  c.scale(1.3, 1.3)
+  hornHand(c)
+  c.restore()
+}
+
+SOUNDS.burbuja = ({ tone }) => {
+  // A harp glissando as she appears, a bloop per bubble and soft pops.
+  ;[523, 587, 659, 784, 880, 1047, 1175, 1319].forEach((f, i) =>
+    tone(f, 0.05 + i * 0.06, 0.8, { type: 'triangle', gain: 0.06 })
+  )
+  for (let i = 0; i < 9; i++)
+    tone(260 + (i % 4) * 60, 0.8 + i * 0.22, 0.16, { to: 700, gain: 0.08 })
+  for (let i = 0; i < 9; i++) {
+    const end = 0.8 + i * 0.22 + 1.4 + (i % 3) * 0.4
+    if (end < 3.5) tone(1200, end, 0.05, { to: 400, type: 'triangle', gain: 0.12 })
+  }
+}
+SOUNDS.ovni = ({ tone }) => {
+  // Theremin-like wobble while it flies, a hum for the beam, the cow, and the zip away.
+  const o = tone(700, 0, 0.9, { gain: 0.08, to: 500, attack: 0.2 })
+  const lfo = o.context.createOscillator()
+  const depth = o.context.createGain()
+  lfo.frequency.value = 6
+  depth.gain.value = 40
+  lfo.connect(depth)
+  depth.connect(o.frequency)
+  lfo.start()
+  lfo.stop(o.context.currentTime + 1)
+  tone(110, 0.85, 1.9, { type: 'sawtooth', gain: 0.07, lp: 500, attack: 0.15 })
+  tone(150, 1.3, 0.8, { type: 'sawtooth', gain: 0.18, lp: 700, to: 105, attack: 0.08 })
+  tone(300, 2.9, 0.45, { to: 2400, gain: 0.1 })
+}
+SOUNDS.ola = ({ noise, tone }) => {
+  noise(0, 3.5, { type: 'lowpass', from: 500, to: 1400, gain: 0.35, attack: 1.2 })
+  noise(0.6, 2.6, { from: 2500, q: 0.7, gain: 0.08, attack: 1 })
+  tone(90, 0.2, 3.2, { gain: 0.08, attack: 1.2 })
+  // Surf guitar twang when the horns go up.
+  ;[
+    [196, 1.25],
+    [262, 1.4],
+    [294, 1.55],
+    [392, 1.7]
+  ].forEach(([f, s]) => tone(f, s, 0.35, { type: 'sawtooth', gain: 0.07, lp: 1800, to: f * 0.97 }))
+}
+
+function ufo(c, t) {
+  // Glass dome with a little green pilot
+  c.fillStyle = 'rgb(170 230 255 / 0.75)'
+  c.beginPath()
+  c.ellipse(0, -10, 30, 26, 0, Math.PI, 0)
+  c.fill()
+  c.fillStyle = '#7ee05a'
+  c.beginPath()
+  c.arc(0, -14, 10, 0, 7)
+  c.fill()
+  c.fillStyle = INK
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.ellipse(s * 4, -15, 2.4, 3.6, 0, 0, 7)
+    c.fill()
+  }
+  // Saucer
+  const g = c.createLinearGradient(0, -12, 0, 16)
+  g.addColorStop(0, '#eef2f7')
+  g.addColorStop(1, '#7d8a99')
+  c.fillStyle = g
+  c.beginPath()
+  c.ellipse(0, 2, 70, 16, 0, 0, 7)
+  c.fill()
+  c.strokeStyle = '#5b6675'
+  c.lineWidth = 2
+  c.stroke()
+  // Blinking lights around the rim
+  for (let i = 0; i < 7; i++) {
+    const on = Math.floor(t * 8 + i) % 3 === 0
+    c.fillStyle = on ? '#ffeb3b' : '#c9a227'
+    c.beginPath()
+    c.arc(-54 + i * 18, 6, on ? 4.5 : 3.5, 0, 7)
+    c.fill()
+  }
+}
+
+function cow(c, t, lift) {
+  const kick = Math.sin(t * 14) * 0.5 * lift
+  // Legs (kicking once lifted)
+  c.strokeStyle = '#f5f5f5'
+  c.lineCap = 'round'
+  c.lineWidth = 9
+  for (const [x, k] of [
+    [-34, kick],
+    [-18, -kick],
+    [18, kick],
+    [34, -kick]
+  ]) {
+    c.beginPath()
+    c.moveTo(x, 10)
+    c.lineTo(x + Math.sin(k) * 14, 38)
+    c.stroke()
+  }
+  c.fillStyle = '#424242'
+  for (const [x, k] of [
+    [-34, kick],
+    [-18, -kick],
+    [18, kick],
+    [34, -kick]
+  ]) {
+    c.beginPath()
+    c.arc(x + Math.sin(k) * 14, 40, 5, 0, 7)
+    c.fill()
+  }
+  // Body with spots
+  c.fillStyle = '#fafafa'
+  c.beginPath()
+  c.ellipse(0, 0, 48, 26, 0, 0, 7)
+  c.fill()
+  c.strokeStyle = '#bdbdbd'
+  c.lineWidth = 2
+  c.stroke()
+  c.fillStyle = '#212121'
+  for (const [x, y, rx, ry] of [
+    [-18, -8, 12, 9],
+    [14, 6, 10, 8],
+    [30, -10, 7, 6]
+  ]) {
+    c.beginPath()
+    c.ellipse(x, y, rx, ry, 0.3, 0, 7)
+    c.fill()
+  }
+  // Tail
+  c.strokeStyle = '#424242'
+  c.lineWidth = 3
+  c.beginPath()
+  c.moveTo(47, -4)
+  c.quadraticCurveTo(62, 4 + Math.sin(t * 6) * 6, 58, 20)
+  c.stroke()
+  // Head
+  c.save()
+  c.translate(-54, -14)
+  c.fillStyle = '#fafafa'
+  c.beginPath()
+  c.ellipse(0, 0, 20, 17, 0, 0, 7)
+  c.fill()
+  c.strokeStyle = '#bdbdbd'
+  c.lineWidth = 2
+  c.stroke()
+  c.fillStyle = '#ffb3c1'
+  c.beginPath()
+  c.ellipse(-6, 9, 13, 9, 0, 0, 7)
+  c.fill()
+  c.fillStyle = '#c2577a'
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.arc(-6 + s * 5, 9, 2, 0, 7)
+    c.fill()
+  }
+  c.fillStyle = '#e0c068'
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.moveTo(s * 8, -14)
+    c.lineTo(s * 14, -26)
+    c.lineTo(s * 4, -16)
+    c.fill()
+  }
+  // Eyes: calm while grazing, wide open once lifted
+  c.fillStyle = INK
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.arc(s * 7, -3, lift > 0.05 ? 4 : 2.5, 0, 7)
+    c.fill()
+  }
+  c.restore()
+}
+
+function bubble(c, x, y, r, t, alpha = 1) {
+  c.save()
+  c.globalAlpha = alpha
+  c.translate(x, y)
+  const g = c.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r)
+  g.addColorStop(0, 'rgb(255 255 255 / 0.15)')
+  g.addColorStop(0.7, 'rgb(255 170 230 / 0.25)')
+  g.addColorStop(0.88, 'rgb(150 210 255 / 0.55)')
+  g.addColorStop(1, 'rgb(255 120 200 / 0.8)')
+  c.fillStyle = g
+  c.beginPath()
+  c.arc(0, 0, r, 0, 7)
+  c.fill()
+  c.lineWidth = Math.max(1.5, r / 14)
+  c.strokeStyle = `hsl(${(t * 140 + x) % 360} 90% 70% / 0.9)`
+  c.stroke()
+  c.fillStyle = 'rgb(255 255 255 / 0.85)'
+  c.beginPath()
+  c.ellipse(-r * 0.35, -r * 0.4, r * 0.22, r * 0.12, -0.7, 0, 7)
+  c.fill()
+  c.restore()
+}
+
+// Sitting on a rock, tail curled to the side, blowing through a bubble wand. `blowing`
+// 0..1 is the stretch of time she's blowing (cheeks puffing in pulses).
+function mermaid(c, t, blowing) {
+  const sway = Math.sin(t * 2.2) * 0.05
+  // Rock
+  c.fillStyle = '#8d8f99'
+  c.beginPath()
+  c.ellipse(0, 18, 86, 30, 0, Math.PI, 0)
+  c.lineTo(86, 26)
+  c.lineTo(-86, 26)
+  c.fill()
+  c.fillStyle = 'rgb(255 255 255 / 0.18)'
+  c.beginPath()
+  c.ellipse(-26, 0, 30, 9, -0.2, 0, 7)
+  c.fill()
+  c.rotate(sway)
+  // Tail: curls down the rock to a fin that flaps.
+  c.fillStyle = '#1fb5a8'
+  c.beginPath()
+  c.moveTo(-24, -40)
+  c.quadraticCurveTo(-36, 10, 10, 6)
+  c.quadraticCurveTo(58, 2, 78, 14)
+  c.lineTo(70, 28)
+  c.quadraticCurveTo(40, 22, 6, 26)
+  c.quadraticCurveTo(-52, 30, -40, -40)
+  c.fill()
+  c.strokeStyle = 'rgb(255 255 255 / 0.35)'
+  c.lineWidth = 2
+  for (let i = 0; i < 6; i++) {
+    c.beginPath()
+    c.arc(-30 + i * 16, 10 + (i % 2) * 6, 6, 0.2, Math.PI - 0.2)
+    c.stroke()
+  }
+  c.save()
+  c.translate(80, 18)
+  c.rotate(Math.sin(t * 5) * 0.35)
+  c.fillStyle = '#4dd0c4'
+  c.beginPath()
+  c.moveTo(0, 0)
+  c.quadraticCurveTo(26, -26, 34, -6)
+  c.quadraticCurveTo(22, 0, 34, 8)
+  c.quadraticCurveTo(26, 26, 0, 0)
+  c.fill()
+  c.restore()
+  // Long wavy hair behind the body
+  c.fillStyle = '#e8473f'
+  c.beginPath()
+  c.moveTo(-40, -150)
+  for (let y = -150; y <= -40; y += 10) c.lineTo(-44 + Math.sin(y / 14 + t * 3) * 7, y)
+  for (let y = -40; y >= -150; y -= 10) c.lineTo(36 + Math.sin(y / 14 + t * 3 + 1) * 7, y)
+  c.fill()
+  // Torso with a shell top
+  c.fillStyle = SKIN
+  c.beginPath()
+  c.roundRect(-22, -112, 44, 76, 16)
+  c.fill()
+  c.fillStyle = '#9c6ade'
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.arc(s * 10, -86, 11, Math.PI, 0)
+    c.fill()
+  }
+  // Arm holding the wand up to her mouth
+  c.strokeStyle = SKIN
+  c.lineCap = 'round'
+  c.lineWidth = 12
+  c.beginPath()
+  c.moveTo(18, -100)
+  c.quadraticCurveTo(44, -90, 52, -118)
+  c.stroke()
+  c.strokeStyle = '#ffca28'
+  c.lineWidth = 4
+  c.beginPath()
+  c.moveTo(52, -118)
+  c.lineTo(60, -126)
+  c.stroke()
+  c.beginPath()
+  c.arc(62, -128, 9, 0, 7)
+  c.stroke()
+  // Head
+  c.save()
+  c.translate(0, -146)
+  c.fillStyle = SKIN
+  c.beginPath()
+  c.arc(0, 0, 30, 0, 7)
+  c.fill()
+  c.strokeStyle = SKIN_DARK
+  c.lineWidth = 2
+  c.stroke()
+  // Bangs and a starfish clip
+  c.fillStyle = '#e8473f'
+  c.beginPath()
+  c.arc(0, -6, 31, Math.PI * 1.05, Math.PI * 1.95)
+  c.quadraticCurveTo(10, -16, -2, -10)
+  c.quadraticCurveTo(-14, -14, -30, -12)
+  c.fill()
+  c.fillStyle = '#ffb74d'
+  c.beginPath()
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 4 : 9
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2
+    c.lineTo(-20 + Math.cos(a) * r, -24 + Math.sin(a) * r)
+  }
+  c.fill()
+  // Eyes with lashes, closed while she blows
+  const blowingNow = blowing > 0 && blowing < 1
+  const puff = blowingNow ? (Math.sin(t * 6) + 1) / 2 : 0
+  c.strokeStyle = INK
+  c.fillStyle = INK
+  c.lineWidth = 2.5
+  for (const s of [-1, 1]) {
+    if (blowingNow) {
+      c.beginPath()
+      c.arc(s * 11, 0, 5, Math.PI * 0.1, Math.PI * 0.9)
+      c.stroke()
+    } else {
+      c.beginPath()
+      c.ellipse(s * 11, 0, 3.5, 5, 0, 0, 7)
+      c.fill()
+    }
+    // A lash at the outer corner of each eye
+    c.beginPath()
+    c.moveTo(s * 15, 1)
+    c.lineTo(s * 20, -1)
+    c.stroke()
+  }
+  c.fillStyle = `rgb(255 120 140 / ${0.4 + puff * 0.4})`
+  for (const s of [-1, 1]) {
+    c.beginPath()
+    c.ellipse(s * 17, 10, 6 + puff * 3, 4 + puff * 2, 0, 0, 7)
+    c.fill()
+  }
+  // Mouth: a little "o" while blowing, a smile otherwise
+  c.fillStyle = '#c2185b'
+  c.strokeStyle = '#c2185b'
+  if (blowingNow) {
+    c.beginPath()
+    c.ellipse(6, 14, 4, 5, 0, 0, 7)
+    c.fill()
+  } else {
+    c.beginPath()
+    c.arc(0, 8, 10, Math.PI * 0.2, Math.PI * 0.8)
+    c.stroke()
+  }
+  c.restore()
+}

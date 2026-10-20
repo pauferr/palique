@@ -7,8 +7,9 @@ export const winks: Record<string, string> = Object.fromEntries(
 
 const labels: Record<string, string> = {
   burbuja: 'Burbuja',
-  rebote: 'Rebote',
   ola: 'Ola',
+  ovni: 'Ovni',
+  rebote: 'Rebote', // retired; kept so old conversations still name it
   globo: 'Globo de agua',
   cerdo: 'Cerdo bailón',
   burla: 'Crío burlón',

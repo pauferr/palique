@@ -146,7 +146,7 @@ Each wink is `src/renderer/src/assets/winks/<id>.webm` (VP9 with alpha + Opus), 
 - `scripts/winks/preview.html`: open it in a browser to watch them (no sound).
 - `node scripts/winks/record.ts [id ...]`: records them with headless Chrome (`MediaRecorder`), no ffmpeg needed. All of them without ids. `CHROME=/path/to/chrome` outside macOS.
 
-The first three (burbuja, rebote, ola) are older placeholders made elsewhere.
+A retired id keeps its label in `winks.ts`, so old conversations still name it.
 
 ## Checks
 
