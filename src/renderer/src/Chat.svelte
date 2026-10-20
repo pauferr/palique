@@ -6,6 +6,7 @@
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { EMOTICONS, emojify } from './emoticons'
+  import { prefs } from './prefs.svelte'
   import { winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
@@ -24,7 +25,7 @@
   // Their display name can change while the window is open.
   const name = $derived(contact?.name ?? '')
   $effect(() => {
-    if (name) document.title = emojify(name)
+    if (name) document.title = prefs.emoticons ? emojify(name) : name
   })
   let draft = $state('')
   let shaking = $state(false)
@@ -44,6 +45,7 @@
   let lastChime = 0
 
   function play(src: string): void {
+    if (!prefs.sounds) return
     if (src === messageSound) {
       if (Date.now() - lastChime < CHIME_GAP) return
       lastChime = Date.now()
@@ -62,10 +64,10 @@
     messages.push(message)
     if (!message.mine) theyType = false
     if (alert && !message.mine) {
-      if (message.buzz) shake()
+      if (message.buzz && prefs.shake) shake()
       if (message.wink) {
         // The full-screen wink brings its own sound; with winks off, a plain chime.
-        window.api.getSettings().then((s) => s.winks || play(messageSound))
+        if (!prefs.winks) play(messageSound)
       } else {
         play(message.buzz ? buzzSound : messageSound)
       }
@@ -210,7 +212,11 @@
         {:else if message.wink}
           <em
             >{#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} /> te ha enviado el guiño{/if}
-            «{winkLabel(message.wink)}»</em
+            <button
+              class="replay"
+              onclick={() => window.api.replayWink(message.wink!)}
+              title="Volver a ver el guiño">«{winkLabel(message.wink)}» ▶</button
+            ></em
           >
         {:else}
           <span class="meta"
@@ -224,7 +230,7 @@
   </ol>
 
   <p class="typing" aria-live="polite">
-    {#if theyType}<Emoticons text={name} /> está escribiendo…{/if}
+    {#if theyType && prefs.typing}<Emoticons text={name} /> está escribiendo…{/if}
   </p>
 
   <div class="compose">
@@ -448,6 +454,22 @@
     background: var(--list-bg);
     border: 1px solid var(--line);
     box-shadow: var(--popup-shadow);
+  }
+
+  /* The wink's name in the conversation: looks like text, plays it again. */
+  .replay {
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline dotted;
+  }
+
+  .replay:hover:not(:disabled) {
+    background: none;
+    text-decoration: underline;
   }
 
   .winks {

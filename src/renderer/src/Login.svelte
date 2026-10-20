@@ -30,6 +30,9 @@
   let info = $state('')
   let busy = $state(false)
   let version = $state('')
+  // "Iniciar sesión automáticamente", like MSN. Only offered with system encryption.
+  let remember = $state(false)
+  let canRemember = $state(false)
 
   const address = (): string => email.trim().toLowerCase()
   // The invite code can be pasted bare or as the whole link (palique://registro?t=CODE).
@@ -67,7 +70,18 @@
   onMount(() => {
     window.api.lastEmail().then((value) => (email ||= value))
     window.api.version().then((value) => (version = value))
-    window.api.pendingLink().then(useLink)
+    window.api.getSettings().then((s) => (remember = s.autoLogin))
+    window.api.remembered().then((r) => (canRemember = r.available))
+    // A link from an email comes first; otherwise sign in by itself if asked to.
+    window.api.pendingLink().then(async (link) => {
+      if (link) return useLink(link)
+      busy = true
+      const result = await window.api.autoLogin()
+      busy = false
+      if (!result) return
+      if ('jid' in result) onlogin(result.jid)
+      else error = messages[result.error]
+    })
     return window.api.onLink(useLink)
   })
 
@@ -103,7 +117,7 @@
         ? await window.api.register({ token: inviteCode(), nick, password, newsletter })
         : mode === 'reset'
           ? await window.api.resetPassword(address(), code.trim(), password)
-          : await window.api.login(address(), password)
+          : await window.api.login(address(), password, remember && canRemember)
     busy = false
     if ('jid' in result) onlogin(result.jid)
     else if (mode === 'reset' && result.error === 'invalid-invite') {
@@ -191,6 +205,13 @@
       <label>
         Repite la contraseña
         <input type="password" bind:value={confirm} autocomplete="new-password" required />
+      </label>
+    {/if}
+
+    {#if mode === 'login' && canRemember}
+      <label class="check">
+        <input type="checkbox" bind:checked={remember} />
+        Iniciar sesión automáticamente
       </label>
     {/if}
 

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { ExportFormat, ExportResult } from '../main/export'
+import type { ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
 import type {
   AuthError,
@@ -15,8 +15,15 @@ import type {
 
 // Custom APIs for renderer
 const api = {
-  login: (email: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:login', email, password),
+  // `remember`: sign in by itself next time (keeps the password, encrypted).
+  login: (email: string, password: string, remember: boolean): Promise<AuthResult> =>
+    ipcRenderer.invoke('auth:login', email, password, remember),
+  // Signs in by itself if "Iniciar sesión automáticamente" is on (once per launch).
+  autoLogin: (): Promise<AuthResult | null> => ipcRenderer.invoke('auth:auto'),
+  remembered: (): Promise<{ available: boolean; saved: boolean }> =>
+    ipcRenderer.invoke('auth:remembered'),
+  // Opening at startup isn't available on Linux.
+  platform: process.platform,
   inviteEmail: (
     token: string
   ): Promise<{ ok: true; email: string } | { ok: false; error: AuthError }> =>
@@ -75,6 +82,20 @@ const api = {
   openChat: (contact: string): Promise<void> => ipcRenderer.invoke('chat:open', contact),
   // Tell the main process this chat window is listening for live messages.
   chatReady: (contact: string): void => ipcRenderer.send('chat:ready', contact),
+  // Unread messages per contact (bare JID → count), for the contact list.
+  getUnread: (): Promise<Record<string, number>> => ipcRenderer.invoke('chat:unread'),
+  onUnread: (callback: (unread: Record<string, number>) => void): (() => void) => {
+    const listener = (_: unknown, unread: Record<string, number>): void => callback(unread)
+    ipcRenderer.on('chat:unread', listener)
+    return () => ipcRenderer.off('chat:unread', listener)
+  },
+  // A message arrived for a conversation that isn't open (the list plays the sound).
+  onIncoming: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('chat:incoming', listener)
+    return () => ipcRenderer.off('chat:incoming', listener)
+  },
+  replayWink: (wink: string): void => ipcRenderer.send('chat:replay-wink', wink),
   getChatHistory: (contact: string): Promise<ChatMessage[]> =>
     ipcRenderer.invoke('chat:history', contact),
   onChatMessage: (callback: (message: ChatMessage, quiet: boolean) => void): (() => void) => {
@@ -96,8 +117,8 @@ const api = {
     return () => ipcRenderer.off('chat:typing', listener)
   },
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
-  exportHistory: (format: ExportFormat): Promise<ExportResult> =>
-    ipcRenderer.invoke('history:export', format),
+  // The format is chosen in the save dialog.
+  exportHistory: (): Promise<ExportResult> => ipcRenderer.invoke('history:export'),
   sendWink: (contact: string, wink: string): Promise<number> =>
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),

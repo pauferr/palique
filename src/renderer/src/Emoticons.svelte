@@ -1,8 +1,10 @@
 <script lang="ts">
   import { parseEmoticons } from './emoticons'
+  import { prefs } from './prefs.svelte'
 
   let { text }: { text: string } = $props()
-  const parts = $derived(parseEmoticons(text))
+  // With emoticons off in Options, the codes stay as typed.
+  const parts = $derived(prefs.emoticons ? parseEmoticons(text) : [{ text }])
 </script>
 
 {#each parts as part, i (i)}{#if 'emoji' in part}<span

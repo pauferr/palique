@@ -61,11 +61,13 @@ export type Contact = {
 
 export type Snapshot = {
   connected: boolean
+  jid: string // our own bare JID
   contacts: Contact[]
   requests: { jid: string; name: string }[] // people asking to add us
   name: string // our own display name
   avatar: string // our own avatar, data: URL or ''
   show: OwnShow // our own status
+  status: string // our own personal message
 }
 
 export type ChatMessage = {
@@ -116,11 +118,13 @@ export function snapshot(): Snapshot {
   })
   return {
     connected: xmpp?.status === 'online',
+    jid: me,
     contacts,
     requests: [...requests].map((jid) => ({ jid, name: nameOf(jid) })),
     name: nameOf(me),
     avatar: avatars.get(me)?.url ?? '',
-    show: own.show
+    show: own.show,
+    status: own.status
   }
 }
 
@@ -607,6 +611,7 @@ export function sendTyping(to: string, typing: boolean): Promise<void> {
 
 // Used to mute notifications while busy.
 export const ownShow = (): OwnShow => own.show
+export const ownStatus = (): string => own.status
 
 // Publish a PNG as our avatar, then re-send presence so the server tells our contacts
 // the new hash right away.

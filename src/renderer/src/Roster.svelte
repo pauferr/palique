@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
+  import messageSound from './assets/sounds/message.ogg'
   import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { emojify } from './emoticons'
+  import { avatarPng } from './picture'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -17,11 +19,13 @@
 
   let roster: Snapshot = $state({
     connected: true,
+    jid: '',
     contacts: [],
     requests: [],
     name: '',
     avatar: '',
-    show: 'online'
+    show: 'online',
+    status: ''
   })
   let picker: HTMLInputElement
   let avatarError = $state('')
@@ -43,29 +47,68 @@
     { label: 'Desconectados', contacts: sorted.filter((c) => c.show === 'offline') }
   ])
 
+  // Messages waiting in conversations that aren't open (contact → count), like MSN.
+  let unread: Record<string, number> = $state({})
+
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
+    window.api.getUnread().then((value) => (unread = value))
     const offRoster = window.api.onRoster((value) => (roster = value))
+    const offUnread = window.api.onUnread((value) => (unread = value))
+    const offIncoming = window.api.onIncoming(() => {
+      new Audio(messageSound).play().catch(() => {})
+    })
     const offOnline = window.api.onContactOnline(() => {
       new Audio(onlineSound).play().catch(() => {})
     })
     return () => {
       offRoster()
+      offUnread()
+      offIncoming()
       offOnline()
     }
   })
 
-  let statusSelect: HTMLSelectElement
+  // The personal message follows the snapshot (Options can change it too), except while
+  // it's being edited here.
+  $effect(() => {
+    if (editing !== 'personal') status = roster.status
+  })
 
-  // The select shows the real status from the snapshot; if the change fails, put it back.
   async function updatePresence(show: OwnShow): Promise<void> {
     presenceError = ''
+    menu = ''
     try {
       await window.api.setPresence(show, status)
     } catch {
       presenceError = 'No se ha podido cambiar el estado.'
-      statusSelect.value = roster.show
     }
+  }
+
+  // Menus like MSN's: the bar on top (Contactos, Herramientas, Ayuda) and the one under
+  // your name (status, Opciones, Cerrar sesión). A click elsewhere or Escape closes them.
+  let menu: '' | 'contacts' | 'tools' | 'help' | 'me' = $state('')
+  const ownLabels: Record<OwnShow, string> = { ...labels, invisible: 'Invisible' }
+
+  function toggleMenu(name: typeof menu): void {
+    menu = menu === name ? '' : name
+  }
+
+  function closeMenus(event: MouseEvent): void {
+    if (!(event.target as Element).closest('.menu, [aria-haspopup]')) menu = ''
+  }
+
+  function exportHistory(): void {
+    menu = ''
+    window.api.exportHistory()
+  }
+
+  let aboutOpen = $state(false)
+  let version = $state('')
+  async function about(): Promise<void> {
+    menu = ''
+    version = await window.api.version()
+    aboutOpen = true
   }
 
   // Our display name, edited in place like the personal message. Empty puts it back.
@@ -83,41 +126,34 @@
     }
   }
 
-  // Center-crop the chosen picture to a 96×96 PNG before publishing it.
   async function chooseAvatar(): Promise<void> {
     const file = picker.files?.[0]
     picker.value = ''
     if (!file) return
     avatarError = ''
     try {
-      const image = await createImageBitmap(file)
-      const side = Math.min(image.width, image.height)
-      const canvas = new OffscreenCanvas(96, 96)
-      canvas
-        .getContext('2d')!
-        .drawImage(
-          image,
-          (image.width - side) / 2,
-          (image.height - side) / 2,
-          side,
-          side,
-          0,
-          0,
-          96,
-          96
-        )
-      const png = await canvas.convertToBlob({ type: 'image/png' })
-      await window.api.setAvatar(new Uint8Array(await png.arrayBuffer()))
+      await window.api.setAvatar(await avatarPng(file))
     } catch {
       avatarError = 'No se ha podido usar esa imagen.'
     }
   }
 
-  // Adding someone is by email. If they're not on Palique, inviting them is a separate,
-  // explicit step (invites are limited).
+  // Adding and inviting are one step: type their email; if they're not on Palique, the
+  // panel offers to invite them (invites are limited, so that's an explicit click).
+  let addOpen = $state(false)
   let address = $state('')
   let addNote = $state('')
   let notFound = $state('') // address with no account, offered an invite
+  let invites: InviteStatus | undefined = $state()
+  const left = $derived(invites ? Math.max(0, invites.max - invites.used) : 0)
+
+  async function openAdd(): Promise<void> {
+    menu = ''
+    addOpen = true
+    addNote = ''
+    notFound = ''
+    invites = await window.api.inviteStatus().catch(() => undefined)
+  }
 
   async function add(event: SubmitEvent): Promise<void> {
     event.preventDefault()
@@ -127,7 +163,7 @@
     try {
       const result = await window.api.addContact(value)
       if (result === 'added') {
-        addNote = 'Solicitud enviada. Aparecerá en tu lista cuando te acepte.'
+        addNote = `Le hemos pedido a ${value} que te acepte. Aparecerá en tu lista cuando lo haga.`
         address = ''
       } else if (result === 'self') addNote = 'Ese es tu propio correo.'
       else notFound = value
@@ -140,32 +176,14 @@
     }
   }
 
-  // Invites: email only, a few per person.
-  let invitesOpen = $state(false)
-  let invites: InviteStatus | undefined = $state()
-  let inviteEmail = $state('')
-  let inviteNote = $state('')
-  const left = $derived(invites ? Math.max(0, invites.max - invites.used) : 0)
-
-  async function toggleInvites(): Promise<void> {
-    invitesOpen = !invitesOpen
-    inviteNote = ''
-    if (invitesOpen) invites = await window.api.inviteStatus()
-  }
-
   async function sendInvite(value: string): Promise<void> {
-    inviteNote = ''
-    invites ??= await window.api.inviteStatus().catch(() => undefined)
-    const count = left === 1 ? 'Te queda 1 invitación' : `Te quedan ${left} invitaciones`
-    if (!confirm(`¿Enviar una invitación a Palique a ${value}? ${count}.`)) return
     try {
       invites = await window.api.inviteByEmail(value)
-      inviteNote = `Invitación enviada a ${value}. Cuando cree su cuenta, estaréis en vuestras listas.`
-      inviteEmail = ''
-      if (notFound === value) notFound = ''
+      addNote = `Invitación enviada a ${value}. Cuando cree su cuenta, aparecerá directamente en tu lista.`
+      address = ''
     } catch (e) {
       const reason = String(e)
-      inviteNote = reason.includes('limit')
+      addNote = reason.includes('limit')
         ? 'Ya no te quedan invitaciones.'
         : reason.includes('registered')
           ? 'Esa persona ya está en Palique: añádela con su correo.'
@@ -173,15 +191,7 @@
             ? 'Esa dirección no parece válida.'
             : 'No se ha podido enviar la invitación.'
     }
-    if (notFound === value) {
-      addNote = inviteNote
-      notFound = ''
-    }
-  }
-
-  function emailInvite(event: SubmitEvent): void {
-    event.preventDefault()
-    sendInvite(inviteEmail.trim().toLowerCase())
+    notFound = ''
   }
 
   function remove(contact: Contact): void {
@@ -191,7 +201,57 @@
   }
 </script>
 
+<svelte:window
+  onclick={closeMenus}
+  onkeydown={(e) => {
+    if (e.key === 'Escape') menu = ''
+  }}
+/>
+
 <section class="roster">
+  <div class="menubar" role="menubar">
+    <button
+      role="menuitem"
+      aria-haspopup="menu"
+      aria-expanded={menu === 'contacts'}
+      onclick={() => toggleMenu('contacts')}>Contactos</button
+    >
+    <button
+      role="menuitem"
+      aria-haspopup="menu"
+      aria-expanded={menu === 'tools'}
+      onclick={() => toggleMenu('tools')}>Herramientas</button
+    >
+    <button
+      role="menuitem"
+      aria-haspopup="menu"
+      aria-expanded={menu === 'help'}
+      onclick={() => toggleMenu('help')}>Ayuda</button
+    >
+    {#if menu === 'contacts'}
+      <div class="menu" role="menu" style:left="4px">
+        <button role="menuitem" onclick={openAdd}>Añadir o invitar a un contacto…</button>
+      </div>
+    {:else if menu === 'tools'}
+      <div class="menu" role="menu" style:left="80px">
+        <button
+          role="menuitem"
+          onclick={() => {
+            menu = ''
+            window.api.openOptions()
+          }}>Opciones…</button
+        >
+        <button role="menuitem" onclick={exportHistory}
+          >Guardar una copia de las conversaciones…</button
+        >
+      </div>
+    {:else if menu === 'help'}
+      <div class="menu" role="menu" style:left="180px">
+        <button role="menuitem" onclick={about}>Acerca de Palique</button>
+      </div>
+    {/if}
+  </div>
+
   <header>
     <button class="me" onclick={() => picker.click()} title="Cambiar tu imagen">
       <Avatar
@@ -227,17 +287,33 @@
             ><Emoticons text={roster.name} /></button
           >
         {/if}
-        <select
-          bind:this={statusSelect}
-          value={roster.show}
-          onchange={(e) => updatePresence(e.currentTarget.value as OwnShow)}
-          aria-label="Estado"
+        <button
+          class="show"
+          aria-haspopup="menu"
+          aria-expanded={menu === 'me'}
+          onclick={() => toggleMenu('me')}>({ownLabels[roster.show]}) ▾</button
         >
-          <option value="online">(Conectado)</option>
-          <option value="away">(Ausente)</option>
-          <option value="dnd">(Ocupado)</option>
-          <option value="invisible">(Invisible)</option>
-        </select>
+        {#if menu === 'me'}
+          <div class="menu me-menu" role="menu">
+            {#each ['online', 'away', 'dnd', 'invisible'] as const as show (show)}
+              <button
+                role="menuitemradio"
+                aria-checked={roster.show === show}
+                onclick={() => updatePresence(show)}
+                ><span class="dot {show}"></span>{ownLabels[show]}</button
+              >
+            {/each}
+            <hr />
+            <button
+              role="menuitem"
+              onclick={() => {
+                menu = ''
+                window.api.openOptions()
+              }}>Opciones…</button
+            >
+            <button role="menuitem" onclick={onlogout}>Cerrar sesión</button>
+          </div>
+        {/if}
       </div>
       {#if editing === 'personal'}
         <input
@@ -287,96 +363,104 @@
           <summary>{group.label} ({group.contacts.length})</summary>
           <ul>
             {#each group.contacts as contact (contact.jid)}
-              <li>
-                <span title={labels[contact.show]}>
-                  <Avatar
-                    jid={contact.jid}
-                    name={contact.name}
-                    url={contact.avatar}
-                    show={contact.show}
-                    size={28}
-                  />
-                </span>
-                <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                  <Emoticons text={contact.name} />
-                  {#if contact.pending}
-                    <small>- Esperando a que te acepte</small>
-                  {:else if contact.status}
-                    <small>- <Emoticons text={contact.status} /></small>
+              <!-- Recreated on each new message, so the row blinks again. -->
+              {#key unread[contact.jid]}
+                <li class:unread={unread[contact.jid]}>
+                  <span title={labels[contact.show]}>
+                    <Avatar
+                      jid={contact.jid}
+                      name={contact.name}
+                      url={contact.avatar}
+                      show={contact.show}
+                      size={28}
+                    />
+                  </span>
+                  <button class="name" onclick={() => window.api.openChat(contact.jid)}>
+                    <Emoticons text={contact.name} />
+                    {#if contact.pending}
+                      <small>- Esperando a que te acepte</small>
+                    {:else if contact.status}
+                      <small>- <Emoticons text={contact.status} /></small>
+                    {/if}
+                  </button>
+                  {#if unread[contact.jid]}
+                    <span class="badge" title="Mensajes sin leer"
+                      >{unread[contact.jid] > 9 ? '9+' : unread[contact.jid]}</span
+                    >
                   {/if}
-                </button>
-                <button
-                  class="remove"
-                  onclick={() => remove(contact)}
-                  title="Eliminar contacto"
-                  aria-label="Eliminar a {emojify(contact.name)}">×</button
-                >
-              </li>
+                  <button
+                    class="remove"
+                    onclick={() => remove(contact)}
+                    title="Eliminar contacto"
+                    aria-label="Eliminar a {emojify(contact.name)}">×</button
+                  >
+                </li>
+              {/key}
             {/each}
           </ul>
         </details>
       {/each}
     {:else}
-      <p class="empty">Aún no tienes contactos. Añade a alguien con su correo o invítale.</p>
+      <div class="no-contacts">
+        <p>
+          Aún no tienes contactos.<br />Añade a alguien con su correo; si no está en Palique, podrás
+          invitarle.
+        </p>
+        <button class="add-link" onclick={openAdd}><b>+</b><span>Añadir un contacto</span></button>
+      </div>
     {/if}
   </div>
 
-  {#if addNote || notFound}
-    <p class="notice" role="status">
-      {#if notFound}
-        No hay nadie en Palique con {notFound}.
-        <button class="link" onclick={() => sendInvite(notFound)}>Enviar invitación</button>
-      {:else}
-        {addNote}
-      {/if}
-    </p>
-  {/if}
-  <form onsubmit={add}>
-    <input
-      type="email"
-      spellcheck="false"
-      bind:value={address}
-      required
-      maxlength="254"
-      placeholder="Correo del contacto"
-      aria-label="Correo del contacto"
-    />
-    <button type="submit">+ Añadir</button>
-  </form>
-
-  {#if invitesOpen}
-    <div class="invites">
-      <p>
-        Para crear una cuenta en Palique hace falta una invitación. Quien entre con la tuya
-        aparecerá directamente en tus contactos.
-      </p>
-      <form class="send" onsubmit={emailInvite}>
+  {#if addOpen}
+    <div class="sheet" role="dialog" aria-label="Añadir un contacto">
+      <h3>
+        Añadir un contacto
+        <button class="close" onclick={() => (addOpen = false)} aria-label="Cerrar">×</button>
+      </h3>
+      <p class="hint">Escribe su correo. Si aún no está en Palique, podrás invitarle.</p>
+      <form onsubmit={add}>
+        <!-- svelte-ignore a11y_autofocus -->
         <input
           type="email"
           spellcheck="false"
-          bind:value={inviteEmail}
+          bind:value={address}
           required
           maxlength="254"
           placeholder="Su correo"
-          aria-label="Correo de la persona invitada"
+          aria-label="Correo del contacto"
+          autofocus
         />
-        <button type="submit" disabled={!left}>Invitar</button>
+        <button type="submit">Añadir</button>
       </form>
-      {#if inviteNote}<p class="hint" role="status">{inviteNote}</p>{/if}
-      {#if invites}
-        <p class="hint">
-          {left === 1 ? 'Te queda 1 invitación' : `Te quedan ${left} invitaciones`} de {invites.max}.
-          Las que caducan sin usarse vuelven a contar.
-        </p>
+      {#if notFound}
+        <div class="result" role="status">
+          <p><strong>{notFound}</strong> aún no está en Palique.</p>
+          <div class="row">
+            <button onclick={() => sendInvite(notFound)} disabled={!left}
+              >Enviarle una invitación</button
+            >
+            <span class="hint">
+              {left === 1 ? 'Te queda 1' : `Te quedan ${left}`}{invites
+                ? ` de ${invites.max}`
+                : ''}.
+            </span>
+          </div>
+        </div>
+      {:else if addNote}
+        <p class="result" role="status">{addNote}</p>
       {/if}
     </div>
   {/if}
 
-  <footer>
-    <button onclick={toggleInvites} aria-expanded={invitesOpen}>Invitar</button>
-    <button onclick={() => window.api.openOptions()}>Opciones</button>
-    <button onclick={onlogout}>Cerrar sesión</button>
-  </footer>
+  {#if aboutOpen}
+    <div class="sheet" role="dialog" aria-label="Acerca de Palique">
+      <h3>
+        Palique {version}
+        <button class="close" onclick={() => (aboutOpen = false)} aria-label="Cerrar">×</button>
+      </h3>
+      <p>¿Echamos un palique? Un mensajero como los de antes.</p>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -411,6 +495,7 @@
   }
 
   .line {
+    position: relative;
     display: flex;
     gap: 4px;
     align-items: center;
@@ -432,14 +517,20 @@
     font-weight: bold;
   }
 
-  /* Status reads like text next to the name, MSN style. */
-  .line select {
-    padding: 0;
-    border: none;
+  /* Status reads like text next to the name and opens your menu, MSN style. */
+  .show {
+    flex: none;
+    padding: 0 2px;
+    border-color: transparent;
+    background: none;
     box-shadow: none;
-    background: transparent;
     color: var(--text-muted);
-    cursor: pointer;
+    font-weight: normal;
+  }
+
+  .show:hover:not(:disabled),
+  .show[aria-expanded='true'] {
+    background: var(--row-hover-bg);
   }
 
   /* Reads as text until you click it, like MSN's personal message. */
@@ -554,6 +645,38 @@
     background: var(--row-hover-bg);
   }
 
+  /* Someone wrote and the conversation isn't open: like a Windows XP taskbar button, the
+     row blinks orange three times, then stays lit until the conversation is opened. Kept
+     with "reduce motion" too: it's a plain color switch, once a second. */
+  li.unread {
+    --unread: linear-gradient(#ffd79a, #f8a73a 55%, #ef8a14);
+    animation: unread 1s steps(1, end) 3 forwards;
+  }
+
+  @keyframes unread {
+    0% {
+      background: transparent;
+    }
+    50%,
+    100% {
+      background: var(--unread);
+    }
+  }
+
+  .badge {
+    flex: none;
+    min-width: 1.5em;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: linear-gradient(#ffb24d, #e6700a);
+    box-shadow: inset 0 1px rgb(255 255 255 / 45%);
+    color: #fff;
+    font-size: 0.85em;
+    font-weight: bold;
+    line-height: 1.5;
+    text-align: center;
+  }
+
   .name {
     flex: 1;
     min-width: 0;
@@ -592,53 +715,205 @@
     visibility: visible;
   }
 
-  .empty {
-    margin: 0;
-    padding: 16px 10px;
+  /* No contacts yet: with no bar at the bottom, say how to add someone, MSN's green link. */
+  .no-contacts {
+    display: grid;
+    gap: 10px;
+    justify-items: center;
+    padding: 24px 16px;
     color: var(--text-muted);
+    text-align: center;
   }
 
-  .invites {
-    display: grid;
+  .no-contacts p {
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .add-link {
+    display: inline-flex;
     gap: 6px;
-    padding: 8px 10px;
+    align-items: center;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-strong);
+  }
+
+  .add-link:hover:not(:disabled) {
+    background: none;
+  }
+
+  .add-link b {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--status-online);
+    color: #fff;
+    line-height: 1;
+  }
+
+  .add-link span {
+    text-decoration: underline;
+  }
+
+  /* The menu bar on top, like MSN Messenger's. */
+  .menubar {
+    position: relative;
+    display: flex;
+    gap: 2px;
+    padding: 2px 4px;
     background: var(--bar-bg);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .menubar > button {
+    padding: 2px 8px;
+    border-color: transparent;
+    background: none;
+    box-shadow: none;
+    color: var(--text);
+  }
+
+  .menubar > button:hover:not(:disabled),
+  .menubar > button[aria-expanded='true'] {
+    background: var(--row-hover-bg);
+  }
+
+  .menu {
+    position: absolute;
+    top: 100%;
+    z-index: 10;
+    display: grid;
+    min-width: 200px;
+    padding: 3px;
+    background: var(--list-bg);
+    border: 1px solid var(--field-border-color);
+    box-shadow: var(--popup-shadow);
+  }
+
+  .me-menu {
+    left: 0;
+  }
+
+  .menu button {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 5px 10px;
+    border-color: transparent;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--text);
+    font-weight: normal;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .menu button:hover:not(:disabled),
+  .menu button:focus-visible {
+    background: var(--row-hover-bg);
+    color: var(--text-strong);
+  }
+
+  .menu [aria-checked='true'] {
+    font-weight: bold;
+  }
+
+  .menu hr {
+    width: 100%;
+    margin: 3px 0;
+    border: 0;
     border-top: 1px solid var(--line);
   }
 
-  .invites p {
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .dot.online {
+    background: var(--status-online);
+  }
+
+  .dot.away {
+    background: var(--status-away);
+  }
+
+  .dot.dnd {
+    background: var(--status-dnd);
+  }
+
+  .dot.invisible {
+    border: 1px solid var(--status-offline);
+  }
+
+  /* Panels that rise from the bottom of the list: adding someone, About. */
+  .sheet {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    background: var(--bar-bg);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 12px rgb(0 0 0 / 10%);
+  }
+
+  .sheet h3 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+    color: var(--text-strong);
+    font-size: inherit;
+  }
+
+  .sheet p {
     margin: 0;
   }
 
-  .send {
-    display: flex;
-    gap: 6px;
-    padding: 0;
+  .close {
+    padding: 0 6px;
+    border-color: transparent;
     background: none;
-    border: none;
+    box-shadow: none;
+    font-size: 16px;
+    line-height: 1;
   }
 
-  .send input {
+  .sheet form {
+    display: flex;
+    gap: 6px;
+  }
+
+  .sheet form input {
     flex: 1;
     min-width: 0;
+  }
+
+  .result {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 8px;
+    background: var(--list-bg);
+    border: 1px solid var(--line);
+    border-radius: var(--group-radius);
+  }
+
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .hint {
     color: var(--text-muted);
     font-size: 12px;
-  }
-
-  form,
-  footer {
-    display: flex;
-    gap: 6px;
-    padding: 8px 10px;
-    background: var(--bar-bg);
-    border-top: 1px solid var(--line);
-  }
-
-  form input {
-    flex: 1;
-    min-width: 0;
   }
 </style>

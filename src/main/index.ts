@@ -8,10 +8,12 @@ import {
   dialog,
   ipcMain,
   nativeImage,
+  powerMonitor,
+  safeStorage,
   screen
 } from 'electron'
 import { join, resolve } from 'path'
-import { writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -27,7 +29,7 @@ import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
-import { THEMES, openSettings, type Settings, type SettingsStore } from './settings'
+import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
   DOMAIN,
@@ -52,6 +54,7 @@ import {
   onTyping,
   isWinkId,
   ownShow,
+  ownStatus,
   rejectRequest,
   removeContact,
   sendBuzz,
@@ -208,10 +211,13 @@ function notify(title: string, body: string, onClick: () => void): void {
 }
 
 // Native titles can't hold images, so emoticon codes become plain emoji.
-const contactName = (jid: string): string =>
-  emojify(snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre')
+const contactName = (jid: string): string => {
+  const name = snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre'
+  return settings.get().emoticons ? emojify(name) : name
+}
 
 function notifyMessage(message: ChatMessage): void {
+  if (!settings.get().alertMessages) return
   const body = message.buzz
     ? '¡Te ha enviado un zumbido!'
     : message.wink
@@ -225,11 +231,13 @@ function notifyMessage(message: ChatMessage): void {
 // "lolo se ha conectado", except for the burst of presences right after we sign in.
 let previous: Snapshot = {
   connected: false,
+  jid: '',
   contacts: [],
   requests: [],
   name: '',
   avatar: '',
-  show: 'online'
+  show: 'online',
+  status: ''
 }
 let connectedAt = 0
 const arrivals = cooldown(ARRIVAL_INTERVAL)
@@ -241,8 +249,12 @@ function announceArrivals(state: Snapshot): void {
       // Someone flapping online/offline gets announced once a minute at most.
       if (arrivals.take(jid)) continue
       // Busy: no arrival sound either (the toast is already muted in notify()).
-      if (ownShow() !== 'dnd') mainWindow?.webContents.send('contact:online', jid)
-      notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
+      if (ownShow() !== 'dnd' && settings.get().sounds) {
+        mainWindow?.webContents.send('contact:online', jid)
+      }
+      if (settings.get().alertOnline) {
+        notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
+      }
     }
   }
   previous = state
@@ -256,6 +268,7 @@ let settings: SettingsStore
 let account = '' // bare JID of the signed-in user
 
 function openChat(contact: string, focus: boolean): BrowserWindow {
+  setUnread(contact, 0)
   const existing = chats.get(contact)
   if (existing) {
     if (focus) {
@@ -297,8 +310,8 @@ function openOptions(): void {
     return
   }
   options = new BrowserWindow({
-    width: 420,
-    height: 720,
+    width: 600,
+    height: 500,
     show: false,
     resizable: false,
     autoHideMenuBar: true,
@@ -311,15 +324,24 @@ function openOptions(): void {
   loadRenderer(options, 'options')
 }
 
-async function exportChats(win: BrowserWindow | null, format: ExportFormat): Promise<ExportResult> {
+// The format is picked in the save dialog, by file type (HTML unless another one).
+const EXPORT_TYPES = [
+  { name: 'Página web', extensions: ['html'] },
+  { name: 'Texto', extensions: ['txt'] },
+  { name: 'Datos (JSON)', extensions: ['json'] }
+]
+
+async function exportChats(win: BrowserWindow | null): Promise<ExportResult> {
   const messages = account ? history.all(account) : []
   if (!messages.length) return 'empty'
   const day = new Date().toISOString().slice(0, 10)
-  const save = { defaultPath: `palique-historial-${day}.${format}` }
+  const save = { defaultPath: `palique-conversaciones-${day}.html`, filters: EXPORT_TYPES }
   const { canceled, filePath } = win
     ? await dialog.showSaveDialog(win, save)
     : await dialog.showSaveDialog(save)
   if (canceled || !filePath) return 'canceled'
+  const extension = filePath.split('.').pop()?.toLowerCase() as ExportFormat
+  const format = FORMATS.includes(extension) ? extension : 'html'
   const state = snapshot()
   const name = (jid: string): string =>
     jid === account ? state.name : (state.contacts.find((c) => c.jid === jid)?.name ?? jid)
@@ -327,14 +349,76 @@ async function exportChats(win: BrowserWindow | null, format: ExportFormat): Pro
   return 'saved'
 }
 
-// Incoming messages open the conversation without stealing focus, and flash it
-// (taskbar on Linux, dock bounce on macOS).
-// `quiet`: show it in the conversation without shaking, sounds, flashing or toasts.
-// Busy (dnd): no sounds, shaking or toasts, but the window still flashes.
+// "Sign in automatically": the password is kept apart from the settings, encrypted by
+// the system (Keychain on macOS, DPAPI on Windows, the keyring on Linux). Without system
+// encryption the option isn't offered.
+const passwordFile = (): string => join(app.getPath('userData'), 'password.bin')
+const canRemember = (): boolean => safeStorage.isEncryptionAvailable()
+
+async function rememberPassword(password: string): Promise<void> {
+  if (canRemember()) await writeFile(passwordFile(), safeStorage.encryptString(password))
+}
+
+async function savedPassword(): Promise<string> {
+  try {
+    return safeStorage.decryptString(await readFile(passwordFile()))
+  } catch {
+    return ''
+  }
+}
+
+function forgetPassword(): void {
+  rm(passwordFile(), { force: true }).catch(() => {})
+}
+
+// Away after a while without using the computer, like MSN, and back when you return.
+// Only from Conectado: Ocupado or Invisible were chosen on purpose.
+let autoAway = false
+
+function checkIdle(): void {
+  const minutes = settings.get().away
+  const idle = powerMonitor.getSystemIdleTime()
+  if (!account) {
+    autoAway = false
+  } else if (!autoAway && minutes && ownShow() === 'online' && idle >= minutes * 60) {
+    autoAway = true
+    setPresence('away', ownStatus()).catch(() => {})
+  } else if (autoAway && (idle < 5 || ownShow() !== 'away')) {
+    if (ownShow() === 'away') setPresence('online', ownStatus()).catch(() => {})
+    autoAway = false
+  }
+}
+
+// Unread messages per contact, MSN style: the contact blinks in the list with a count
+// (and the dock icon shows the total) until its conversation is opened.
+const unread = new Map<string, number>()
+
+function setUnread(contact: string, count: number): void {
+  if (count) unread.set(contact, count)
+  else if (!unread.delete(contact)) return
+  mainWindow?.webContents.send('chat:unread', Object.fromEntries(unread))
+  app.setBadgeCount([...unread.values()].reduce((a, b) => a + b, 0))
+}
+
+// Messages for an open conversation go to it, and flash it if it isn't focused (taskbar
+// on Linux, dock bounce on macOS). With no conversation open they wait in the contact
+// list instead; only a buzz opens the window, without stealing focus.
+// `quiet`: no shaking, sounds, flashing or toasts (old messages, e.g. while offline).
+// Busy (dnd): no sounds, shaking or toasts, but windows still flash.
 function deliver(message: ChatMessage, quiet = false): void {
   if (account) history.save(account, message)
-  const win = openChat(message.with, false)
   const silent = quiet || (!message.mine && ownShow() === 'dnd')
+  if (!chats.has(message.with) && !(message.buzz && !message.mine)) {
+    // Ours from another device are only history.
+    if (message.mine) return
+    setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
+    if (!silent && settings.get().sounds) mainWindow?.webContents.send('chat:incoming')
+    if (quiet) return
+    if (mainWindow?.isVisible() && !mainWindow.isFocused()) mainWindow.flashFrame(true)
+    if (!notified.take(message.with)) notifyMessage(message)
+    return
+  }
+  const win = openChat(message.with, false)
   const queue = pending.get(message.with)
   if (queue) queue.push([message, silent])
   else win.webContents.send('chat:message', message, silent)
@@ -353,14 +437,16 @@ const gotWinks = cooldown(WINK_INTERVAL)
 const gotBuzzes = cooldown(BUZZ_INTERVAL)
 const notified = cooldown(NOTIFY_INTERVAL)
 
-// Stored by the server while we were offline (or just old): delivered quietly. Their
-// windows open at sign-in, so there's no need for sounds, flashing or a toast storm.
+// Stored by the server while we were offline (or just old): delivered quietly. They wait
+// in the contact list at sign-in, with no sounds, flashing or a toast storm.
 const isLate = (message: ChatMessage): boolean =>
   Boolean(message.delayed) || Date.now() - message.at > 60_000
 
 function playWink(message: ChatMessage): void {
+  // Only in an open conversation (otherwise it waits there, and can be replayed from it).
   // The wink video has sound, so not while busy either.
-  if (settings.get().winks && !isLate(message) && ownShow() !== 'dnd') showWink(message.wink)
+  const show = settings.get().winks && !isLate(message) && ownShow() !== 'dnd'
+  if (show && chats.has(message.with)) showWink(message.wink)
 }
 
 // Transparent, click-through window over the whole primary display.
@@ -401,6 +487,7 @@ app.whenReady().then(() => {
 
   history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
+  setInterval(checkIdle, 15_000)
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
   // Sign in with the last status, so an invisible user is never briefly visible.
@@ -427,15 +514,45 @@ app.whenReady().then(() => {
   }
   const clean = (email: unknown): string => String(email).trim().toLowerCase()
 
-  ipcMain.handle('auth:login', async (_, email: string, password: string) => {
+  // `remember`: the sign-in screen's "Iniciar sesión automáticamente" box.
+  ipcMain.handle('auth:login', async (_, email: string, password: string, remember: unknown) => {
     try {
       const username = await accountFor(clean(email))
       const result = await login(username, String(password), { show: lastShow() })
+      if (result.ok && typeof remember === 'boolean') {
+        settings.set({ autoLogin: remember && canRemember() })
+        if (remember) await rememberPassword(String(password))
+        else forgetPassword()
+      }
       return signedIn(result, clean(email))
     } catch (e) {
       return failed(e)
     }
   })
+  // Once per launch, before the sign-in screen shows: sign in by itself if asked to.
+  // After signing out, the screen stays (null means "nothing to do").
+  let triedAuto = false
+  ipcMain.handle('auth:auto', async () => {
+    if (triedAuto) return null
+    triedAuto = true
+    const { autoLogin, email } = settings.get()
+    const password = autoLogin && email ? await savedPassword() : ''
+    if (!password) return null
+    try {
+      const result = await login(await accountFor(email), password, { show: lastShow() })
+      // A changed password: forget the old one, the sign-in screen asks.
+      if (!result.ok && result.error === 'not-authorized') forgetPassword()
+      return signedIn(result, email)
+    } catch (e) {
+      return failed(e)
+    }
+  })
+  // For the Options window: whether "sign in automatically" can work here, and whether a
+  // password is saved for it yet.
+  ipcMain.handle('auth:remembered', async () => ({
+    available: canRemember(),
+    saved: canRemember() && (await savedPassword()) !== ''
+  }))
   // Which address an invite is for (the sign-up form shows it).
   ipcMain.handle('auth:invite', async (_, token: string) => {
     try {
@@ -471,6 +588,7 @@ app.whenReady().then(() => {
         invite: String(token).trim(),
         show: lastShow()
       })
+      if (result.ok && settings.get().autoLogin) await rememberPassword(String(password))
       return signedIn(result, clean(email))
     } catch (e) {
       return failed(e)
@@ -482,6 +600,7 @@ app.whenReady().then(() => {
   ipcMain.handle('auth:logout', async () => {
     await logout()
     account = ''
+    for (const contact of [...unread.keys()]) setUnread(contact, 0)
     chats.forEach((win) => win.close())
     options?.close()
   })
@@ -560,11 +679,10 @@ app.whenReady().then(() => {
   ipcMain.handle('app:version', () => (app.isPackaged ? `v${app.getVersion()}` : 'desarrollo'))
   ipcMain.handle('settings:get', () => settings.get())
   // Only known keys with valid values; every window hears about the change (e.g. the theme).
-  ipcMain.handle('settings:set', (_, patch: { winks?: unknown; theme?: unknown }) => {
-    const valid: Partial<Settings> = {}
-    if (typeof patch?.winks === 'boolean') valid.winks = patch.winks
-    if (THEMES.includes(patch?.theme as Settings['theme']))
-      valid.theme = patch.theme as Settings['theme']
+  ipcMain.handle('settings:set', (_, patch: unknown) => {
+    const valid = validPatch(patch)
+    if (valid.startup !== undefined) app.setLoginItemSettings({ openAtLogin: valid.startup })
+    if (valid.autoLogin === false) forgetPassword()
     const current = settings.set(valid)
     BrowserWindow.getAllWindows().forEach((win) =>
       win.webContents.send('settings:changed', current)
@@ -588,6 +706,11 @@ app.whenReady().then(() => {
     })
     pending.delete(String(contact))
   })
+  ipcMain.handle('chat:unread', () => Object.fromEntries(unread))
+  // Clicking a wink in a conversation plays it again, even with full-screen winks off.
+  ipcMain.on('chat:replay-wink', (_, wink: string) => {
+    if (isWinkId(wink)) showWink(wink)
+  })
   ipcMain.handle('chat:history', (_, contact: string) =>
     account ? history.load(account, String(contact)) : []
   )
@@ -602,11 +725,8 @@ app.whenReady().then(() => {
     return BUZZ_INTERVAL
   })
   ipcMain.handle('options:open', () => openOptions())
-  ipcMain.handle('history:export', (event, format: ExportFormat) =>
-    exportChats(
-      BrowserWindow.fromWebContents(event.sender),
-      FORMATS.includes(format) ? format : 'html'
-    )
+  ipcMain.handle('history:export', (event) =>
+    exportChats(BrowserWindow.fromWebContents(event.sender))
   )
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 

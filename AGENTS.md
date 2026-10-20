@@ -46,8 +46,8 @@ compose.yaml       local server stack
 - **Windows:** contact list (main), one window per conversation (like MSN), Options, and a transparent click-through overlay for winks. Closing the contact list hides it (tray keeps the app running).
 - **IPC:** `ipcMain.handle('area:action')` in `index.ts`, wrapped one-to-one in `src/preload/index.ts`. Validate everything that comes from the renderer in main (types, sizes, ids).
 - **Single instance** per data folder (`app.requestSingleInstanceLock`). To run a second copy for testing, give it its own folder (see Development).
-- **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`.
-- **Messages:** contacts only; strangers can't message you. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects.
+- **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
+- **Messages:** contacts only; strangers can't message you. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened. Only a buzz opens the window. Clicking a wink in a conversation replays it.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).
 
 ### Accounts and identity
