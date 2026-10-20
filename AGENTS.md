@@ -34,6 +34,7 @@ server/
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
 scripts/           check-*.ts: runnable checks (see Checks), invite.ts, mailpit.ts helpers
+  winks/           wink sources (canvas drawing + synthesized sound) and record.ts (see Winks)
 docs/              palique.md (plan and decisions), despliegue.md (deployment guide)
 compose.yaml       local server stack
 ```
@@ -137,6 +138,15 @@ npm run build        # typecheck + build
 npm run build:mac    # package .dmg
 npm run build:linux  # AppImage + .deb (use CI from macOS)
 ```
+
+## Winks
+
+Each wink is `src/renderer/src/assets/winks/<id>.webm` (VP9 with alpha + Opus), with its label in `src/renderer/src/winks.ts`. They're generated from `scripts/winks/winks.js` (canvas drawing and Web Audio sound per wink):
+
+- `scripts/winks/preview.html`: open it in a browser to watch them (no sound).
+- `node scripts/winks/record.ts [id ...]`: records them with headless Chrome (`MediaRecorder`), no ffmpeg needed. All of them without ids. `CHROME=/path/to/chrome` outside macOS.
+
+The first three (burbuja, rebote, ola) are older placeholders made elsewhere.
 
 ## Checks
 

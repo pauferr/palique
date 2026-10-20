@@ -8,7 +8,16 @@ export const winks: Record<string, string> = Object.fromEntries(
 const labels: Record<string, string> = {
   burbuja: 'Burbuja',
   rebote: 'Rebote',
-  ola: 'Ola'
+  ola: 'Ola',
+  globo: 'Globo de agua',
+  cerdo: 'Cerdo bailón',
+  burla: 'Crío burlón',
+  beso: 'Beso',
+  carcajada: 'Carcajada',
+  enamorado: 'Enamorado',
+  enfadado: 'Enfadado',
+  llorando: 'Llorando',
+  chulo: 'Chulo'
 }
 
 export const winkLabel = (id: string): string => labels[id] ?? id
