@@ -39,9 +39,11 @@
     if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur()
   }
 
-  // Two groups like MSN, alphabetical inside each.
+  // Two groups like MSN, alphabetical inside each (by the name as read, without its codes).
   let sorted = $derived(
-    [...roster.contacts].sort((a, b) => a.name.localeCompare(b.name) || a.jid.localeCompare(b.jid))
+    [...roster.contacts].sort(
+      (a, b) => stripPlus(a.name).localeCompare(stripPlus(b.name)) || a.jid.localeCompare(b.jid)
+    )
   )
   // The search box filters by name, ignoring case and accents.
   let query = $state('')
