@@ -1,0 +1,44 @@
+# Typecheck, lint and every scripts/check-*.ts on each push, so a regression shows up
+# before a release. Server checks run against the development stack (compose.yaml).
+# See AGENTS.md, "Checks".
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # check:version reads the tags
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: docker compose up -d --build --wait
+
+      - run: npm run typecheck
+      - run: npm run lint
+
+      - name: Local checks
+        run: |
+          for c in history export settings presence emoticons plus cooldown version; do
+            npm run --silent check:$c
+          done
+
+      - name: Server checks
+        run: |
+          for c in auth roster chat avatar invites email reset newsletter invisible; do
+            npm run --silent check:$c
+          done
+
+      - if: failure()
+        run: docker compose logs

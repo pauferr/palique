@@ -171,6 +171,8 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 
 Add or update the matching check with any change to that logic. Before committing, run `npm run typecheck`, `npm run lint` and the affected checks.
 
+CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck, lint and every check on each push to `main`, with the development stack up.
+
 ## Conventions
 
 - **Language:** UI text and user-facing emails are in **Spanish** (Spain). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, taken from mock accounts (`@palique.com` addresses).

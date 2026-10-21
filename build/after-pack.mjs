@@ -3,6 +3,8 @@
 // app with a broken signature is "damaged" to macOS. Ad-hoc signed, it's only "unverified".
 import { execFileSync } from 'node:child_process'
 
+// Plain JavaScript: no place for a return type.
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export default function afterPack({ electronPlatformName, appOutDir, packager }) {
   if (electronPlatformName !== 'darwin') return
   const app = `${appOutDir}/${packager.appInfo.productFilename}.app`
