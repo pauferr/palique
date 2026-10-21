@@ -437,7 +437,15 @@
   </main>
 
   <footer>
-    <small>Palique {version}</small>
+    <small
+      >Palique {version} ·
+      <button
+        class="link"
+        onclick={() => window.api.openLogs()}
+        title="Si algo falla, envíanos este archivo. No guarda contraseñas, mensajes ni direcciones."
+        >Registro de errores…</button
+      ></small
+    >
     <button onclick={() => window.close()}>Cerrar</button>
   </footer>
 </div>

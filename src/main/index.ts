@@ -27,6 +27,7 @@ import {
 } from './cooldown'
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
+import { openLog } from './log'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
@@ -78,6 +79,30 @@ import {
 // One Palique per user: opening it again (e.g. from the app menu) shows the existing
 // window. That's also the way back on desktops without a tray (GNOME by default).
 if (!app.requestSingleInstanceLock()) app.exit(0)
+
+// Errors and warnings also go to palique.log (see log.ts), for the user to send us when
+// something fails: Options opens its folder.
+const logFile = join(app.getPath('logs'), 'palique.log')
+const log = openLog(logFile)
+const { error: consoleError, warn: consoleWarn } = console
+console.error = (...parts: unknown[]): void => {
+  consoleError(...parts)
+  // Node's notice that node:sqlite is experimental comes on every start: not an error.
+  if (!String(parts[0]).includes('ExperimentalWarning')) log.write('error', ...parts)
+}
+console.warn = (...parts: unknown[]): void => {
+  consoleWarn(...parts)
+  log.write('warn', ...parts)
+}
+log.write(
+  'info',
+  `start ${app.isPackaged ? app.getVersion() : 'dev'} ${process.platform} ${process.arch}`,
+  `electron ${process.versions.electron}${process.env['WAYLAND_DISPLAY'] ? ' wayland' : ''}`
+)
+process.on('uncaughtException', (e) => log.write('error', 'uncaught:', e))
+process.on('unhandledRejection', (e) => log.write('error', 'unhandled rejection:', e))
+app.on('render-process-gone', (_, __, details) => log.write('error', 'renderer gone:', details))
+app.on('child-process-gone', (_, details) => log.write('error', 'process gone:', details))
 
 // palique:// links (invite and password recovery emails). In development Electron itself
 // is the handler, so it needs the app's path to know what to open.
@@ -521,6 +546,10 @@ app.whenReady().then(() => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+    // The renderer's errors (exceptions, failed IPC calls) end up in the log too.
+    window.webContents.on('console-message', ({ level, message, sourceId, lineNumber }) => {
+      if (level === 'error') log.write('error', `renderer: ${message} (${sourceId}:${lineNumber})`)
+    })
   })
 
   history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
@@ -719,6 +748,7 @@ app.whenReady().then(() => {
     return isPng ? setAvatar(png) : undefined
   })
   // "v0.3.0-alpha". Releases get their version at build time (see release.yml).
+  ipcMain.handle('logs:open', () => shell.showItemInFolder(logFile))
   ipcMain.handle('app:version', () => (app.isPackaged ? `v${app.getVersion()}` : 'desarrollo'))
   ipcMain.handle('settings:get', () => settings.get())
   // Only known keys with valid values; every window hears about the change (e.g. the theme).

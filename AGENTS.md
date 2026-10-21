@@ -23,6 +23,7 @@ src/main/          Electron main process
   export.ts        history export: html / txt / json
   presence.ts      "came online" detection
   cooldown.ts      per-contact rate limits (buzz, winks, toasts, arrivals)
+  log.ts           error log (palique.log), with nothing personal in it
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
                    '' → App (Login / Roster), #chat=<jid>, #options, #wink=<id>
@@ -47,6 +48,7 @@ compose.yaml       local server stack
 - **IPC:** `ipcMain.handle('area:action')` in `index.ts`, wrapped one-to-one in `src/preload/index.ts`. Validate everything that comes from the renderer in main (types, sizes, ids).
 - **Single instance** per data folder (`app.requestSingleInstanceLock`). To run a second copy for testing, give it its own folder (see Development).
 - **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
+- **Error log:** `console.error`/`console.warn` in main, uncaught errors and the renderer's console errors go to `palique.log` in the OS's logs folder (one older copy, ~1 MB each). Nothing is sent: Options → «Registro de errores…» opens its folder for the user to send it. `log.ts` writes errors as name, message and stack only and masks addresses, JIDs, link codes and the home folder; never log passwords or message bodies. Where xmpp.ts can only tell the UI 'unknown', `unexpected()` logs the real cause first.
 - **Theme and font:** chosen in Options, applied as `data-theme` / `data-font` on every window's root. A font overrides the theme's `--font` (`themes/fonts.css`) and is scaled to the theme font's x-height (`--x-height`, `font-size-adjust` in `base.css`), so every font looks the same size. All bundled fonts are free (OFL): Comic Relief stands in for Comic Sans.
 - **Messages:** contacts only; strangers can't message you. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened. Only a buzz opens the window. Clicking a wink in a conversation replays it.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).
@@ -166,6 +168,7 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `newsletter` | newsletter choice |
 | `invisible` | invisible status (needs the server module) |
 | `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
+| `log` | error log: format, size limit, nothing personal written |
 | `version` | next release version from the commits |
 
 Add or update the matching check with any change to that logic. Before committing, run `npm run typecheck`, `npm run lint` and the affected checks.

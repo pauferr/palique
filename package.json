@@ -39,6 +39,7 @@
     "check:plus": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-plus.ts",
     "check:invisible": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invisible.ts",
     "check:cooldown": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-cooldown.ts",
+    "check:log": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-log.ts",
     "check:invites": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-invites.ts",
     "check:email": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-email.ts",
     "check:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-reset.ts",

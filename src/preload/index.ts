@@ -130,6 +130,8 @@ const api = {
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  // Shows palique.log in the file manager.
+  openLogs: (): Promise<void> => ipcRenderer.invoke('logs:open'),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   onSettings: (callback: (settings: Settings) => void): (() => void) => {
     const listener = (_: unknown, settings: Settings): void => callback(settings)

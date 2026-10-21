@@ -421,7 +421,7 @@ function toAuthError(e: unknown): AuthError {
     return condition
   }
   if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ETIMEDOUT') return 'unreachable'
-  return 'unknown'
+  return unexpected('sign-in', e)
 }
 
 // Signs in with the account's JID localpart (see accountFor). Passing an invite code
@@ -698,6 +698,13 @@ export async function setNick(value: string): Promise<void> {
 
 const condition = (e: unknown): string | undefined => (e as { condition?: string }).condition
 
+// A failure the UI can only call 'unknown': logged first, so palique.log (see index.ts)
+// keeps the real cause.
+function unexpected(what: string, e: unknown): 'unknown' {
+  console.error(`${what} failed:`, e)
+  return 'unknown'
+}
+
 function accountsIq(type: 'get' | 'set', child: Element): Promise<Element> {
   return xmpp!.iqCaller.request(xml('iq', { type, to: ACCOUNTS_JID }, child))
 }
@@ -728,7 +735,7 @@ export async function inviteByEmail(address: string): Promise<InviteStatus> {
       conflict: 'registered',
       'bad-request': 'invalid'
     }
-    throw new Error(errors[condition(e) ?? ''] ?? 'unknown')
+    throw new Error(errors[condition(e) ?? ''] ?? unexpected('invite', e))
   }
 }
 
@@ -740,7 +747,11 @@ export async function lookupContact(address: string): Promise<string> {
   } catch (e) {
     const c = condition(e)
     throw new Error(
-      c === 'bad-request' ? 'invalid' : c === 'resource-constraint' ? 'wait' : 'unknown'
+      c === 'bad-request'
+        ? 'invalid'
+        : c === 'resource-constraint'
+          ? 'wait'
+          : unexpected('lookup', e)
     )
   }
 }
@@ -767,7 +778,7 @@ export async function changeEmail(address: string): Promise<EmailStatus> {
     const res = await accountsIq('set', xml('email', { xmlns: ACCOUNTS, address }))
     return parseEmail(res.getChild('email', ACCOUNTS)!)
   } catch (e) {
-    throw new Error(condition(e) === 'bad-request' ? 'invalid' : 'unknown')
+    throw new Error(condition(e) === 'bad-request' ? 'invalid' : unexpected('email change', e))
   }
 }
 
@@ -776,7 +787,7 @@ export async function resendVerification(): Promise<void> {
   try {
     await accountsIq('set', xml('resend', { xmlns: ACCOUNTS }))
   } catch (e) {
-    throw new Error(condition(e) === 'resource-constraint' ? 'wait' : 'unknown')
+    throw new Error(condition(e) === 'resource-constraint' ? 'wait' : unexpected('resend', e))
   }
 }
 
