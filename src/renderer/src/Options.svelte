@@ -7,7 +7,8 @@
   import { events, packs, playSound } from './sounds'
 
   // Laid out like Windows Live Messenger's Options: sections on the left, one at a time on
-  // the right. Every change applies at once; there's only "Cerrar".
+  // the right. Every change applies at once; there's only "Cerrar". The name and personal
+  // message are edited from the contact list.
   const sections = [
     { id: 'personal', icon: '🙂', label: 'Personal' },
     { id: 'general', icon: '🖥️', label: 'General' },
@@ -73,33 +74,6 @@
   }
 
   // Personal
-
-  async function rename(event: Event): Promise<void> {
-    const input = event.currentTarget as HTMLInputElement
-    note = ''
-    if (!input.value.trim()) {
-      input.value = me?.name ?? ''
-      return
-    }
-    try {
-      await window.api.setNick(input.value)
-    } catch {
-      input.value = me?.name ?? ''
-      note = 'No se ha podido cambiar tu nombre.'
-    }
-  }
-
-  async function setStatus(event: Event): Promise<void> {
-    note = ''
-    try {
-      await window.api.setPresence(
-        me?.show ?? 'online',
-        (event.currentTarget as HTMLInputElement).value
-      )
-    } catch {
-      note = 'No se ha podido cambiar tu mensaje personal.'
-    }
-  }
 
   // Only exists while the Personal section shows.
   let picker: HTMLInputElement | undefined = $state()
@@ -195,21 +169,10 @@
   <main>
     {#if section === 'personal'}
       <h1>Personal</h1>
-      <section>
-        <h2>Mi nombre para mostrar</h2>
-        <input value={me?.name ?? ''} onchange={rename} maxlength="64" aria-label="Tu nombre" />
-        <p class="hint">Escribe (L), :) o (H) y tus contactos verán los emoticonos.</p>
-      </section>
-      <section>
-        <h2>Mi mensaje personal</h2>
-        <input
-          value={me?.status ?? ''}
-          onchange={setStatus}
-          maxlength="140"
-          placeholder="Escribe un mensaje personal"
-          aria-label="Mensaje personal"
-        />
-      </section>
+      <p class="hint">
+        Tu nombre y tu mensaje personal se cambian haciendo clic sobre ellos en la lista de
+        contactos.
+      </p>
       <section>
         <h2>Mi imagen para mostrar</h2>
         <div class="row">

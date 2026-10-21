@@ -29,6 +29,7 @@ import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './
 import { openHistory, type History } from './history'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
+import { stripPlus } from '../renderer/src/plus'
 import { winkLabel } from '../renderer/src/wink-labels'
 import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
@@ -216,9 +217,10 @@ function notify(title: string, body: string, onClick: () => void): void {
   notification.show()
 }
 
-// Native titles can't hold images, so emoticon codes become plain emoji.
+// Native titles can't hold images or colors: emoticon codes become plain emoji, and
+// Messenger Plus! codes go.
 const contactName = (jid: string): string => {
-  const name = snapshot().contacts.find((c) => c.jid === jid)?.name ?? 'Sin nombre'
+  const name = stripPlus(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '') || 'Sin nombre'
   return settings.get().emoticons ? emojify(name) : name
 }
 
@@ -328,6 +330,29 @@ function openOptions(): void {
   options.on('closed', () => (options = null))
   options.once('ready-to-show', () => options?.show())
   loadRenderer(options, 'options')
+}
+
+// Changing our display name, with its Messenger Plus! colors: a small window of its own.
+let nickWindow: BrowserWindow | null = null
+
+function openNick(): void {
+  if (nickWindow) {
+    nickWindow.focus()
+    return
+  }
+  nickWindow = new BrowserWindow({
+    width: 480,
+    height: 560,
+    show: false,
+    resizable: false,
+    autoHideMenuBar: true,
+    title: 'Cambiar tu nombre',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false }
+  })
+  nickWindow.on('closed', () => (nickWindow = null))
+  nickWindow.once('ready-to-show', () => nickWindow?.show())
+  loadRenderer(nickWindow, 'nick')
 }
 
 // The format is picked in the save dialog, by file type (HTML unless another one).
@@ -616,6 +641,7 @@ app.whenReady().then(() => {
     for (const contact of [...unread.keys()]) setUnread(contact, 0)
     chats.forEach((win) => win.close())
     options?.close()
+    nickWindow?.close()
   })
 
   // Every window gets the full contact list on each change.
@@ -738,6 +764,7 @@ app.whenReady().then(() => {
     return BUZZ_INTERVAL
   })
   ipcMain.handle('options:open', () => openOptions())
+  ipcMain.handle('nick:open', () => openNick())
   ipcMain.handle('history:export', (event) =>
     exportChats(BrowserWindow.fromWebContents(event.sender))
   )

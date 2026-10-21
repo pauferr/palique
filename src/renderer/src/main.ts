@@ -12,6 +12,7 @@ import Options from './Options.svelte'
 import Wink from './Wink.svelte'
 import WinkGallery from './WinkGallery.svelte'
 import SoundGallery from './SoundGallery.svelte'
+import NickEditor from './NickEditor.svelte'
 
 // Every window follows the theme and font chosen in Options, live.
 const applyTheme = ({ theme, font }: { theme: string; font: string }): void => {
@@ -36,8 +37,10 @@ const app = wink
       ? mount(Options, { target })
       : params.has('winks')
         ? mount(WinkGallery, { target })
-        : params.has('sounds')
-          ? mount(SoundGallery, { target })
-          : mount(App, { target })
+        : params.has('nick')
+          ? mount(NickEditor, { target })
+          : params.has('sounds')
+            ? mount(SoundGallery, { target })
+            : mount(App, { target })
 
 export default app

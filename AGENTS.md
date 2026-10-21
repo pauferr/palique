@@ -54,7 +54,7 @@ compose.yaml       local server stack
 ### Accounts and identity
 
 - **The email is the account.** Each account has a random, permanent JID localpart (10 chars, `[a-z2-7]`, e.g. `k3f9x2ab7q@domain`). Only the account service knows which email goes with which JID. Changing the email touches nothing else, and contacts never see it.
-- **Display name:** XEP-0172 nick, published in PEP and sent in every presence and subscription request. The UI never shows JIDs; unknown names show as "Sin nombre".
+- **Display name:** XEP-0172 nick, published in PEP and sent in every presence and subscription request. The UI never shows JIDs; unknown names show as "Sin nombre". It may carry Messenger Plus!-style codes (`[b]`, `[c=#hex]…[/c]`, gradients `[c=A]…[/c=B]`, `[a=…]` backgrounds), parsed in `src/renderer/src/plus.ts` into styled text (never HTML) and stripped for plain-text places (titles, notifications). It's edited in its own window (`#nick`), opened by clicking the name in the contact list.
 - **Sign-in:** the app asks the account service `POST /cuenta {email}` → `{username}` and does normal SASL with it. Unknown addresses get a made-up, stable localpart (HMAC of the email), so a wrong address fails exactly like a wrong password.
 - **Registration is invite-only, by email:**
   1. Someone invites an address (the admin, without limit, or a user, 3 each; expired unused invites stop counting).
@@ -166,7 +166,7 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `reset` | password recovery by email |
 | `newsletter` | newsletter choice, Brevo client, unsubscribe webhook |
 | `invisible` | invisible status (needs the server module) |
-| `history`, `export`, `settings`, `presence`, `emoticons`, `cooldown` | local logic, no server |
+| `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `version` | next release version from the commits |
 
 Add or update the matching check with any change to that logic. Before committing, run `npm run typecheck`, `npm run lint` and the affected checks.

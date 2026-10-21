@@ -26,7 +26,7 @@ const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 export const AVATAR_MAX_BYTES = 100_000
 const NICK = 'http://jabber.org/protocol/nick' // display names (XEP-0172): PEP and presence
-export const NICK_MAX = 64
+export const NICK_MAX = 128 // room for Messenger Plus! codes
 
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>

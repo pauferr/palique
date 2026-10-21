@@ -5,6 +5,7 @@
   import Emoticons from './Emoticons.svelte'
   import { emojify } from './emoticons'
   import { avatarPng } from './picture'
+  import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
   import { playSound } from './sounds'
 
@@ -32,7 +33,7 @@
   let presenceError = $state('')
   let status = $state('')
   // Name and personal message show their emoticons until clicked, then become inputs.
-  let editing: '' | 'nick' | 'personal' = $state('')
+  let editing = $state(false) // the personal message, edited in place
   const focus = (input: HTMLInputElement): void => input.focus()
   const commitOnEnter = (event: KeyboardEvent): void => {
     if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur()
@@ -45,7 +46,7 @@
   // The search box filters by name, ignoring case and accents.
   let query = $state('')
   const fold = (text: string): string =>
-    emojify(text).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    emojify(stripPlus(text)).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   let found = $derived(sorted.filter((c) => fold(c.name).includes(fold(query.trim()))))
   let groups = $derived([
     { label: 'Conectados', contacts: found.filter((c) => c.show !== 'offline') },
@@ -73,7 +74,7 @@
   // The personal message follows the snapshot (Options can change it too), except while
   // it's being edited here.
   $effect(() => {
-    if (editing !== 'personal') status = roster.status
+    if (!editing) status = roster.status
   })
 
   async function updatePresence(show: OwnShow): Promise<void> {
@@ -110,21 +111,6 @@
     menu = ''
     version = await window.api.version()
     aboutOpen = true
-  }
-
-  // Our display name, edited in place like the personal message. Empty puts it back.
-  async function rename(event: Event): Promise<void> {
-    const input = event.currentTarget as HTMLInputElement
-    if (!input.value.trim()) {
-      input.value = roster.name
-      return
-    }
-    try {
-      await window.api.setNick(input.value)
-    } catch {
-      input.value = roster.name
-      presenceError = 'No se ha podido cambiar tu nombre.'
-    }
   }
 
   async function chooseAvatar(): Promise<void> {
@@ -196,7 +182,7 @@
   }
 
   function remove(contact: Contact): void {
-    if (confirm(`¿Eliminar a ${emojify(contact.name)} de tus contactos?`)) {
+    if (confirm(`¿Eliminar a ${emojify(stripPlus(contact.name))} de tus contactos?`)) {
       window.api.removeContact(contact.jid)
     }
   }
@@ -272,22 +258,10 @@
     />
     <div class="identity">
       <div class="line">
-        {#if editing === 'nick'}
-          <input
-            class="nick"
-            value={roster.name}
-            onchange={rename}
-            onblur={() => (editing = '')}
-            onkeydown={commitOnEnter}
-            use:focus
-            maxlength="64"
-            aria-label="Tu nombre"
-          />
-        {:else}
-          <button class="nick" onclick={() => (editing = 'nick')} title="Cambiar tu nombre"
-            ><Emoticons text={roster.name} /></button
-          >
-        {/if}
+        <!-- The name opens its own window, with the Messenger Plus! formatting tools. -->
+        <button class="nick" onclick={() => window.api.openNick()} title="Cambiar tu nombre"
+          ><Emoticons text={roster.name} plus /></button
+        >
         <button
           class="show"
           aria-haspopup="menu"
@@ -316,12 +290,12 @@
           </div>
         {/if}
       </div>
-      {#if editing === 'personal'}
+      {#if editing}
         <input
           class="personal"
           bind:value={status}
           onchange={() => updatePresence(roster.show)}
-          onblur={() => (editing = '')}
+          onblur={() => (editing = false)}
           onkeydown={commitOnEnter}
           use:focus
           maxlength="140"
@@ -332,7 +306,7 @@
         <button
           class="personal"
           class:empty={!status}
-          onclick={() => (editing = 'personal')}
+          onclick={() => (editing = true)}
           title="Cambiar tu mensaje personal"
           >{#if status}<Emoticons text={status} />{:else}Escribe un mensaje personal{/if}</button
         >
@@ -352,7 +326,7 @@
   <div class="list">
     {#each roster.requests as request (request.jid)}
       <div class="request">
-        <span><strong><Emoticons text={request.name} /></strong> quiere añadirte</span>
+        <span><strong><Emoticons text={request.name} plus /></strong> quiere añadirte</span>
         <button onclick={() => window.api.acceptRequest(request.jid)}>Aceptar</button>
         <button onclick={() => window.api.rejectRequest(request.jid)}>Rechazar</button>
       </div>
@@ -387,7 +361,7 @@
                   </span>
                   <!-- Name, and the personal message under it. -->
                   <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                    <span><Emoticons text={contact.name} /></span>
+                    <span><Emoticons text={contact.name} plus /></span>
                     {#if contact.pending}
                       <small>Esperando a que te acepte</small>
                     {:else if contact.status}
@@ -403,7 +377,7 @@
                     class="remove"
                     onclick={() => remove(contact)}
                     title="Eliminar contacto"
-                    aria-label="Eliminar a {emojify(contact.name)}">×</button
+                    aria-label="Eliminar a {emojify(stripPlus(contact.name))}">×</button
                   >
                 </li>
               {/key}

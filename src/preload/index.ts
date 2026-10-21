@@ -123,6 +123,7 @@ const api = {
     return () => ipcRenderer.off('chat:typing', listener)
   },
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
+  openNick: (): Promise<void> => ipcRenderer.invoke('nick:open'),
   // The format is chosen in the save dialog.
   exportHistory: (): Promise<ExportResult> => ipcRenderer.invoke('history:export'),
   sendWink: (contact: string, wink: string): Promise<number> =>

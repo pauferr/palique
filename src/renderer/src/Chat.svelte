@@ -4,6 +4,7 @@
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { EMOTICONS, emojify } from './emoticons'
+  import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
   import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
@@ -25,7 +26,7 @@
   // Their display name can change while the window is open.
   const name = $derived(contact?.name ?? '')
   $effect(() => {
-    if (name) document.title = prefs.emoticons ? emojify(name) : name
+    if (name) document.title = prefs.emoticons ? emojify(stripPlus(name)) : stripPlus(name)
   })
   let draft = $state('')
   let shaking = $state(false)
@@ -222,7 +223,7 @@
   <header>
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
-      <span>Para: <strong><Emoticons text={name} /></strong></span>
+      <span>Para: <strong><Emoticons text={name} plus /></strong></span>
       <small
         >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
             contact?.show ?? 'offline'
@@ -237,13 +238,14 @@
       {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
       {#if message.buzz}
         <li class="event">
-          🫨 {#if message.mine}Has enviado un zumbido{:else}<Emoticons text={name} /> te ha enviado un
-            zumbido{/if}
+          🫨 {#if message.mine}Has enviado un zumbido{:else}<Emoticons text={name} plus /> te ha enviado
+            un zumbido{/if}
           <time>{time(message.at)}</time>
         </li>
       {:else if message.wink}
         <li class="event">
-          🎬 {#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} /> te ha enviado el guiño{/if}
+          🎬 {#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} plus /> te ha enviado
+            el guiño{/if}
           <button
             class="replay"
             onclick={() => window.api.replayWink(message.wink!)}
@@ -255,7 +257,7 @@
         <li class:mine={message.mine} class:continues={continues(i)}>
           {#if !continues(i)}
             <span class="meta"
-              >{#if message.mine}Tú dices{:else}<Emoticons text={name} /> dice{/if}:
+              >{#if message.mine}Tú dices{:else}<Emoticons text={name} plus /> dice{/if}:
               <time>{time(message.at)}</time></span
             >
           {/if}
@@ -266,7 +268,7 @@
   </ol>
 
   <p class="typing" aria-live="polite">
-    {#if theyType && prefs.typing}<Emoticons text={name} /> está escribiendo…{/if}
+    {#if theyType && prefs.typing}<Emoticons text={name} plus /> está escribiendo…{/if}
   </p>
 
   <div class="compose">

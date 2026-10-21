@@ -158,7 +158,7 @@
         <p class="intro">Entrarás con <strong>{invitedEmail}</strong>.</p>
         <label>
           Tu nombre
-          <input bind:value={nick} required maxlength="64" autocomplete="nickname" />
+          <input bind:value={nick} required maxlength="128" autocomplete="nickname" />
           <small>Es lo que verán tus contactos. Puedes cambiarlo cuando quieras.</small>
         </label>
       {:else}

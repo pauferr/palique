@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Contact } from '../../main/xmpp'
+  import { stripPlus } from './plus'
 
   let {
     jid,
@@ -14,7 +15,7 @@
   const color = $derived(
     `var(--avatar-${[...jid].reduce((sum, c) => sum + c.charCodeAt(0), 0) % 8})`
   )
-  const initial = $derived((name || jid).charAt(0).toUpperCase())
+  const initial = $derived([...(stripPlus(name).trim() || jid)][0].toUpperCase())
 </script>
 
 <span class="avatar {show}" style:--size="{size}px" style:--color={color} aria-hidden="true">
