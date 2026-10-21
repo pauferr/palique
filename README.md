@@ -24,7 +24,7 @@ Quién está conectado, quién se ha ido a merendar y quién está de exámenes,
 
 ### Conversaciones con chispa
 
-Zumbidos que hacen temblar la ventana, guiños a pantalla completa con su sonido, los emoticonos de siempre y el mítico «está escribiendo…».
+Zumbidos que hacen temblar la ventana, guiños a pantalla completa, los emoticonos de siempre y el mítico «está escribiendo…» mientras esperas el mensaje de la persona que te gusta 🤪
 
 <p align="center">
   <img src="docs/images/guinos.png" width="380" alt="El selector de guiños: Beso, Burbuja, Carcajada, Cerdo bailón, Chulo, Crío burlón y más">
