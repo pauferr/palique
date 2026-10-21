@@ -17,14 +17,15 @@
   ] as const
   let section: (typeof sections)[number]['id'] = $state('personal')
 
-  const themes: { id: Theme; label: string }[] = [
-    { id: 'classic', label: 'Clásico' },
-    { id: 'retro', label: 'Retro' },
-    { id: 'glass', label: 'Cristal' }
+  const themes: { id: Theme; label: string; font: string }[] = [
+    { id: 'classic', label: 'Clásico', font: 'Noto Sans' },
+    { id: 'retro', label: 'Retro', font: 'IBM Plex Sans' },
+    { id: 'glass', label: 'Cristal', font: 'Hind' }
   ]
 
   const fonts: { id: Font; label: string }[] = [
-    { id: 'theme', label: 'La del tema' },
+    // The theme's own font, named after it.
+    { id: 'theme', label: '' },
     { id: 'comic', label: 'Comic Relief' },
     { id: 'nunito', label: 'Nunito' },
     { id: 'fira', label: 'Fira Sans' },
@@ -35,6 +36,7 @@
   ]
 
   let settings: Settings | undefined = $state()
+  let themeFont = $derived(themes.find((t) => t.id === settings?.theme)?.font ?? 'La del tema')
   let me: Snapshot | undefined = $state()
   let email: EmailStatus | undefined = $state()
   let invites: InviteStatus | undefined = $state()
@@ -307,7 +309,9 @@
             onchange={(e) => set({ font: e.currentTarget.value as Font })}
             aria-label="Fuente"
           >
-            {#each fonts as item (item.id)}<option value={item.id}>{item.label}</option>{/each}
+            {#each fonts as item (item.id)}<option value={item.id}
+                >{item.label || `${themeFont} (predeterminada)`}</option
+              >{/each}
           </select>
         </label>
         <p class="hint">¡Hola! ¿Nos vemos en el Messenger? 😎</p>
