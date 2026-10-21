@@ -247,6 +247,10 @@ async function invite(email: string, inviter: string | null, inviterName: string
   })
 }
 
+// Messenger Plus! codes a display name may carry ([b], [c=#hex]…): plain text in emails.
+// Same pattern as `tag` in src/renderer/src/plus.ts.
+const PLUS_CODES = /\[\/?(?:b|i|u|s|c|a)(?:=(?:#[0-9a-f]{6}|#[0-9a-f]{3}))?\]/gi
+
 // <invite-email address='…' name='…'/>: the user explicitly invites someone. `name` is
 // the inviter's display name, for the email. Errors: 'resource-constraint' (no invites
 // left), 'conflict' (that address already has an account: add them instead).
@@ -265,6 +269,7 @@ xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
       address,
       jid,
       String(request.attrs.name ?? '')
+        .replace(PLUS_CODES, '')
         .trim()
         .slice(0, 64)
     )

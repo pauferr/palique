@@ -115,7 +115,10 @@ assert.deepEqual(await A.login(`other${id}`, pass, { invite: code }), {
 
 // Three per person. At the limit, the answer is "limit" even for a registered address.
 await A.login(a, pass)
+// A colored name reaches the email as plain text.
+await A.setNick(`[c=#e11d48]${aName}[/c]`)
 await A.inviteByEmail(mail(`invx${id}`))
+assert.equal((await lastMail(mail(`invx${id}`))).subject, `${aName} quiere agregarte en Palique`)
 assert.deepEqual(await A.inviteByEmail(mail(`invy${id}`)), { max: 3, used: 3 })
 await assert.rejects(A.inviteByEmail(mail(`invz${id}`)), /limit/)
 await assert.rejects(A.inviteByEmail(mail(memberName)), /limit/)
