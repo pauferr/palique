@@ -465,8 +465,11 @@ function setUnread(contact: string, count: number): void {
 // Busy (dnd): no sounds, shaking or toasts, but windows still flash.
 function deliver(message: ChatMessage, quiet = false): void {
   if (account) history.save(account, message)
-  const silent = quiet || (!message.mine && ownShow() === 'dnd')
-  if (!chats.has(message.with) && !(message.buzz && !message.mine)) {
+  const dnd = !message.mine && ownShow() === 'dnd'
+  const silent = quiet || dnd
+  // Only a buzz opens the conversation, and not in No molestar: there it waits like a message.
+  const opens = message.buzz && !message.mine && !dnd
+  if (!chats.has(message.with) && !opens) {
     // Ours from another device are only history.
     if (message.mine) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
