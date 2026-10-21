@@ -30,13 +30,7 @@ services:
       SMTP_PORT: "1025"
       DATA_DIR: /data
       SIGNIN_LIMIT: "1000" # sign-in lookups per IP a minute (production: 30)
-      # Newsletter on Brevo: leave empty to store choices without syncing.
-      # Production also sends mail through Brevo's SMTP (SMTP_HOST=smtp-relay.brevo.com, port 587,
-      # SMTP_USER/SMTP_PASS from Brevo > SMTP & API). Keep real keys out of git (.env file).
-      BREVO_API_KEY: ${BREVO_API_KEY:-}
-      BREVO_LIST_ID: ${BREVO_LIST_ID:-}
-      BREVO_API_URL: ${BREVO_API_URL:-https://api.brevo.com/v3}
-      BREVO_WEBHOOK_TOKEN: ${BREVO_WEBHOOK_TOKEN:-dev-only-brevo-webhook-token}
+      # Keep real keys out of git (.env file).
     volumes:
       - accounts-data:/data
 

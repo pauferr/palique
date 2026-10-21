@@ -3,11 +3,10 @@
 // People sign in with their email; behind it, each account has a random JID that never
 // changes (so contacts and chats don't care if the email does). Only this service knows
 // which email goes with which JID.
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage } from 'node:http'
 import { mkdirSync } from 'node:fs'
 import { component, xml } from '@xmpp/component'
-import { brevo } from './brevo.ts'
 import { openDb, type Account } from './db.ts'
 import { BUTTERFLY, escape, mailer } from './mail.ts'
 
@@ -33,21 +32,6 @@ const send = mailer({
   user: process.env['SMTP_USER'],
   pass: process.env['SMTP_PASS']
 })
-
-// Newsletter list (Brevo). Prepared but optional: without these it just doesn't sync.
-const newsletter = brevo({
-  apiKey: process.env['BREVO_API_KEY'],
-  listId: Number(process.env['BREVO_LIST_ID']) || undefined,
-  baseUrl: process.env['BREVO_API_URL']
-})
-if (!newsletter) console.log('brevo not configured: newsletter choices are stored, not synced')
-
-// Failures are logged; sync-brevo.ts can catch up.
-function syncNewsletter(email: string, subscribed: boolean): void {
-  if (!newsletter) return
-  const action = subscribed ? newsletter.subscribe(email) : newsletter.unsubscribe(email)
-  action.catch((e) => console.error('brevo', e.message))
-}
 
 const xmpp = component({
   service: env('XMPP_SERVICE'),
@@ -162,14 +146,13 @@ xmpp.iqCallee.set(NS, 'resend', async (ctx) => {
   return true
 })
 
-// <newsletter subscribe='true|false'/>: the user's choice, any time.
+// <newsletter subscribe='true|false'/>: the user's choice, any time. Only stored (with its
+// date, as proof of consent) until there's a newsletter to send.
 xmpp.iqCallee.set(NS, 'newsletter', (ctx) => {
   const jid = user(ctx.from)
   if (!jid || !db.account(jid)) return stanzaError('forbidden')
   const wanted = ctx.stanza.getChild('newsletter', NS)!.attrs.subscribe === 'true'
-  const account = db.setNewsletter(jid, wanted)!
-  syncNewsletter(account.email, account.newsletter)
-  return status(account)
+  return status(db.setNewsletter(jid, wanted)!)
 })
 
 // <lookup address='…'/>: who has this address (adding a contact). Knowing someone's email
@@ -361,17 +344,6 @@ async function sendReset(email: string): Promise<void> {
 // Per IP a minute; development raises it so the checks can run back to back.
 const signInIps = ipLimit(Number(env('SIGNIN_LIMIT', '30')), 60_000)
 
-// Brevo's webhook (configure it with ?token=BREVO_WEBHOOK_TOKEN): someone left the list
-// from a newsletter's own link, or the address bounced or complained. Mirror it here.
-const WEBHOOK_TOKEN = process.env['BREVO_WEBHOOK_TOKEN'] ?? ''
-const LEAVE_EVENTS = new Set(['unsubscribed', 'spam', 'hard_bounce', 'hardBounce', 'blocked'])
-
-function sameSecret(given: string): boolean {
-  const a = Buffer.from(given)
-  const b = Buffer.from(WEBHOOK_TOKEN)
-  return WEBHOOK_TOKEN !== '' && a.length === b.length && timingSafeEqual(a, b)
-}
-
 const pushStatus = (account: Account): void => {
   xmpp.send(xml('message', { to: account.jid }, status(account))).catch(() => {})
 }
@@ -434,32 +406,14 @@ createServer(async (req, res) => {
       return json(500, { error: (e as Error).message })
     }
   }
-  if (req.method === 'POST' && url.pathname === '/brevo') {
-    if (!sameSecret(url.searchParams.get('token') ?? '')) {
-      res.writeHead(403)
-      return res.end()
-    }
-    const event = await readJson(req)
-    const email = cleanEmail(event.email)
-    if (LEAVE_EVENTS.has(String(event.event)) && email) {
-      for (const account of db.unsubscribeEmail(email)) pushStatus(account)
-    }
-    res.writeHead(200)
-    return res.end()
-  }
 
   const reply = (code: number, title: string, message: string): void => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
     res.end(page(title, message))
   }
   if (req.method === 'GET' && url.pathname === '/verify') {
-    const result = db.verify(url.searchParams.get('t') ?? '')
-    if (!result) return reply(404, 'Enlace no válido', 'Este enlace ya se ha usado o no existe.')
-    const { account, previous } = result
-    if (account.newsletter) {
-      syncNewsletter(previous, false)
-      syncNewsletter(account.email, true)
-    }
+    const account = db.verify(url.searchParams.get('t') ?? '')
+    if (!account) return reply(404, 'Enlace no válido', 'Este enlace ya se ha usado o no existe.')
     // Let the app know right away (it also asks on every sign-in).
     pushStatus(account)
     return reply(

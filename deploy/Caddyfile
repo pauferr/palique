@@ -2,7 +2,7 @@
 	email {$ACME_EMAIL}
 }
 
-# Account service pages and endpoints (email links, password recovery, Brevo webhook).
+# Account service pages and endpoints (email links, password recovery).
 # Caddy gets the certificate for this name; deploy/certs.sh hands it to Prosody too.
 {$PALIQUE_DOMAIN} {
 	reverse_proxy accounts:8080

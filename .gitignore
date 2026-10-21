@@ -8,7 +8,7 @@ out
 # Local agent instructions (points to AGENTS.md)
 CLAUDE.md
 
-# Local secrets (e.g. BREVO_API_KEY for docker compose)
+# Local secrets
 .env
 deploy/.env
 deploy/certs/

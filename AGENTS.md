@@ -9,7 +9,7 @@ A desktop instant messenger in the spirit of MSN Messenger and AIM: Electron + S
 - **App:** Electron 39, Svelte 5 (runes), TypeScript, built with electron-vite. Node 22+ to develop; CI uses Node 24.
 - **Messaging:** XMPP with `@xmpp/client`. Server: Prosody 13 (Docker image `prosodyim/prosody:13.0`).
 - **Account service** (`server/accounts`): TypeScript run directly by Node 24 (`node:sqlite`, no framework, no build step), `@xmpp/component`, nodemailer.
-- **Email:** Mailpit in development, Brevo (SMTP + newsletter list) in production.
+- **Email:** Mailpit in development, any SMTP server in production.
 - **Platforms:** macOS and Linux first; unsigned Windows installer exists.
 
 ## Repository layout
@@ -75,7 +75,6 @@ compose.yaml       local server stack
 - **HTTP**, for the signed-out app and email links:
   - `POST /account`, `/signup`, `/recover`
   - `GET /verify`, `/no-invites`
-  - `POST /brevo` (webhook)
   - `POST /admin/invite`, only from loopback, used by `src/invite.ts`
 - **Storage:** SQLite at `$DATA_DIR/accounts.sqlite`, with tables `accounts` (email unique), `invites` and `invite_optout`.
 - **Rate limits** are in memory, so a restart clears them:
@@ -164,7 +163,7 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `invites` | invites by email, 3-per-user limit, inviter becomes a contact, opt-out |
 | `email` | changing the email, uniqueness, old address works until confirmed |
 | `reset` | password recovery by email |
-| `newsletter` | newsletter choice, Brevo client, unsubscribe webhook |
+| `newsletter` | newsletter choice |
 | `invisible` | invisible status (needs the server module) |
 | `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `version` | next release version from the commits |
@@ -227,17 +226,10 @@ The workflow **never runs on push**: releasing is a manual decision.
 ## Production
 
 - **Stack:** Prosody, the account service and Caddy (HTTPS, Let's Encrypt) via Docker from `deploy/`.
-- **Guide:** a free test server on Oracle Cloud + DuckDNS + Brevo, in [docs/deployment.md](docs/deployment.md).
+- **Guide:** deploying to a server of your own, in [docs/deployment.md](docs/deployment.md).
 - **First accounts:** `docker compose exec accounts node src/invite.ts you@example.com`.
 - **Backups:** volumes `palique_prosody-data` (accounts, rosters) and `palique_accounts-data` (emails, invites, preferences).
 
-### Newsletter (Brevo)
+### Newsletter
 
-Choices are stored by the account service and synced to a Brevo list. Without Brevo settings it still works; it just doesn't sync. To connect it:
-
-1. In Brevo, create a contact list (note its ID) and an API key (*SMTP & API → API keys*).
-2. Put `BREVO_API_KEY`, `BREVO_LIST_ID` and `BREVO_WEBHOOK_TOKEN` in a git-ignored `.env` next to the compose file.
-3. Run `docker compose up -d accounts`, then `docker compose exec accounts node --disable-warning=ExperimentalWarning src/sync-brevo.ts`.
-4. Add a Brevo webhook for *unsubscribed*, *hard bounce* and *spam* to `https://<domain>/brevo?token=<BREVO_WEBHOOK_TOKEN>`.
-
-Production also sends mail through Brevo's SMTP relay (`smtp-relay.brevo.com:587`).
+There's no newsletter yet. The account service only stores each user's choice and when it was made (proof of consent); the app changes it in Options. When there is one, its list comes from those choices, and every issue needs a working unsubscribe link.

@@ -28,15 +28,12 @@ services:
       USER_DOMAIN: ${PALIQUE_DOMAIN}
       PUBLIC_URL: https://${PALIQUE_DOMAIN}
       TRUST_PROXY: "true" # behind Caddy: real client IPs for rate limits
-      SMTP_HOST: ${SMTP_HOST:-smtp-relay.brevo.com}
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:?set SMTP_USER in .env}
       SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in .env}
       MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
       MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
-      BREVO_API_KEY: ${BREVO_API_KEY:-}
-      BREVO_LIST_ID: ${BREVO_LIST_ID:-}
-      BREVO_WEBHOOK_TOKEN: ${BREVO_WEBHOOK_TOKEN:-}
       DATA_DIR: /data
     volumes:
       - accounts-data:/data

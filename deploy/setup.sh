@@ -10,7 +10,7 @@ if [ ! -f .env ]; then
 fi
 
 # Secrets nobody has to type: generated once and kept in .env.
-for name in ACCOUNTS_SECRET BREVO_WEBHOOK_TOKEN; do
+for name in ACCOUNTS_SECRET; do
   if ! grep -q "^$name=." .env; then
     value=$(openssl rand -hex 24)
     if grep -q "^$name=" .env; then
@@ -50,7 +50,4 @@ cat <<EOF
 Palique is running on $PALIQUE_DOMAIN.
 Invite the first accounts (yours too) by email with:
   docker compose exec accounts node src/invite.ts you@example.com
-
-Brevo webhook URL (optional, newsletter unsubscribes):
-  https://$PALIQUE_DOMAIN/brevo?token=$BREVO_WEBHOOK_TOKEN
 EOF

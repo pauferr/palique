@@ -1,4 +1,4 @@
-// Outgoing email over SMTP (Mailpit in development, Brevo in production).
+// Outgoing email over SMTP (Mailpit in development, any SMTP server in production).
 import nodemailer from 'nodemailer'
 
 export const escape = (text: string): string =>

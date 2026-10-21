@@ -187,11 +187,9 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
 
 **Boletín de novedades:**
-- Consentimiento explícito y separado al registrarse (casilla sin marcar por defecto), modificable en Opciones. Cada envío lleva enlace de baja.
-- Plataforma: **Brevo** (empresa europea, pensada para el RGPD). Brevo envía también los correos de verificación y recuperación en producción (SMTP).
-- El servicio de cuentas guarda la elección y la fecha del consentimiento, y la sincroniza con una lista de Brevo (todas las direcciones están verificadas: la invitación o el cambio de correo llegaron a ellas): al cambiar la preferencia en Opciones y al cambiar de dirección (la antigua sale de la lista).
-- Cada boletín lleva el enlace de baja de Brevo. Un *webhook* de Brevo (bajas, rebotes graves, spam), protegido con un código secreto, desmarca el boletín en Palique y la app se entera al momento.
-- Preparado sin cuenta de Brevo: sin clave, las elecciones se guardan sin sincronizar, y `src/sync-brevo.ts` pone la lista al día cuando se añade la clave. Pasos en AGENTS.md.
+- Consentimiento explícito y separado al registrarse (casilla sin marcar por defecto), modificable en Opciones.
+- Todavía no hay boletín. El servicio de cuentas guarda la elección y la fecha del consentimiento (todas las direcciones están verificadas: la invitación o el cambio de correo llegaron a ellas).
+- La herramienta de envío se elegirá cuando haya boletín, sin atarse a ninguna de antemano. Su lista saldrá de esas elecciones, y cada envío llevará un enlace de baja que funcione.
 
 ### Almacenamiento de datos
 

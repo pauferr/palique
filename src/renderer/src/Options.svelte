@@ -136,7 +136,7 @@
     }
   }
 
-  // Newsletter: stored with the account service, synced to Brevo.
+  // Newsletter: the choice is stored with the account service.
   async function toggleNewsletter(event: Event): Promise<void> {
     const box = event.currentTarget as HTMLInputElement
     note = ''

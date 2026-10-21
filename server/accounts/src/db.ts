@@ -185,7 +185,7 @@ export function openDb(file: string) {
 
     // The pending address becomes the account's. Undefined if the link is unknown or used
     // (or, in a race, someone else got the address first).
-    verify(t: string): { account: Account; previous: string } | undefined {
+    verify(t: string): Account | undefined {
       const row = db.prepare('SELECT * FROM accounts WHERE token = ?').get(t) as
         AccountRow | undefined
       if (!row?.pending_email) return undefined
@@ -196,7 +196,7 @@ export function openDb(file: string) {
       } catch {
         return undefined
       }
-      return { account: toAccount(get(row.jid)!), previous: row.email }
+      return toAccount(get(row.jid)!)
     },
 
     // --- newsletter ---
@@ -209,22 +209,6 @@ export function openDb(file: string) {
         jid
       )
       return toAccount(get(jid)!)
-    },
-
-    // Unsubscribed through Brevo.
-    unsubscribeEmail(email: string): Account[] {
-      const rows = db
-        .prepare('SELECT * FROM accounts WHERE email = ? AND newsletter = 1')
-        .all(email) as AccountRow[]
-      db.prepare('UPDATE accounts SET newsletter = 0, newsletter_at = ? WHERE email = ?').run(
-        Date.now(),
-        email
-      )
-      return rows.map((row) => ({ ...toAccount(row), newsletter: false }))
-    },
-
-    allAccounts(): Account[] {
-      return (db.prepare('SELECT * FROM accounts').all() as AccountRow[]).map(toAccount)
     }
   }
 }
