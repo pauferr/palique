@@ -174,12 +174,40 @@
     setTimeout(() => (canWink = true), await window.api.sendWink(jid, id))
   }
 
-  // "13:32" today, "3 oct, 13:32" on other days.
-  function time(at: number): string {
+  const GROUP_GAP = 5 * 60 * 1000 // messages closer than this share one "X dice:"
+
+  const time = (at: number): string =>
+    new Date(at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+
+  // "Hoy", "Ayer" or "3 de octubre" (with the year when it isn't this one).
+  function day(at: number): string {
     const date = new Date(at)
-    const clock = date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
-    if (date.toDateString() === new Date().toDateString()) return clock
-    return `${date.toLocaleDateString('es', { day: 'numeric', month: 'short' })}, ${clock}`
+    const today = new Date()
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+    if (date.toDateString() === today.toDateString()) return 'Hoy'
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer'
+    return date.toLocaleDateString('es', {
+      day: 'numeric',
+      month: 'long',
+      year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric'
+    })
+  }
+
+  const newDay = (i: number): boolean =>
+    i === 0 ||
+    new Date(messages[i - 1].at).toDateString() !== new Date(messages[i].at).toDateString()
+
+  // A text message right after another from the same person goes on without its header.
+  function continues(i: number): boolean {
+    const [before, message] = [messages[i - 1], messages[i]]
+    return (
+      !!before &&
+      !newDay(i) &&
+      !before.buzz &&
+      !before.wink &&
+      before.mine === message.mine &&
+      message.at - before.at < GROUP_GAP
+    )
   }
 </script>
 
@@ -205,30 +233,35 @@
 
   <ol bind:this={list} aria-live="polite">
     <li class="notice">Esta conversación solo se guarda en este equipo.</li>
-    {#each messages as message (message.id)}
-      <li class:mine={message.mine}>
-        {#if message.buzz}
-          <em
-            >{#if message.mine}¡Has enviado un zumbido!{:else}¡<Emoticons text={name} /> te ha enviado
-              un zumbido!{/if}</em
+    {#each messages as message, i (message.id)}
+      {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
+      {#if message.buzz}
+        <li class="event">
+          🫨 {#if message.mine}Has enviado un zumbido{:else}<Emoticons text={name} /> te ha enviado un
+            zumbido{/if}
+          <time>{time(message.at)}</time>
+        </li>
+      {:else if message.wink}
+        <li class="event">
+          🎬 {#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} /> te ha enviado el guiño{/if}
+          <button
+            class="replay"
+            onclick={() => window.api.replayWink(message.wink!)}
+            title="Volver a ver el guiño">«{winkLabel(message.wink)}» ▶</button
           >
-        {:else if message.wink}
-          <em
-            >{#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} /> te ha enviado el guiño{/if}
-            <button
-              class="replay"
-              onclick={() => window.api.replayWink(message.wink!)}
-              title="Volver a ver el guiño">«{winkLabel(message.wink)}» ▶</button
-            ></em
-          >
-        {:else}
-          <span class="meta"
-            >{#if message.mine}Tú dices{:else}<Emoticons text={name} /> dice{/if}:
-            <time>{time(message.at)}</time></span
-          >
-          <p><Emoticons text={message.body} /></p>
-        {/if}
-      </li>
+          <time>{time(message.at)}</time>
+        </li>
+      {:else}
+        <li class:mine={message.mine} class:continues={continues(i)}>
+          {#if !continues(i)}
+            <span class="meta"
+              >{#if message.mine}Tú dices{:else}<Emoticons text={name} /> dice{/if}:
+              <time>{time(message.at)}</time></span
+            >
+          {/if}
+          <p title={time(message.at)}><Emoticons text={message.body} /></p>
+        </li>
+      {/if}
     {/each}
   </ol>
 
@@ -298,7 +331,7 @@
         onkeydown={onKeydown}
         oninput={onInput}
         maxlength="4000"
-        rows="3"
+        rows="2"
         placeholder="Escribe un mensaje…"
         aria-label="Mensaje"
       ></textarea>
@@ -357,6 +390,10 @@
     margin-bottom: 8px;
   }
 
+  li.continues {
+    margin-top: -6px;
+  }
+
   .notice {
     color: var(--text-muted);
     font-size: 11px;
@@ -382,8 +419,33 @@
     overflow-wrap: anywhere;
   }
 
-  em {
-    color: var(--text-error);
+  /* Day separator and buzz/wink notices: small centered chips, not messages. */
+  .day,
+  .event {
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .day {
+    margin: 12px 0;
+    font-size: 11px;
+  }
+
+  .day span,
+  .event {
+    width: fit-content;
+    margin-inline: auto;
+    padding: 2px 10px;
+    border-radius: var(--button-radius);
+    background: var(--bar-bg);
+  }
+
+  .event {
+    font-size: 12px;
+  }
+
+  .event time {
+    margin-left: 4px;
   }
 
   .typing {
@@ -558,14 +620,23 @@
     gap: 6px;
   }
 
+  /* Grows with what's written, up to a point, then scrolls. */
   textarea {
     flex: 1;
+    min-height: 2lh;
+    max-height: 8lh;
     resize: none;
+    field-sizing: content;
   }
 
   .send {
-    align-self: stretch;
+    align-self: flex-end;
+    min-height: calc(2lh + 10px);
     font-weight: bold;
+  }
+
+  .send:disabled {
+    opacity: 0.5;
   }
 
   .shaking {

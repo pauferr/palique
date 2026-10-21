@@ -623,8 +623,13 @@
     display: block;
   }
 
+  .thumb.classic {
+    border-color: #c9d4ea;
+    border-radius: 6px;
+  }
+
   .thumb.classic i:first-child {
-    background: linear-gradient(#e3edfd, #9fbef0);
+    background: linear-gradient(#eef3fd, #d3e0f8);
   }
 
   .thumb.classic i:last-child {

@@ -1,4 +1,5 @@
-/* Theme "Clásico" (default): glossy blues and candy buttons, inspired by early-2000s messengers.
+/* Theme "Clásico" (default): early-2000s messenger blues with today's flat polish: light
+   surfaces, thin borders, soft shadows and round buttons.
    Plain :root so it also applies before a theme is picked. */
 @import '@fontsource/noto-sans/latin-400.css';
 @import '@fontsource/noto-sans/latin-400-italic.css';
@@ -9,37 +10,37 @@
   --font-size: 13px;
   --x-height: 0.536; /* Noto Sans's, so other fonts match it (base.css) */
 
-  --text: #1b2a4a;
-  --text-strong: #0b3c9e;
-  --text-muted: #5b6f94;
+  --text: #1c2740;
+  --text-strong: #2156d1;
+  --text-muted: #68748c;
   --text-error: #b03a2e;
 
-  --window-bg: #f3f6fc;
+  --window-bg: #f5f7fb;
   --list-bg: #ffffff;
   --field-bg: #ffffff;
-  --header-bg: linear-gradient(#e3edfd, #c3d7f7);
-  --bar-bg: #eaf0fb;
-  --line: #c6d5ee;
-  --row-hover-bg: #e8f0fd;
+  --header-bg: linear-gradient(#eef3fd, #e2eafa);
+  --bar-bg: #f5f7fb;
+  --line: #e1e6f0;
+  --row-hover-bg: #eef3fd;
   --warning-bg: #fdecc8;
   --request-bg: #fff8dc;
 
-  --radius: 2px;
-  --radius-large: 12px;
-  --avatar-radius: 8px;
-  --avatar-face-radius: 4px;
+  --radius: 6px;
+  --radius-large: 16px;
+  --avatar-radius: 12px;
+  --avatar-face-radius: 8px;
 
-  --button-bg: linear-gradient(#ffffff, #c4dbf8);
-  --button-bg-hover: linear-gradient(#ffffff, #a9cbf7);
+  --button-bg: #ffffff;
+  --button-bg-hover: #eef3fd;
   --button-border-width: 1px;
-  --button-border-color: #6d93d1;
-  --button-border-color-active: #4a74b8;
-  --button-radius: 11px;
-  --button-shadow: none;
+  --button-border-color: #c9d4ea;
+  --button-border-color-active: #2156d1;
+  --button-radius: 10px;
+  --button-shadow: 0 1px 2px rgb(20 40 90 / 8%);
   --button-shadow-active: inset 0 1px 2px rgb(0 0 0 / 15%);
 
   --field-border-width: 1px;
-  --field-border-color: #7f9db9;
+  --field-border-color: #c9d4ea;
   --field-shadow: none;
 
   /* Lists and transcripts sit flush in the window. */
@@ -49,10 +50,10 @@
   --panel-margin: 0;
   --panel-radius: 0;
 
-  --group-border: 1px solid #c6d5ee;
-  --group-radius: 4px;
+  --group-border: 1px solid #e1e6f0;
+  --group-radius: 12px;
   --group-bg: #ffffff;
-  --popup-shadow: 2px 2px 6px rgb(0 0 0 / 20%);
+  --popup-shadow: 0 8px 24px rgb(20 40 90 / 14%);
 
   /* Default avatars: each user always gets the same one of these. */
   --avatar-0: #ff6b9d;

@@ -42,9 +42,14 @@
   let sorted = $derived(
     [...roster.contacts].sort((a, b) => a.name.localeCompare(b.name) || a.jid.localeCompare(b.jid))
   )
+  // The search box filters by name, ignoring case and accents.
+  let query = $state('')
+  const fold = (text: string): string =>
+    emojify(text).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  let found = $derived(sorted.filter((c) => fold(c.name).includes(fold(query.trim()))))
   let groups = $derived([
-    { label: 'Conectados', contacts: sorted.filter((c) => c.show !== 'offline') },
-    { label: 'Desconectados', contacts: sorted.filter((c) => c.show === 'offline') }
+    { label: 'Conectados', contacts: found.filter((c) => c.show !== 'offline') },
+    { label: 'Desconectados', contacts: found.filter((c) => c.show === 'offline') }
   ])
 
   // Messages waiting in conversations that aren't open (contact → count), like MSN.
@@ -354,7 +359,16 @@
     {/each}
 
     {#if roster.contacts.length}
-      {#each groups as group (group.label)}
+      <input
+        class="search"
+        type="search"
+        bind:value={query}
+        placeholder="Buscar contactos"
+        aria-label="Buscar contactos"
+      />
+      {#if !found.length}<p class="no-match">Nadie se llama así.</p>{/if}
+      <!-- While searching, only the groups with someone in them. -->
+      {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
         <details open>
           <summary>{group.label} ({group.contacts.length})</summary>
           <ul>
@@ -368,15 +382,16 @@
                       name={contact.name}
                       url={contact.avatar}
                       show={contact.show}
-                      size={28}
+                      size={36}
                     />
                   </span>
+                  <!-- Name, and the personal message under it. -->
                   <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                    <Emoticons text={contact.name} />
+                    <span><Emoticons text={contact.name} /></span>
                     {#if contact.pending}
-                      <small>- Esperando a que te acepte</small>
+                      <small>Esperando a que te acepte</small>
                     {:else if contact.status}
-                      <small>- <Emoticons text={contact.status} /></small>
+                      <small><Emoticons text={contact.status} /></small>
                     {/if}
                   </button>
                   {#if unread[contact.jid]}
@@ -632,9 +647,21 @@
 
   li {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
-    padding: 2px 10px 2px 18px;
+    padding: 4px 10px 4px 18px;
+  }
+
+  .search {
+    box-sizing: border-box;
+    width: calc(100% - 16px);
+    margin: 8px 8px 2px;
+  }
+
+  .no-match {
+    margin: 12px;
+    color: var(--text-muted);
+    text-align: center;
   }
 
   li:hover {
@@ -674,17 +701,25 @@
   }
 
   .name {
+    display: grid;
     flex: 1;
     min-width: 0;
-    overflow: hidden;
     padding: 0;
     background: none;
     border: none;
     box-shadow: none;
     color: var(--text);
     text-align: left;
+  }
+
+  .name > * {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .name small {
+    font-size: 0.9em;
   }
 
   .name:hover:not(:disabled) {
