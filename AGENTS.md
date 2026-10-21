@@ -27,7 +27,7 @@ src/main/          Electron main process
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
                    '' → App (Login / Roster), #chat=<jid>, #options, #wink=<id>
-  themes/          classic, retro, glass (CSS variables)
+  themes/          classic, retro, glass, night (CSS variables)
 server/
   prosody.cfg.lua  development Prosody config
   modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible

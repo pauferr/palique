@@ -21,7 +21,8 @@
   const themes: { id: Theme; label: string; font: string }[] = [
     { id: 'classic', label: 'Clásico', font: 'Noto Sans' },
     { id: 'retro', label: 'Retro', font: 'IBM Plex Sans' },
-    { id: 'glass', label: 'Cristal', font: 'Hind' }
+    { id: 'glass', label: 'Cristal', font: 'Hind' },
+    { id: 'night', label: 'Noche', font: 'Noto Sans' }
   ]
 
   const fonts: { id: Font; label: string }[] = [
@@ -556,6 +557,7 @@
 
   .themes {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
   }
 
@@ -618,6 +620,19 @@
 
   .thumb.retro i:last-child {
     background: #c0c0c0;
+  }
+
+  .thumb.night {
+    border-color: #4a5468;
+    border-radius: 6px;
+  }
+
+  .thumb.night i:first-child {
+    background: linear-gradient(#34405a, #263044);
+  }
+
+  .thumb.night i:last-child {
+    background: #1b1f27;
   }
 
   .thumb.glass {

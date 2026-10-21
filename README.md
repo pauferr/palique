@@ -40,7 +40,7 @@ Zumbidos que hacen temblar la ventana, guiños a pantalla completa, los emoticon
 
 ### Tres temas
 
-Clásico, con los azules de los 2000. Retro, como un escritorio de los 90. Y Cristal, todo cielo, hierba y brillo.
+Clásico, con los azules de los 2000. Retro, como un escritorio de los 90. Cristal, todo cielo, hierba y brillo. Y Noche, para cuando se apagan las luces.
 
 <p align="center">
   <img src="docs/images/contactos.png" width="240" alt="Tema Clásico">

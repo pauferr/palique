@@ -3,6 +3,7 @@ import { mount } from 'svelte'
 import './themes/classic.css'
 import './themes/retro.css'
 import './themes/glass.css'
+import './themes/night.css'
 import './themes/fonts.css'
 import './themes/base.css'
 

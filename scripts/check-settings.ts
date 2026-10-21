@@ -71,4 +71,5 @@ assert.deepEqual(
 )
 assert.deepEqual(validPatch(null), {})
 
+assert.deepEqual(validPatch({ theme: 'night' }), { theme: 'night' }, 'the dark theme')
 console.log('settings check passed')

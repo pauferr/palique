@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
 
-export const THEMES = ['classic', 'retro', 'glass'] as const
+export const THEMES = ['classic', 'retro', 'glass', 'night'] as const
 export type Theme = (typeof THEMES)[number]
 
 // 'theme' = the theme's own font; the rest are bundled (themes/fonts.css).
