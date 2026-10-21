@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Settings, SoundPack, Theme } from '../../main/settings'
+  import type { Font, Settings, SoundPack, Theme } from '../../main/settings'
   import type { EmailStatus, InviteStatus, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import { avatarPng } from './picture'
@@ -21,6 +21,17 @@
     { id: 'classic', label: 'Clásico' },
     { id: 'retro', label: 'Retro' },
     { id: 'glass', label: 'Cristal' }
+  ]
+
+  const fonts: { id: Font; label: string }[] = [
+    { id: 'theme', label: 'La del tema' },
+    { id: 'comic', label: 'Comic' },
+    { id: 'nunito', label: 'Nunito' },
+    { id: 'fira', label: 'Fira Sans' },
+    { id: 'hand', label: 'A mano' },
+    { id: 'legible', label: 'Muy legible' },
+    { id: 'serif', label: 'Serif' },
+    { id: 'typewriter', label: 'Máquina de escribir' }
   ]
 
   let settings: Settings | undefined = $state()
@@ -287,6 +298,19 @@
             </button>
           {/each}
         </div>
+      </section>
+      <section>
+        <h2>Fuente</h2>
+        <label>
+          <select
+            value={settings?.font}
+            onchange={(e) => set({ font: e.currentTarget.value as Font })}
+            aria-label="Fuente"
+          >
+            {#each fonts as item (item.id)}<option value={item.id}>{item.label}</option>{/each}
+          </select>
+        </label>
+        <p class="hint">¡Hola! ¿Nos vemos en el Messenger? 😎</p>
       </section>
     {:else if section === 'messages'}
       <h1>Mensajes</h1>

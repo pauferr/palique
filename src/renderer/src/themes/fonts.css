@@ -1,0 +1,52 @@
+/* The font chosen in Options, over the theme's own (data-font on :root; none = the
+   theme's). Loaded after the themes so it wins at the same specificity. All free (OFL):
+   Comic Neue stands in for Comic Sans, which is Microsoft's and can't be bundled. */
+@import '@fontsource/comic-neue/latin-400.css';
+@import '@fontsource/comic-neue/latin-400-italic.css';
+@import '@fontsource/comic-neue/latin-700.css';
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-400-italic.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/fira-sans/latin-400.css';
+@import '@fontsource/fira-sans/latin-400-italic.css';
+@import '@fontsource/fira-sans/latin-700.css';
+@import '@fontsource/patrick-hand/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400-italic.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700.css';
+@import '@fontsource/gelasio/latin-400.css';
+@import '@fontsource/gelasio/latin-400-italic.css';
+@import '@fontsource/gelasio/latin-700.css';
+@import '@fontsource/courier-prime/latin-400.css';
+@import '@fontsource/courier-prime/latin-400-italic.css';
+@import '@fontsource/courier-prime/latin-700.css';
+
+:root[data-font='comic'] {
+  --font: 'Comic Neue', cursive;
+}
+
+:root[data-font='nunito'] {
+  --font: 'Nunito', sans-serif;
+}
+
+:root[data-font='fira'] {
+  --font: 'Fira Sans', sans-serif;
+}
+
+/* Small letters for its size: one step up to read like the others. */
+:root[data-font='hand'] {
+  --font: 'Patrick Hand', cursive;
+  --font-size: 15px;
+}
+
+:root[data-font='legible'] {
+  --font: 'Atkinson Hyperlegible', sans-serif;
+}
+
+:root[data-font='serif'] {
+  --font: 'Gelasio', serif;
+}
+
+:root[data-font='typewriter'] {
+  --font: 'Courier Prime', monospace;
+}

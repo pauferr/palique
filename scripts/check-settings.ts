@@ -10,6 +10,7 @@ const file = join(dir, 'settings.json')
 
 const defaults = {
   theme: 'classic',
+  font: 'theme',
   winks: true,
   show: 'online',
   email: '',
@@ -36,24 +37,29 @@ assert.deepEqual(
 writeFileSync(file, '{ broken')
 assert.deepEqual(openSettings(file).get(), defaults, 'corrupt file falls back to defaults')
 
-writeFileSync(file, JSON.stringify({ theme: 'xp', winks: false }))
+writeFileSync(file, JSON.stringify({ theme: 'xp', font: 'wingdings', winks: false }))
 assert.deepEqual(
   openSettings(file).get(),
   { ...defaults, winks: false },
-  'a theme that no longer exists falls back to the default'
+  'a theme or font that no longer exists falls back to the default'
 )
 
 // The Options window can only change known keys, with valid values.
-assert.deepEqual(validPatch({ sounds: false, theme: 'glass', away: 15, soundPack: 'bubble' }), {
-  sounds: false,
-  soundPack: 'bubble',
-  theme: 'glass',
-  away: 15
-})
+assert.deepEqual(
+  validPatch({ sounds: false, theme: 'glass', font: 'comic', away: 15, soundPack: 'bubble' }),
+  {
+    font: 'comic',
+    sounds: false,
+    soundPack: 'bubble',
+    theme: 'glass',
+    away: 15
+  }
+)
 assert.deepEqual(
   validPatch({
     sounds: 'no',
     soundPack: 'neon',
+    font: 'wingdings',
     theme: 'neon',
     away: 7,
     email: 'x@y.z',

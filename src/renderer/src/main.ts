@@ -3,6 +3,7 @@ import { mount } from 'svelte'
 import './themes/classic.css'
 import './themes/retro.css'
 import './themes/glass.css'
+import './themes/fonts.css'
 import './themes/base.css'
 
 import App from './App.svelte'
@@ -12,9 +13,10 @@ import Wink from './Wink.svelte'
 import WinkGallery from './WinkGallery.svelte'
 import SoundGallery from './SoundGallery.svelte'
 
-// Every window follows the theme chosen in Options, live.
-const applyTheme = ({ theme }: { theme: string }): void => {
+// Every window follows the theme and font chosen in Options, live.
+const applyTheme = ({ theme, font }: { theme: string; font: string }): void => {
   document.documentElement.dataset.theme = theme
+  document.documentElement.dataset.font = font
 }
 window.api.getSettings().then(applyTheme)
 window.api.onSettings(applyTheme)

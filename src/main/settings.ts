@@ -5,12 +5,26 @@ import type { OwnShow } from './xmpp'
 export const THEMES = ['classic', 'retro', 'glass'] as const
 export type Theme = (typeof THEMES)[number]
 
+// 'theme' = the theme's own font; the rest are bundled (themes/fonts.css).
+export const FONTS = [
+  'theme',
+  'comic',
+  'nunito',
+  'fira',
+  'hand',
+  'legible',
+  'serif',
+  'typewriter'
+] as const
+export type Font = (typeof FONTS)[number]
+
 // Sound collections, drawn in the renderer (sounds.ts).
 export const SOUND_PACKS = ['classic', 'velvet', 'crystal', 'bubble'] as const
 export type SoundPack = (typeof SOUND_PACKS)[number]
 
 export type Settings = {
   theme: Theme
+  font: Font
   winks: boolean // play winks full screen
   show: OwnShow // last status, used at the next sign-in (like MSN)
   email: string // last account signed in, pre-filled on the sign-in screen
@@ -30,6 +44,7 @@ export const AWAY_MINUTES = [0, 5, 10, 15, 30]
 
 const DEFAULTS: Settings = {
   theme: 'classic',
+  font: 'theme',
   winks: true,
   show: 'online',
   email: '',
@@ -63,6 +78,7 @@ export function validPatch(patch: unknown): Partial<Settings> {
   const valid: Partial<Settings> = {}
   for (const key of SWITCHES) if (typeof given[key] === 'boolean') valid[key] = given[key]
   if (THEMES.includes(given.theme as Theme)) valid.theme = given.theme as Theme
+  if (FONTS.includes(given.font as Font)) valid.font = given.font as Font
   if (SOUND_PACKS.includes(given.soundPack as SoundPack))
     valid.soundPack = given.soundPack as SoundPack
   if (AWAY_MINUTES.includes(given.away as number)) valid.away = given.away as number
@@ -82,6 +98,7 @@ export function openSettings(file: string): SettingsStore {
     // First run or unreadable file: defaults.
   }
   if (!THEMES.includes(current.theme)) current = { ...current, theme: DEFAULTS.theme }
+  if (!FONTS.includes(current.font)) current = { ...current, font: DEFAULTS.font }
   return {
     get: () => current,
     set(patch) {
