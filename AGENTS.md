@@ -34,7 +34,6 @@ server/
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
 scripts/           check-*.ts: runnable checks (see Checks), invite.ts, mailpit.ts helpers
-  winks/           wink sources (canvas drawing + synthesized sound) and record.ts (see Winks)
 docs/              palique.md (plan and decisions), deployment.md (deployment guide)
 compose.yaml       local server stack
 ```
@@ -141,12 +140,13 @@ npm run build:linux  # AppImage (use CI from macOS)
 
 ## Winks
 
-Each wink is `src/renderer/src/assets/winks/<id>.webm` (VP9 with alpha + Opus), with its label in `src/renderer/src/winks.ts`. They're generated from `scripts/winks/winks.js` (canvas drawing and Web Audio sound per wink):
+Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/renderer/src/winks/`, so they're sharp at any size (thumbnail, conversation, full screen) and weigh a few KB.
 
-- `scripts/winks/preview.html`: open it in a browser to watch them (no sound).
-- `node scripts/winks/record.ts [id ...]`: records them with headless Chrome (`MediaRecorder`), no ffmpeg needed. All of them without ids. `CHROME=/path/to/chrome` outside macOS.
-
-A retired id keeps its label in `winks.ts`, so old conversations still name it.
+- `kit.ts`: the `Wink` type (`id`, `dur`, `still`, `draw(c, t)` in a 480×360 space, `sound(s)`), timing helpers, shared shapes and the synthesizer.
+- One file per wink (`<id>.ts`), listed in `catalog.ts`; shared characters in `face.ts` (emotes) and `kid.ts`.
+- `WinkPlayer.svelte` plays one, scaled to its box at the screen's pixel density. Sound follows "Reproducir sonidos".
+- To see them all: `npm run dev`, then open the dev app at `#winks` (e.g. `ELECTRON_RENDERER_URL=http://localhost:5173 npx electron .` and change the hash, or load `http://localhost:5173/#winks` in its DevTools).
+- A new wink: its file, an entry in `catalog.ts` and a label in `src/renderer/src/wink-labels.ts`. Ids travel over the network and live in histories: never rename or reuse one. A retired id keeps its label so old conversations still name it.
 
 ## Checks
 

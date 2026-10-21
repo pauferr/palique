@@ -1,8 +1,14 @@
-// Bundled wink catalog: every assets/winks/<id>.webm is a wink, the file name is its id.
-const files = import.meta.glob<string>('./assets/winks/*.webm', { eager: true, import: 'default' })
+// The wink catalog. Winks are drawn live (src/renderer/src/winks/), so they stay sharp
+// at any size and weigh a few KB.
+import { CATALOG } from './winks/catalog'
+import type { Wink } from './winks/kit'
+import { winkLabel } from './wink-labels'
 
-export const winks: Record<string, string> = Object.fromEntries(
-  Object.entries(files).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -5), url])
+export { winkLabel }
+
+// In the picker, by name.
+export const winks: Wink[] = [...CATALOG].sort((a, b) =>
+  winkLabel(a.id).localeCompare(winkLabel(b.id), 'es')
 )
 
-export { winkLabel } from './wink-labels'
+export const findWink = (id: string): Wink | undefined => CATALOG.find((w) => w.id === id)

@@ -7,7 +7,8 @@
   import Emoticons from './Emoticons.svelte'
   import { EMOTICONS, emojify } from './emoticons'
   import { prefs } from './prefs.svelte'
-  import { winkLabel, winks } from './winks'
+  import WinkPlayer from './WinkPlayer.svelte'
+  import { findWink, winkLabel, winks } from './winks'
 
   let { jid }: { jid: string } = $props()
 
@@ -94,7 +95,7 @@
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     const offWink = window.api.onWinkPlay((id) => {
-      if (Object.hasOwn(winks, id)) playing = id
+      if (findWink(id)) playing = id
     })
     window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     // History never triggers effects; live messages (even the one that opened this window)
@@ -165,18 +166,8 @@
     onInput()
   }
 
-  // Wink thumbnails: frozen on a telling frame, playing while hovered or focused.
-  const STILL_AT = 1
-  function preview(event: Event): void {
-    const video = (event.currentTarget as HTMLElement).querySelector('video')!
-    video.currentTime = 0
-    video.play().catch(() => {})
-  }
-  function still(event: Event): void {
-    const video = (event.currentTarget as HTMLElement).querySelector('video')!
-    video.pause()
-    video.currentTime = STILL_AT
-  }
+  // Wink thumbnails: a still at a telling moment, playing (muted) while hovered or focused.
+  let previewing = $state('')
 
   async function wink(id: string): Promise<void> {
     pickerOpen = false
@@ -195,16 +186,10 @@
 
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
   {#if playing}
-    <!-- Decorative animation with no dialogue: nothing to caption. A click closes it. -->
-    <!-- svelte-ignore a11y_media_has_caption, a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <!-- A click closes it. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="wink-layer" onclick={() => (playing = '')}>
-      <video
-        src={winks[playing]}
-        aria-hidden="true"
-        autoplay
-        onended={() => (playing = '')}
-        onerror={() => (playing = '')}
-      ></video>
+      <WinkPlayer id={playing} playing sound={prefs.sounds} onended={() => (playing = '')} />
     </div>
   {/if}
   <header>
@@ -277,26 +262,21 @@
         <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
         <div class="popup">
           <ul class="winks">
-            {#each Object.entries(winks) as [id, src] (id)}
+            {#each winks as { id } (id)}
               <li>
                 <button
                   class="wink"
                   onclick={() => wink(id)}
                   disabled={!canWink}
                   aria-label="Enviar el guiño {winkLabel(id)}"
-                  onmouseenter={preview}
-                  onmouseleave={still}
-                  onfocus={preview}
-                  onblur={still}
+                  onmouseenter={() => (previewing = id)}
+                  onmouseleave={() => (previewing = '')}
+                  onfocus={() => (previewing = id)}
+                  onblur={() => (previewing = '')}
                 >
-                  <video
-                    src="{src}#t={STILL_AT}"
-                    muted
-                    loop
-                    playsinline
-                    preload="auto"
-                    aria-hidden="true"
-                  ></video>
+                  <span class="thumb">
+                    {#if pickerOpen}<WinkPlayer {id} playing={previewing === id} loop />{/if}
+                  </span>
                   <span>{winkLabel(id)}</span>
                 </button>
               </li>
@@ -484,10 +464,9 @@
     background: rgb(0 0 0 / 15%);
   }
 
-  .wink-layer video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
+  .wink-layer :global(canvas) {
+    position: absolute;
+    inset: 0;
   }
 
   /* The wink's name in the conversation: looks like text, plays it again. */
@@ -536,11 +515,11 @@
     outline: none;
   }
 
-  .wink video {
+  .thumb {
+    display: block;
     box-sizing: border-box;
     width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: contain;
+    aspect-ratio: 4 / 3;
     pointer-events: none;
     background: var(--field-bg);
     border: 1px solid var(--line);

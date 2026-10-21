@@ -9,6 +9,7 @@ import App from './App.svelte'
 import Chat from './Chat.svelte'
 import Options from './Options.svelte'
 import Wink from './Wink.svelte'
+import WinkGallery from './WinkGallery.svelte'
 
 // Every window follows the theme chosen in Options, live.
 const applyTheme = ({ theme }: { theme: string }): void => {
@@ -30,6 +31,8 @@ const app = wink
     ? mount(Chat, { target, props: { jid: chat } })
     : params.has('options')
       ? mount(Options, { target })
-      : mount(App, { target })
+      : params.has('winks')
+        ? mount(WinkGallery, { target })
+        : mount(App, { target })
 
 export default app

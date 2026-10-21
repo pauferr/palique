@@ -1,19 +1,22 @@
 <script lang="ts">
-  import { winks } from './winks'
+  import { onMount } from 'svelte'
+  import WinkPlayer from './WinkPlayer.svelte'
+  import { findWink } from './winks'
 
   let { id }: { id: string } = $props()
-  // svelte-ignore state_referenced_locally
-  const src = Object.hasOwn(winks, id) ? winks[id] : undefined
   const done = (): void => window.api.winkDone()
 
-  // Unknown id (e.g. a pack the user doesn't have): close without showing anything.
-  if (!src) done()
+  // Sound follows Options, so wait for the settings before playing.
+  let sounds: boolean | undefined = $state()
+  onMount(() => {
+    // Unknown id (e.g. sent by a newer Palique): close without showing anything.
+    if (!findWink(id)) return done()
+    window.api.getSettings().then((s) => (sounds = s.sounds))
+  })
 </script>
 
-{#if src}
-  <!-- Decorative animation with no dialogue: nothing to caption. -->
-  <!-- svelte-ignore a11y_media_has_caption -->
-  <video {src} aria-hidden="true" autoplay onended={done} onerror={done}></video>
+{#if sounds !== undefined}
+  <WinkPlayer {id} playing sound={sounds} onended={done} />
 {/if}
 
 <style>
@@ -21,14 +24,13 @@
      overlay (html.overlay is set in main.ts) or every window would turn see-through. */
   :global(html.overlay),
   :global(html.overlay body) {
+    height: 100%;
     margin: 0;
     background: transparent;
     overflow: hidden;
   }
 
-  video {
-    width: 100vw;
-    height: 100vh;
-    object-fit: contain;
+  :global(html.overlay #app) {
+    height: 100%;
   }
 </style>
