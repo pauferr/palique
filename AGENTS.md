@@ -173,7 +173,7 @@ Add or update the matching check with any change to that logic. Before committin
 
 ## Conventions
 
-- **Language:** UI text and user-facing emails are in **Spanish** (Spain). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish.
+- **Language:** UI text and user-facing emails are in **Spanish** (Spain). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, taken from mock accounts (`@palique.com` addresses).
 - **Commits:**
   - Conventional Commits in English, as in [CONTRIBUTING.md](CONTRIBUTING.md).
   - Small commits straight to `main`, pushed as you go; no PRs.
