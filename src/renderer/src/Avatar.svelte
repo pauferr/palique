@@ -37,11 +37,12 @@
     width: var(--size);
     height: var(--size);
     overflow: hidden;
-    /* A white ring keeps the status frame visible whatever the picture's color. */
+    /* A gap keeps the status frame visible whatever the picture's color. Transparent, so
+       it takes whatever is behind (header, list, conversation) in every theme. */
     padding: 2px;
     border: 3px solid;
     border-radius: var(--avatar-radius);
-    background: #fff;
+    background: transparent;
     color: #fff;
     font-weight: bold;
     text-shadow: 0 1px 1px rgb(0 0 0 / 25%);
