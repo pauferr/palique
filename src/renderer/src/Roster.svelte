@@ -8,6 +8,7 @@
   import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
   import { playSound } from './sounds'
+  import UpdateNotice from './UpdateNotice.svelte'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -318,6 +319,7 @@
     </div>
   </header>
 
+  <UpdateNotice />
   {#if avatarError}<p class="notice error" role="alert">{avatarError}</p>{/if}
   {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
   {#if roster.show === 'invisible'}

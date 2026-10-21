@@ -59,7 +59,8 @@
     "@fontsource/noto-sans": "^5.3.0",
     "@fontsource/nunito": "^5.3.0",
     "@fontsource/patrick-hand": "^5.3.0",
-    "@xmpp/client": "^0.14.0"
+    "@xmpp/client": "^0.14.0",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

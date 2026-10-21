@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
+import type { UpdateStatus } from '../main/updates'
 import type {
   AuthError,
   AuthLink,
@@ -67,6 +68,14 @@ const api = {
     ipcRenderer.on('roster:changed', listener)
     return () => ipcRenderer.off('roster:changed', listener)
   },
+  // A new release: null until there is one (see main/updates.ts).
+  update: (): Promise<UpdateStatus | null> => ipcRenderer.invoke('update:get'),
+  onUpdate: (callback: (status: UpdateStatus) => void): (() => void) => {
+    const listener = (_: unknown, status: UpdateStatus): void => callback(status)
+    ipcRenderer.on('update:changed', listener)
+    return () => ipcRenderer.off('update:changed', listener)
+  },
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
   onContactOnline: (callback: (jid: string) => void): (() => void) => {
     const listener = (_: unknown, jid: string): void => callback(jid)
     ipcRenderer.on('contact:online', listener)

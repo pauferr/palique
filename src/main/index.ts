@@ -28,6 +28,7 @@ import {
 import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
 import { openHistory, type History } from './history'
 import { openLog } from './log'
+import { installNow, startUpdates, type UpdateStatus } from './updates'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
@@ -803,6 +804,17 @@ app.whenReady().then(() => {
     exportChats(BrowserWindow.fromWebContents(event.sender))
   )
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
+
+  // New releases: every window shows the notice (sign-in screen and contact list).
+  let update: UpdateStatus | null = null
+  startUpdates((status) => {
+    update = status
+    BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('update:changed', status))
+  })
+  ipcMain.handle('update:get', () => update)
+  ipcMain.handle('update:install', () => {
+    if (update?.state === 'ready') installNow()
+  })
 
   createWindow()
   createTray()

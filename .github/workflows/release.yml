@@ -102,7 +102,8 @@ jobs:
           # Unsigned for now (no Apple Developer account yet).
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      # Only what people download. Auto-update files (latest*.yml) come back with an updater.
+      # What people download, and the update files the installed apps read
+      # (latest.yml, latest-linux.yml, latest-mac.yml; see src/main/updates.ts).
       - uses: actions/upload-artifact@v7
         with:
           name: palique-${{ matrix.platform }}
@@ -110,6 +111,7 @@ jobs:
             dist/*.dmg
             dist/*.AppImage
             dist/*.exe
+            dist/latest*.yml
           retention-days: 7
 
   # Only once every OS has built: one release with all the files.

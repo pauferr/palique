@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import type { AuthLink } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import UpdateNotice from './UpdateNotice.svelte'
 
   let { onlogin }: { onlogin: (jid: string) => void } = $props()
 
@@ -127,6 +128,7 @@
 </script>
 
 <div class="login" style:--overlap={mode === 'login' ? '56px' : '36px'}>
+  <UpdateNotice />
   <header>
     <h1>Palique</h1>
     <p>¿Echamos un palique?</p>

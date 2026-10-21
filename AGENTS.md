@@ -202,7 +202,12 @@ GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) 
 - **Linux:** `.AppImage`
 - **Windows:** unsigned `.exe`
 
-Only installers go up: no auto-update files (`latest*.yml`, blockmaps) until there's an updater.
+The installers go up with the update files the installed apps read (`latest*.yml`; no blockmaps, so updates are full downloads).
+
+**Updates** ([src/main/updates.ts](src/main/updates.ts), `electron-updater`, packaged builds only): every few hours the app looks for a newer published release (drafts don't count; pre-releases do while the version has a stage).
+
+- **Windows and Linux** download it in the background and install it on quit. The contact list and sign-in screen offer «Reiniciar ahora».
+- **macOS** can't install it (ad-hoc signature, no Developer ID): the same places show a notice with a link to download it.
 
 **Versions are semver, worked out from the commits** since the last release by [scripts/next-version.ts](scripts/next-version.ts). That's one more reason to keep commit messages in Conventional Commits.
 

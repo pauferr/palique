@@ -46,9 +46,8 @@ win:
     - target: nsis
       arch: [x64]
   artifactName: ${name}-${version}-windows-${arch}.${ext}
-# Only the installers: no blockmaps until there's an auto-updater to use them.
-dmg:
-  writeUpdateInfo: false
+# Update files (latest*.yml) for src/main/updates.ts: Windows and Linux update themselves,
+# macOS only checks (latest-mac.yml). Full downloads, no blockmaps for now.
 nsis:
   differentialPackage: false
   oneClick: false
