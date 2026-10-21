@@ -1,0 +1,59 @@
+name: Something isn't working
+description: A bug, or something that behaves oddly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. This page is public: don't include your email address or any personal data about you or your contacts.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you were doing, what you expected, and what happened instead. If a message appeared, copy it exactly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the contact list
+        2. Click "Añadir o invitar a un contacto"
+        3. …
+
+  - type: input
+    id: version
+    attributes:
+      label: Palique version
+      description: Shown at the bottom left of Options ("Opciones").
+      placeholder: v0.8.0-alpha
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: macOS 15, Windows 11, Ubuntu 24.04 with Wayland…
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Error log
+      description: |
+        In Options ("Opciones"), click "Registro de errores…" at the bottom and paste the last lines of `palique.log` here (or drag the file in). It holds no passwords, messages or addresses, but have a look before pasting it.
+      render: text

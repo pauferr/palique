@@ -1,0 +1,16 @@
+name: Idea or suggestion
+description: Something you'd like Palique to do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What for
+      description: When it would help you. It makes the idea easier to understand.
