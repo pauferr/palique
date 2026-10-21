@@ -25,13 +25,13 @@
 
   const fonts: { id: Font; label: string }[] = [
     { id: 'theme', label: 'La del tema' },
-    { id: 'comic', label: 'Comic' },
+    { id: 'comic', label: 'Comic Relief' },
     { id: 'nunito', label: 'Nunito' },
     { id: 'fira', label: 'Fira Sans' },
-    { id: 'hand', label: 'A mano' },
-    { id: 'legible', label: 'Muy legible' },
-    { id: 'serif', label: 'Serif' },
-    { id: 'typewriter', label: 'Máquina de escribir' }
+    { id: 'hand', label: 'Patrick Hand' },
+    { id: 'legible', label: 'Atkinson Hyperlegible' },
+    { id: 'serif', label: 'Gelasio' },
+    { id: 'typewriter', label: 'Courier Prime' }
   ]
 
   let settings: Settings | undefined = $state()
