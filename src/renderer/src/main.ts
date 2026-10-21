@@ -1,8 +1,8 @@
 import { mount } from 'svelte'
 
-import './themes/xp.css'
-import './themes/win98.css'
-import './themes/aero.css'
+import './themes/classic.css'
+import './themes/retro.css'
+import './themes/glass.css'
 import './themes/base.css'
 
 import App from './App.svelte'
@@ -10,6 +10,7 @@ import Chat from './Chat.svelte'
 import Options from './Options.svelte'
 import Wink from './Wink.svelte'
 import WinkGallery from './WinkGallery.svelte'
+import SoundGallery from './SoundGallery.svelte'
 
 // Every window follows the theme chosen in Options, live.
 const applyTheme = ({ theme }: { theme: string }): void => {
@@ -33,6 +34,8 @@ const app = wink
       ? mount(Options, { target })
       : params.has('winks')
         ? mount(WinkGallery, { target })
-        : mount(App, { target })
+        : params.has('sounds')
+          ? mount(SoundGallery, { target })
+          : mount(App, { target })
 
 export default app

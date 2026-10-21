@@ -9,7 +9,7 @@ const dir = mkdtempSync(join(tmpdir(), 'palique-'))
 const file = join(dir, 'settings.json')
 
 const defaults = {
-  theme: 'xp',
+  theme: 'classic',
   winks: true,
   show: 'online',
   email: '',
@@ -19,6 +19,7 @@ const defaults = {
   alertOnline: true,
   alertMessages: true,
   sounds: true,
+  soundPack: 'classic',
   emoticons: true,
   shake: true,
   typing: true
@@ -35,14 +36,29 @@ assert.deepEqual(
 writeFileSync(file, '{ broken')
 assert.deepEqual(openSettings(file).get(), defaults, 'corrupt file falls back to defaults')
 
+writeFileSync(file, JSON.stringify({ theme: 'xp', winks: false }))
+assert.deepEqual(
+  openSettings(file).get(),
+  { ...defaults, winks: false },
+  'a theme that no longer exists falls back to the default'
+)
+
 // The Options window can only change known keys, with valid values.
-assert.deepEqual(validPatch({ sounds: false, theme: 'aero', away: 15 }), {
+assert.deepEqual(validPatch({ sounds: false, theme: 'glass', away: 15, soundPack: 'bubble' }), {
   sounds: false,
-  theme: 'aero',
+  soundPack: 'bubble',
+  theme: 'glass',
   away: 15
 })
 assert.deepEqual(
-  validPatch({ sounds: 'no', theme: 'neon', away: 7, email: 'x@y.z', show: 'dnd' }),
+  validPatch({
+    sounds: 'no',
+    soundPack: 'neon',
+    theme: 'neon',
+    away: 7,
+    email: 'x@y.z',
+    show: 'dnd'
+  }),
   {},
   'wrong types, unknown values and other keys are dropped'
 )

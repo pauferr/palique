@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import type { ChatMessage, Contact } from '../../main/xmpp'
-  import buzzSound from './assets/sounds/buzz.ogg'
-  import messageSound from './assets/sounds/message.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { EMOTICONS, emojify } from './emoticons'
   import { prefs } from './prefs.svelte'
+  import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
   import { findWink, winkLabel, winks } from './winks'
 
@@ -47,13 +46,13 @@
   const CHIME_GAP = 1500
   let lastChime = 0
 
-  function play(src: string): void {
+  function play(event: SoundEvent): void {
     if (!prefs.sounds) return
-    if (src === messageSound) {
+    if (event === 'message') {
       if (Date.now() - lastChime < CHIME_GAP) return
       lastChime = Date.now()
     }
-    new Audio(src).play().catch(() => {})
+    playSound(prefs.soundPack, event)
   }
 
   function shake(): void {
@@ -70,9 +69,9 @@
       if (message.buzz && prefs.shake) shake()
       if (message.wink) {
         // The full-screen wink brings its own sound; with winks off, a plain chime.
-        if (!prefs.winks) play(messageSound)
+        if (!prefs.winks) play('message')
       } else {
-        play(message.buzz ? buzzSound : messageSound)
+        play(message.buzz ? 'buzz' : 'message')
       }
     }
     if (alert && message.mine && message.buzz) shake()

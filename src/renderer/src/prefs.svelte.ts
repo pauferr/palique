@@ -2,9 +2,13 @@
 // Options window changes them.
 import type { Settings } from '../../main/settings'
 
-export const prefs: Pick<Settings, 'winks' | 'sounds' | 'emoticons' | 'shake' | 'typing'> = $state({
+export const prefs: Pick<
+  Settings,
+  'winks' | 'sounds' | 'soundPack' | 'emoticons' | 'shake' | 'typing'
+> = $state({
   winks: true,
   sounds: true,
+  soundPack: 'classic',
   emoticons: true,
   shake: true,
   typing: true
@@ -13,6 +17,7 @@ export const prefs: Pick<Settings, 'winks' | 'sounds' | 'emoticons' | 'shake' | 
 const update = (settings: Settings): void => {
   prefs.winks = settings.winks
   prefs.sounds = settings.sounds
+  prefs.soundPack = settings.soundPack
   prefs.emoticons = settings.emoticons
   prefs.shake = settings.shake
   prefs.typing = settings.typing

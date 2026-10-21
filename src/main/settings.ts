@@ -2,8 +2,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
 
-export const THEMES = ['xp', 'win98', 'aero'] as const
+export const THEMES = ['classic', 'retro', 'glass'] as const
 export type Theme = (typeof THEMES)[number]
+
+// Sound collections, drawn in the renderer (sounds.ts).
+export const SOUND_PACKS = ['classic', 'velvet', 'crystal', 'bubble'] as const
+export type SoundPack = (typeof SOUND_PACKS)[number]
 
 export type Settings = {
   theme: Theme
@@ -16,6 +20,7 @@ export type Settings = {
   alertOnline: boolean // toast when a contact comes online
   alertMessages: boolean // toast when a message arrives
   sounds: boolean
+  soundPack: SoundPack
   emoticons: boolean // show (L), :) … as emoji
   shake: boolean // buzzes shake the conversation window
   typing: boolean // show "está escribiendo…"
@@ -24,7 +29,7 @@ export type Settings = {
 export const AWAY_MINUTES = [0, 5, 10, 15, 30]
 
 const DEFAULTS: Settings = {
-  theme: 'xp',
+  theme: 'classic',
   winks: true,
   show: 'online',
   email: '',
@@ -34,6 +39,7 @@ const DEFAULTS: Settings = {
   alertOnline: true,
   alertMessages: true,
   sounds: true,
+  soundPack: 'classic',
   emoticons: true,
   shake: true,
   typing: true
@@ -57,6 +63,8 @@ export function validPatch(patch: unknown): Partial<Settings> {
   const valid: Partial<Settings> = {}
   for (const key of SWITCHES) if (typeof given[key] === 'boolean') valid[key] = given[key]
   if (THEMES.includes(given.theme as Theme)) valid.theme = given.theme as Theme
+  if (SOUND_PACKS.includes(given.soundPack as SoundPack))
+    valid.soundPack = given.soundPack as SoundPack
   if (AWAY_MINUTES.includes(given.away as number)) valid.away = given.away as number
   return valid
 }
@@ -73,6 +81,7 @@ export function openSettings(file: string): SettingsStore {
   } catch {
     // First run or unreadable file: defaults.
   }
+  if (!THEMES.includes(current.theme)) current = { ...current, theme: DEFAULTS.theme }
   return {
     get: () => current,
     set(patch) {

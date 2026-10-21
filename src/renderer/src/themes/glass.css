@@ -1,11 +1,11 @@
-/* Theme "Aero" ("Cristal"): sky-and-grass gradients, aqua glossy buttons and translucent
+/* Theme "Cristal": sky-and-grass gradients, aqua glossy buttons and translucent
    rounded panels, inspired by late-2000s desktops. Linux has no general way to blur what's
    behind a window, so the glass is simulated over the theme's own sky. */
 @import '@fontsource/hind/latin-400.css';
 @import '@fontsource/hind/latin-600.css';
 @import '@fontsource/hind/latin-700.css';
 
-:root[data-theme='aero'] {
+:root[data-theme='glass'] {
   --font: 'Hind', sans-serif;
   --font-size: 14px;
 

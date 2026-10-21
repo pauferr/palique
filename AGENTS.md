@@ -26,7 +26,7 @@ src/main/          Electron main process
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
                    '' → App (Login / Roster), #chat=<jid>, #options, #wink=<id>
-  themes/          xp, win98, aero (CSS variables)
+  themes/          classic, retro, glass (CSS variables)
 server/
   prosody.cfg.lua  development Prosody config
   modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible
@@ -147,6 +147,8 @@ Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/ren
 - `WinkPlayer.svelte` plays one, scaled to its box at the screen's pixel density. Sound follows "Reproducir sonidos".
 - To see them all: `npm run dev`, then open the dev app at `#winks` (e.g. `ELECTRON_RENDERER_URL=http://localhost:5173 npx electron .` and change the hash, or load `http://localhost:5173/#winks` in its DevTools).
 - A new wink: its file, an entry in `catalog.ts` and a label in `src/renderer/src/wink-labels.ts`. Ids travel over the network and live in histories: never rename or reuse one. A retired id keeps its label so old conversations still name it.
+
+**Sounds** (message, contact online, buzz) come in collections chosen in Options (`soundPack` setting): `src/renderer/src/sounds.ts`, synthesized with the winks' `makeSound` except the classic message (a recording, cut shorter). `#sounds` shows them all side by side. A new collection: its entry in `packs` and its id in `SOUND_PACKS` (`src/main/settings.ts`).
 
 ## Checks
 

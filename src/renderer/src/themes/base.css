@@ -1,4 +1,4 @@
-/* Shared look built only from theme variables (see xp.css, win98.css, aero.css). */
+/* Shared look built only from theme variables (see classic.css, retro.css, glass.css). */
 html {
   /* So gradient window backgrounds cover short pages without repeating. */
   min-height: 100%;

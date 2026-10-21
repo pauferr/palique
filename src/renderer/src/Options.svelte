@@ -1,12 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Settings, Theme } from '../../main/settings'
+  import type { Settings, SoundPack, Theme } from '../../main/settings'
   import type { EmailStatus, InviteStatus, Snapshot } from '../../main/xmpp'
-  import buzzSound from './assets/sounds/buzz.ogg'
-  import messageSound from './assets/sounds/message.ogg'
-  import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import { avatarPng } from './picture'
+  import { events, packs, playSound } from './sounds'
 
   // Laid out like Windows Live Messenger's Options: sections on the left, one at a time on
   // the right. Every change applies at once; there's only "Cerrar".
@@ -20,9 +18,9 @@
   let section: (typeof sections)[number]['id'] = $state('personal')
 
   const themes: { id: Theme; label: string }[] = [
-    { id: 'xp', label: 'Caramelo' },
-    { id: 'win98', label: 'Clásico' },
-    { id: 'aero', label: 'Cristal' }
+    { id: 'classic', label: 'Clásico' },
+    { id: 'retro', label: 'Retro' },
+    { id: 'glass', label: 'Cristal' }
   ]
 
   let settings: Settings | undefined = $state()
@@ -59,10 +57,6 @@
 
   function set(patch: Partial<Settings>): void {
     window.api.setSettings(patch).then((value) => (settings = value))
-  }
-
-  function play(src: string): void {
-    new Audio(src).play().catch(() => {})
   }
 
   // Personal
@@ -373,22 +367,26 @@
           />
           Reproducir sonidos
         </label>
+        <label>
+          Colección
+          <select
+            value={settings?.soundPack}
+            onchange={(e) => set({ soundPack: e.currentTarget.value as SoundPack })}
+          >
+            {#each packs as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+          </select>
+        </label>
         <table class="sounds">
           <tbody>
-            <tr
-              ><td>Mensaje nuevo</td><td
-                ><button onclick={() => play(messageSound)}>▶ Probar</button></td
-              ></tr
-            >
-            <tr
-              ><td>Un contacto se conecta</td><td
-                ><button onclick={() => play(onlineSound)}>▶ Probar</button></td
-              ></tr
-            >
-            <tr
-              ><td>Zumbido</td><td><button onclick={() => play(buzzSound)}>▶ Probar</button></td
-              ></tr
-            >
+            {#each events as e (e.id)}
+              <tr
+                ><td>{e.label}</td><td
+                  ><button onclick={() => settings && playSound(settings.soundPack, e.id)}
+                    >▶ Probar</button
+                  ></td
+                ></tr
+              >
+            {/each}
           </tbody>
         </table>
         <p class="hint">Con el estado Ocupado no hay alertas ni sonidos.</p>
@@ -597,36 +595,36 @@
     display: block;
   }
 
-  .thumb.xp i:first-child {
+  .thumb.classic i:first-child {
     background: linear-gradient(#e3edfd, #9fbef0);
   }
 
-  .thumb.xp i:last-child {
+  .thumb.classic i:last-child {
     background: #fff;
   }
 
-  .thumb.win98 {
+  .thumb.retro {
     border: 2px solid;
     border-color: #fff #404040 #404040 #fff;
   }
 
-  .thumb.win98 i:first-child {
+  .thumb.retro i:first-child {
     background: linear-gradient(90deg, #000080, #1084d0);
   }
 
-  .thumb.win98 i:last-child {
+  .thumb.retro i:last-child {
     background: #c0c0c0;
   }
 
-  .thumb.aero {
+  .thumb.glass {
     background: linear-gradient(160deg, #6fcff2, #b6ecdc 55%, #6cc286);
   }
 
-  .thumb.aero i:first-child {
+  .thumb.glass i:first-child {
     background: rgb(255 255 255 / 50%);
   }
 
-  .thumb.aero i:last-child {
+  .thumb.glass i:last-child {
     margin: 4px;
     background: rgb(255 255 255 / 70%);
   }

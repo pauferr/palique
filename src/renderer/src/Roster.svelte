@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
-  import messageSound from './assets/sounds/message.ogg'
-  import onlineSound from './assets/sounds/online.ogg'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { emojify } from './emoticons'
   import { avatarPng } from './picture'
+  import { prefs } from './prefs.svelte'
+  import { playSound } from './sounds'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
@@ -55,12 +55,8 @@
     window.api.getUnread().then((value) => (unread = value))
     const offRoster = window.api.onRoster((value) => (roster = value))
     const offUnread = window.api.onUnread((value) => (unread = value))
-    const offIncoming = window.api.onIncoming(() => {
-      new Audio(messageSound).play().catch(() => {})
-    })
-    const offOnline = window.api.onContactOnline(() => {
-      new Audio(onlineSound).play().catch(() => {})
-    })
+    const offIncoming = window.api.onIncoming(() => playSound(prefs.soundPack, 'message'))
+    const offOnline = window.api.onContactOnline(() => playSound(prefs.soundPack, 'online'))
     return () => {
       offRoster()
       offUnread()
