@@ -3,6 +3,7 @@
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
+  import { Bug, Download, Info, LogOut, Settings, UserPlus } from '@lucide/svelte'
   import { emojify } from './emoticons'
   import { avatarPng } from './picture'
   import { stripPlus } from './plus'
@@ -219,7 +220,9 @@
     >
     {#if menu === 'contacts'}
       <div class="menu" role="menu" style:left="4px">
-        <button role="menuitem" onclick={openAdd}>Añadir o invitar a un contacto…</button>
+        <button role="menuitem" onclick={openAdd}
+          ><UserPlus size={16} aria-hidden="true" />Añadir o invitar a un contacto…</button
+        >
       </div>
     {:else if menu === 'tools'}
       <div class="menu" role="menu" style:left="80px">
@@ -228,10 +231,10 @@
           onclick={() => {
             menu = ''
             window.api.openOptions()
-          }}>Opciones…</button
+          }}><Settings size={16} aria-hidden="true" />Opciones…</button
         >
         <button role="menuitem" onclick={exportHistory}
-          >Guardar una copia de las conversaciones…</button
+          ><Download size={16} aria-hidden="true" />Guardar una copia de las conversaciones…</button
         >
       </div>
     {:else if menu === 'help'}
@@ -240,9 +243,10 @@
           role="menuitem"
           onclick={() => help(window.api.openLogs)}
           title="Si algo falla, envíanos este archivo. No guarda contraseñas, mensajes ni direcciones."
-          >Registro de errores…</button
+          ><Bug size={16} aria-hidden="true" />Registro de errores…</button
         >
-        <button role="menuitem" onclick={() => help(window.api.openAbout)}>Acerca de Palique</button
+        <button role="menuitem" onclick={() => help(window.api.openAbout)}
+          ><Info size={16} aria-hidden="true" />Acerca de Palique</button
         >
       </div>
     {/if}
@@ -293,9 +297,11 @@
               onclick={() => {
                 menu = ''
                 window.api.openOptions()
-              }}>Opciones…</button
+              }}><Settings size={16} aria-hidden="true" />Opciones…</button
             >
-            <button role="menuitem" onclick={onlogout}>Cerrar sesión</button>
+            <button role="menuitem" onclick={onlogout}
+              ><LogOut size={16} aria-hidden="true" />Cerrar sesión</button
+            >
           </div>
         {/if}
       </div>
@@ -804,6 +810,10 @@
     left: 0;
   }
 
+  .menu :global(svg) {
+    flex: none;
+  }
+
   .menu button {
     display: flex;
     gap: 8px;
@@ -839,6 +849,7 @@
   .dot {
     width: 9px;
     height: 9px;
+    margin: 0 3.5px; /* as wide as the menus' icons, so the labels line up */
     border-radius: 50%;
   }
 

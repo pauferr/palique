@@ -3,6 +3,7 @@
   import type { Font, Settings, SoundPack, Theme } from '../../main/settings'
   import type { EmailStatus, InviteStatus, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import { Bell, KeyRound, MessageCircle, Monitor, User } from '@lucide/svelte'
   import { avatarPng } from './picture'
   import { events, packs, playSound } from './sounds'
 
@@ -10,11 +11,11 @@
   // the right. Every change applies at once; there's only "Cerrar". The name and personal
   // message are edited from the contact list.
   const sections = [
-    { id: 'personal', icon: '🙂', label: 'Personal' },
-    { id: 'general', icon: '🖥️', label: 'General' },
-    { id: 'messages', icon: '💬', label: 'Mensajes' },
-    { id: 'alerts', icon: '🔔', label: 'Alertas' },
-    { id: 'account', icon: '🔑', label: 'Cuenta' }
+    { id: 'personal', icon: User, label: 'Personal' },
+    { id: 'general', icon: Monitor, label: 'General' },
+    { id: 'messages', icon: MessageCircle, label: 'Mensajes' },
+    { id: 'alerts', icon: Bell, label: 'Alertas' },
+    { id: 'account', icon: KeyRound, label: 'Cuenta' }
   ] as const
   let section: (typeof sections)[number]['id'] = $state('personal')
 
@@ -162,7 +163,7 @@
         onclick={() => {
           section = item.id
           note = ''
-        }}><span aria-hidden="true">{item.icon}</span>{item.label}</button
+        }}><item.icon size={16} aria-hidden="true" />{item.label}</button
       >
     {/each}
   </nav>
@@ -461,6 +462,10 @@
     border-right: 1px solid var(--line);
   }
 
+  nav :global(svg) {
+    flex: none;
+  }
+
   nav button {
     display: flex;
     gap: 8px;
@@ -482,12 +487,6 @@
     background: var(--list-bg);
     color: var(--text-strong);
     font-weight: bold;
-  }
-
-  nav span {
-    width: 20px;
-    font-size: 16px;
-    text-align: center;
   }
 
   main {
