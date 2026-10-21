@@ -1,5 +1,6 @@
 // Error log on this computer (palique.log in the OS's logs folder). Nothing is sent
-// anywhere: Options opens its folder so the user can send it when something fails, so it
+// anywhere: Ayuda → «Registro de errores…» opens its folder so the user can send it when
+// something fails, so it
 // must hold nothing personal: errors are written as name, message and stack only (an
 // XMPP error also carries the stanza, with addresses), and addresses and link tokens are
 // masked, like the home folder. Callers never pass passwords or message bodies.

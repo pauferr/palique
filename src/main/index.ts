@@ -83,7 +83,7 @@ import {
 if (!app.requestSingleInstanceLock()) app.exit(0)
 
 // Errors and warnings also go to palique.log (see log.ts), for the user to send us when
-// something fails: Options opens its folder.
+// something fails: Ayuda → «Registro de errores…» opens its folder.
 const logFile = join(app.getPath('logs'), 'palique.log')
 const log = openLog(logFile)
 const { error: consoleError, warn: consoleWarn } = console
@@ -380,6 +380,30 @@ function openNick(): void {
   nickWindow.on('closed', () => (nickWindow = null))
   nickWindow.once('ready-to-show', () => nickWindow?.show())
   loadRenderer(nickWindow, 'nick')
+}
+
+let aboutWindow: BrowserWindow | null = null
+
+function openAbout(): void {
+  if (aboutWindow) {
+    aboutWindow.focus()
+    return
+  }
+  aboutWindow = new BrowserWindow({
+    width: 340,
+    height: 280,
+    show: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    autoHideMenuBar: true,
+    title: 'Acerca de Palique',
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false }
+  })
+  aboutWindow.on('closed', () => (aboutWindow = null))
+  aboutWindow.once('ready-to-show', () => aboutWindow?.show())
+  loadRenderer(aboutWindow, 'about')
 }
 
 // The format is picked in the save dialog, by file type (HTML unless another one).
@@ -808,6 +832,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('options:open', () => openOptions())
   ipcMain.handle('nick:open', () => openNick())
+  ipcMain.handle('about:open', () => openAbout())
   ipcMain.handle('history:export', (event) =>
     exportChats(BrowserWindow.fromWebContents(event.sender))
   )

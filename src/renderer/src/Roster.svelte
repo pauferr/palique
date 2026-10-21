@@ -108,12 +108,9 @@
     window.api.exportHistory()
   }
 
-  let aboutOpen = $state(false)
-  let version = $state('')
-  async function about(): Promise<void> {
+  function help(open: () => Promise<void>): void {
     menu = ''
-    version = await window.api.version()
-    aboutOpen = true
+    open()
   }
 
   async function chooseAvatar(): Promise<void> {
@@ -239,7 +236,14 @@
       </div>
     {:else if menu === 'help'}
       <div class="menu" role="menu" style:left="180px">
-        <button role="menuitem" onclick={about}>Acerca de Palique</button>
+        <button
+          role="menuitem"
+          onclick={() => help(window.api.openLogs)}
+          title="Si algo falla, envíanos este archivo. No guarda contraseñas, mensajes ni direcciones."
+          >Registro de errores…</button
+        >
+        <button role="menuitem" onclick={() => help(window.api.openAbout)}>Acerca de Palique</button
+        >
       </div>
     {/if}
   </div>
@@ -440,16 +444,6 @@
       {:else if addNote}
         <p class="result" role="status">{addNote}</p>
       {/if}
-    </div>
-  {/if}
-
-  {#if aboutOpen}
-    <div class="sheet" role="dialog" aria-label="Acerca de Palique">
-      <h3>
-        Palique {version}
-        <button class="close" onclick={() => (aboutOpen = false)} aria-label="Cerrar">×</button>
-      </h3>
-      <p>¿Echamos un palique? Un mensajero como los de antes.</p>
     </div>
   {/if}
 </section>

@@ -133,6 +133,7 @@ const api = {
   },
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
   openNick: (): Promise<void> => ipcRenderer.invoke('nick:open'),
+  openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),
   // The format is chosen in the save dialog.
   exportHistory: (): Promise<ExportResult> => ipcRenderer.invoke('history:export'),
   sendWink: (contact: string, wink: string): Promise<number> =>

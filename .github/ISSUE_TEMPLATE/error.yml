@@ -55,5 +55,5 @@ body:
     attributes:
       label: Error log
       description: |
-        In Options ("Opciones"), click "Registro de errores…" at the bottom and paste the last lines of `palique.log` here (or drag the file in). It holds no passwords, messages or addresses, but have a look before pasting it.
+        In the contact list, open "Ayuda" → "Registro de errores…" and paste the last lines of `palique.log` here (or drag the file in). It holds no passwords, messages or addresses, but have a look before pasting it.
       render: text
