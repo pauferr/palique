@@ -212,7 +212,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 **Incluido**
 - Registro e inicio de sesión con usuario y contraseña desde la app. Icono en la bandeja del sistema.
 - Lista de contactos: añadir, aceptar y eliminar.
-- Estados: Conectado, Ausente, Ocupado, Invisible. Mensaje personal bajo el nombre.
+- Estados: Disponible, Ausente, No molestar, Invisible (neutros en género); los contactos se agrupan en En línea y Sin conexión. Mensaje personal bajo el nombre.
 - Avatar de usuario (XEP-0084).
 - Chat uno a uno, cada conversación en su propia ventana.
 - Indicador de "está escribiendo..." (XEP-0085).

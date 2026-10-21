@@ -739,8 +739,10 @@ export async function inviteByEmail(address: string): Promise<InviteStatus> {
   }
 }
 
-// The JID of whoever has this email, '' if nobody. Rejects with 'invalid' or 'wait'.
+// The JID of whoever has this email, '' if nobody. Rejects with 'invalid', 'wait' or
+// 'offline' (not connected right now).
 export async function lookupContact(address: string): Promise<string> {
+  if (!xmpp) throw new Error('offline')
   try {
     const res = await accountsIq('get', xml('lookup', { xmlns: ACCOUNTS, address }))
     return res.getChild('lookup', ACCOUNTS)?.attrs.jid ?? ''

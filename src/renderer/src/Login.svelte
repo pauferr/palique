@@ -7,7 +7,7 @@
 
   const messages = {
     conflict: 'Esta invitación ya se usó para crear una cuenta. Inicia sesión.',
-    'not-acceptable': 'El servidor no acepta esa contraseña.',
+    'not-acceptable': 'Esa contraseña no se puede usar. Prueba con otra.',
     'not-authorized': 'Correo o contraseña incorrectos.',
     'invalid-invite': 'La invitación no es válida, ya se usó o ha caducado.',
     wait: 'Demasiados intentos. Espera un minuto.',
@@ -218,7 +218,7 @@
     {#if invitedEmail}
       <label class="check">
         <input type="checkbox" bind:checked={newsletter} />
-        Quiero recibir el boletín con las novedades de Palique (puedes darte de baja cuando quieras)
+        Quiero recibir novedades de Palique por correo
       </label>
     {/if}
 
@@ -244,7 +244,7 @@
       </button>
     {:else}
       <button type="button" class="link" onclick={() => go('login')} disabled={busy}>
-        Volver a iniciar sesión
+        ← Volver
       </button>
     {/if}
     <small class="version">{version}</small>

@@ -55,7 +55,7 @@ Clásico, con los azules de los 2000. Retro, como un escritorio de los 90. Y Cri
 
 ### A tu manera
 
-Elige tu fuente (sí, también hay una al estilo Comic Sans), tu colección de sonidos y tu estado: Conectado, Ausente, Ocupado o Invisible.
+Elige tu fuente (sí, también hay una al estilo Comic Sans), tu colección de sonidos y tu estado: Disponible, Ausente, No molestar o Invisible.
 
 <p align="center">
   <img src="docs/images/opciones-general.png" width="400" alt="Opciones: tema y fuente">

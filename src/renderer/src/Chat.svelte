@@ -15,10 +15,10 @@
   const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
   const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
   const labels: Record<Contact['show'], string> = {
-    online: 'Conectado',
+    online: 'Disponible',
     away: 'Ausente',
-    dnd: 'Ocupado',
-    offline: 'Desconectado'
+    dnd: 'No molestar',
+    offline: 'Sin conexión'
   }
 
   let messages: ChatMessage[] = $state([])
@@ -233,7 +233,7 @@
   </header>
 
   <ol bind:this={list} aria-live="polite">
-    <li class="notice">Esta conversación solo se guarda en este equipo.</li>
+    <li class="notice">Esta conversación solo se guarda en este ordenador.</li>
     {#each messages as message, i (message.id)}
       {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
       {#if message.buzz}

@@ -16,7 +16,6 @@
   let to = $state('#7a5cff')
   let error = $state('')
   let busy = $state(false)
-  let copied = $state(false)
 
   // Ready-made gradients, one click away.
   const presets = [
@@ -79,12 +78,6 @@
     replace(a, b, stripPlus(name.slice(a, b)))
   }
 
-  async function copy(): Promise<void> {
-    await navigator.clipboard.writeText(color)
-    copied = true
-    setTimeout(() => (copied = false), 1500)
-  }
-
   async function apply(): Promise<void> {
     if (!stripPlus(name).trim()) {
       error = 'Tu nombre no puede quedar vacío.'
@@ -143,10 +136,6 @@
         </span>
       </span>
     </div>
-    <p class="hex">
-      Color elegido: <code>{color}</code>
-      <button class="link" onclick={copy}>{copied ? '¡Copiado!' : 'Copiar'}</button>
-    </p>
   </div>
 
   <div class="field">
@@ -275,12 +264,6 @@
     border-radius: var(--radius);
     background: none;
     cursor: pointer;
-  }
-
-  .hex {
-    margin: 6px 0 0;
-    color: var(--text-muted);
-    font-size: 12px;
   }
 
   #nick {

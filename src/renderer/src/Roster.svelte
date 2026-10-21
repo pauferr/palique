@@ -12,10 +12,10 @@
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
   const labels: Record<Contact['show'], string> = {
-    online: 'Conectado',
+    online: 'Disponible',
     away: 'Ausente',
-    dnd: 'Ocupado',
-    offline: 'Desconectado'
+    dnd: 'No molestar',
+    offline: 'Sin conexión'
   }
 
   let roster: Snapshot = $state({
@@ -51,8 +51,8 @@
     emojify(stripPlus(text)).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   let found = $derived(sorted.filter((c) => fold(c.name).includes(fold(query.trim()))))
   let groups = $derived([
-    { label: 'Conectados', contacts: found.filter((c) => c.show !== 'offline') },
-    { label: 'Desconectados', contacts: found.filter((c) => c.show === 'offline') }
+    { label: 'En línea', contacts: found.filter((c) => c.show !== 'offline') },
+    { label: 'Sin conexión', contacts: found.filter((c) => c.show === 'offline') }
   ])
 
   // Messages waiting in conversations that aren't open (contact → count), like MSN.
@@ -157,11 +157,13 @@
       } else if (result === 'self') addNote = 'Ese es tu propio correo.'
       else notFound = value
     } catch (e) {
-      addNote = String(e).includes('wait')
-        ? 'Has buscado demasiados correos. Espera un rato.'
-        : String(e).includes('invalid')
-          ? 'Esa dirección no parece válida.'
-          : 'No se ha podido añadir.'
+      addNote = String(e).includes('offline')
+        ? 'Sin conexión con el servidor. Inténtalo cuando vuelvas a estar conectado.'
+        : String(e).includes('wait')
+          ? 'Has buscado demasiados correos. Espera un rato.'
+          : String(e).includes('invalid')
+            ? 'Esa dirección no parece válida.'
+            : 'No se ha podido añadir.'
     }
   }
 
@@ -319,7 +321,7 @@
   {#if avatarError}<p class="notice error" role="alert">{avatarError}</p>{/if}
   {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
   {#if roster.show === 'invisible'}
-    <p class="notice">Estás invisible: tus contactos te ven desconectado, pero puedes chatear.</p>
+    <p class="notice">Estás invisible: tus contactos te ven sin conexión, pero puedes chatear.</p>
   {/if}
   {#if !roster.connected}
     <p class="notice warning" role="status">Reconectando…</p>

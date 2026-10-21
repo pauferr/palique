@@ -174,7 +174,7 @@
         contactos.
       </p>
       <section>
-        <h2>Mi imagen para mostrar</h2>
+        <h2>Tu imagen para mostrar</h2>
         <div class="row">
           {#if me}
             <Avatar
@@ -196,7 +196,7 @@
         </div>
       </section>
       <section>
-        <h2>Mi estado</h2>
+        <h2>Tu estado</h2>
         <label>
           <input
             type="checkbox"
@@ -217,12 +217,12 @@
             minutos
           </span>
         </label>
-        <p class="hint">Al volver, te pone otra vez Conectado.</p>
+        <p class="hint">Cuando vuelvas, pasarás a Disponible otra vez.</p>
       </section>
     {:else if section === 'general'}
       <h1>General</h1>
       <section>
-        <h2>Iniciar sesión</h2>
+        <h2>Inicio</h2>
         {#if startupAvailable}
           <label>
             <input
@@ -243,7 +243,7 @@
           Iniciar sesión automáticamente
         </label>
         {#if !remembered.available}
-          <p class="hint">Este equipo no puede guardar la contraseña de forma segura.</p>
+          <p class="hint">Este ordenador no puede guardar la contraseña de forma segura.</p>
         {:else if settings?.autoLogin && !remembered.saved}
           <p class="hint">Se activará la próxima vez que inicies sesión.</p>
         {/if}
@@ -277,7 +277,7 @@
               >{/each}
           </select>
         </label>
-        <p class="hint">¡Hola! ¿Nos vemos en el Messenger? 😎</p>
+        <p class="hint">Vista previa: ¡Hola! ¿Hablamos luego? 😎</p>
       </section>
     {:else if section === 'messages'}
       <h1>Mensajes</h1>
@@ -345,7 +345,7 @@
             checked={settings?.alertMessages}
             onchange={(e) => set({ alertMessages: e.currentTarget.checked })}
           />
-          Reciba un mensaje
+          Me llegue un mensaje
         </label>
       </section>
       <section>
@@ -380,12 +380,12 @@
             {/each}
           </tbody>
         </table>
-        <p class="hint">Con el estado Ocupado no hay alertas ni sonidos.</p>
+        <p class="hint">Con el estado No molestar no hay alertas ni sonidos.</p>
       </section>
     {:else}
       <h1>Cuenta</h1>
       <section>
-        <h2>Mi correo</h2>
+        <h2>Tu correo</h2>
         <p>Entras en Palique con <strong>{email?.address}</strong>. Tus contactos no lo ven.</p>
         {#if email?.pending}
           <p class="hint" role="status">
@@ -416,7 +416,7 @@
         <h2>Invitaciones</h2>
         <p>
           {#if invites}Te quedan <strong>{left}</strong> de {invites.max}.{/if}
-          Las que caducan sin usarse vuelven a contar. Para invitar a alguien, ve a
+          Las que caducan sin usarse se te devuelven. Para invitar a alguien, ve a
           <em>Contactos → Añadir o invitar a un contacto</em> en tu lista.
         </p>
       </section>
@@ -429,7 +429,7 @@
             disabled={!email}
             onchange={toggleNewsletter}
           />
-          Recibir por correo las novedades de Palique
+          Quiero recibir novedades de Palique por correo
         </label>
       </section>
     {/if}

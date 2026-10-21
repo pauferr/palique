@@ -144,5 +144,7 @@ await C.stop()
 
 await B.stop()
 await A.logout()
+// Signed out (or the connection dropped): the UI can say so instead of a generic failure.
+await assert.rejects(A.lookupContact(`${bName}@correo.test`), /offline/)
 console.log('roster check passed')
 process.exit(0)
