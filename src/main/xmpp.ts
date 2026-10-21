@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
+import { stripPlus } from '../renderer/src/plus'
 
 // Which server: fixed at build time for releases (MAIN_VITE_* variables, see the release
 // workflow), overridable with PALIQUE_* at run time, localhost in development.
@@ -708,13 +709,13 @@ export async function inviteStatus(): Promise<InviteStatus> {
   return parseInvites(res.getChild('invites', ACCOUNTS))
 }
 
-// Emails an invite (with our display name, for the email). Rejects with 'limit' (none
+// Emails an invite (with our display name, without color codes, for the email). Rejects with 'limit' (none
 // left), 'registered' (that address already has an account) or 'invalid'.
 export async function inviteByEmail(address: string): Promise<InviteStatus> {
   try {
     const res = await accountsIq(
       'set',
-      xml('invite-email', { xmlns: ACCOUNTS, address, name: nicks.get(me) ?? '' })
+      xml('invite-email', { xmlns: ACCOUNTS, address, name: stripPlus(nicks.get(me) ?? '') })
     )
     return parseInvites(res.getChild('invites', ACCOUNTS))
   } catch (e) {
