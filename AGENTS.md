@@ -209,6 +209,8 @@ The installers go up with the update files the installed apps read (`latest*.yml
 - **Windows and Linux** download it in the background and install it on quit. The contact list and sign-in screen offer «Reiniciar ahora».
 - **macOS** can't install it (ad-hoc signature, no Developer ID): the same places show a notice with a link to download it.
 
+**Oldest app allowed** (`MIN_APP_VERSION` in the server's `.env`, empty by default): the app sends its version (`x-palique-version`) to `/account`, `/signup` and `/recover`; older apps get `outdated` and the sign-in screen asks them to download the new one. Raise it only when a change breaks older apps (major.minor.patch; the stage doesn't count). Checked in `check:version`.
+
 **Versions are semver, worked out from the commits** since the last release by [scripts/next-version.ts](scripts/next-version.ts). That's one more reason to keep commit messages in Conventional Commits.
 
 | Since the last version tag | Bump |

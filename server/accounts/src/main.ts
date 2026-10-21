@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage } from 'node:http'
 import { mkdirSync } from 'node:fs'
 import { component, xml } from '@xmpp/component'
 import { openDb, type Account } from './db.ts'
+import { outdated } from './version.ts'
 import { BUTTERFLY, escape, mailer } from './mail.ts'
 
 const env = (name: string, fallback?: string): string => {
@@ -366,11 +367,23 @@ main{width:min(420px,100% - 32px);background:var(--card);border:1px solid var(--
 const isLoopback = (req: IncomingMessage): boolean =>
   ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '')
 
+// The app's own requests (sign-in, sign-up, recovery) carry its version: an app older
+// than MIN_APP_VERSION is asked to update instead (see version.ts).
+const MIN_APP_VERSION = process.env['MIN_APP_VERSION'] ?? ''
+const APP_PATHS = new Set(['/account', '/signup', '/recover'])
+
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', PUBLIC_URL)
   const json = (code: number, body: unknown): void => {
     res.writeHead(code, { 'content-type': 'application/json' })
     res.end(JSON.stringify(body))
+  }
+
+  if (req.method === 'POST' && APP_PATHS.has(url.pathname)) {
+    const version = req.headers['x-palique-version']
+    if (outdated(MIN_APP_VERSION, Array.isArray(version) ? version[0] : version)) {
+      return json(426, { error: 'outdated' })
+    }
   }
 
   if (req.method === 'POST' && url.pathname === '/account') {

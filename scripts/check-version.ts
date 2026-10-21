@@ -1,5 +1,6 @@
 // Next release version from the commits (no server needed). Run: npm run check:version
 import assert from 'node:assert/strict'
+import { outdated } from '../server/accounts/src/version.ts'
 import { latest, nextVersion } from './next-version.ts'
 
 const next = (last: string | undefined, commits: string[], stage = 'alpha'): string =>
@@ -37,4 +38,12 @@ assert.equal(latest(['v1.0.0', 'v1.0.0-beta']), 'v1.0.0')
 assert.equal(latest(['v2026.10.12x', 'nope']), undefined)
 assert.equal(latest([]), undefined)
 
+// Oldest app that may sign in (account service, MIN_APP_VERSION).
+assert.equal(outdated('', undefined), false, 'no minimum: everyone in')
+assert.equal(outdated('0.9.0', undefined), true, 'apps from before the check')
+assert.equal(outdated('0.9.0', '0.8.3-alpha'), true)
+assert.equal(outdated('0.9.0', '0.9.0-alpha'), false, 'the stage does not count')
+assert.equal(outdated('0.9.0', '0.10.0'), false, 'numbers, not text')
+assert.equal(outdated('v1.0.0', '0.99.9'), true)
+assert.equal(outdated('0.9.0', 'nonsense'), true)
 console.log('version check passed')

@@ -57,6 +57,7 @@ export type AuthError =
   | 'not-authorized' // wrong email or password
   | 'invalid-invite' // missing, wrong, used or expired invite code
   | 'wait' // too many attempts, try again in a minute
+  | 'outdated' // this app is older than the server accepts: update it
   | 'unreachable'
   | 'unknown'
 
@@ -806,13 +807,19 @@ export async function setNewsletter(subscribe: boolean): Promise<EmailStatus> {
 const ACCOUNTS_URL =
   config('PALIQUE_ACCOUNTS_URL', 'MAIN_VITE_ACCOUNTS_URL') ?? 'http://localhost:8080'
 
-// Errors: 'unreachable', 'wait' (too many requests), or the service's own.
+// Sent with every request to the account service, which turns away apps that are too old.
+let appVersion = ''
+export function setAppVersion(version: string): void {
+  appVersion = version
+}
+
+// Errors: 'unreachable', 'wait' (too many requests), or the service's own (e.g. 'outdated').
 async function accountsPost<T>(path: string, body: Record<string, string>): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${ACCOUNTS_URL}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-palique-version': appVersion },
       body: JSON.stringify(body)
     })
   } catch {

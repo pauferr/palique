@@ -34,6 +34,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:?set SMTP_PASS in .env}
       MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
       MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
+      MIN_APP_VERSION: ${MIN_APP_VERSION:-}
       DATA_DIR: /data
     volumes:
       - accounts-data:/data

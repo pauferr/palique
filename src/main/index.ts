@@ -66,6 +66,7 @@ import {
   sendMessage,
   sendTyping,
   sendWink,
+  setAppVersion,
   setAvatar,
   setPresence,
   cleanNick,
@@ -540,6 +541,7 @@ function showWink(id: string, chat: BrowserWindow | null): void {
 }
 
 app.whenReady().then(() => {
+  setAppVersion(app.getVersion())
   electronApp.setAppUserModelId('com.palique.app')
 
   // Default open or close DevTools by F12 in development
@@ -572,7 +574,10 @@ app.whenReady().then(() => {
     const error = (e as Error).message
     return {
       ok: false,
-      error: error === 'wait' || error === 'invalid-invite' ? error : 'unreachable'
+      error:
+        error === 'wait' || error === 'invalid-invite' || error === 'outdated'
+          ? error
+          : 'unreachable'
     }
   }
   // Signed in: remember the email for next time (pre-filled on the sign-in screen).

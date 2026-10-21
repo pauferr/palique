@@ -12,6 +12,7 @@
     'not-authorized': 'Correo o contraseña incorrectos.',
     'invalid-invite': 'La invitación no es válida, ya se usó o ha caducado.',
     wait: 'Demasiados intentos. Espera un minuto.',
+    outdated: 'Esta versión de Palique ya no funciona. Descarga la nueva para entrar.',
     unreachable: 'No se puede conectar con el servidor.',
     unknown: 'Algo ha fallado. Inténtalo de nuevo.'
   }
@@ -107,8 +108,8 @@
       try {
         await window.api.forgotPassword(address())
         info = `Si ${address()} tiene cuenta, te hemos enviado un enlace y un código. Caducan en una hora.`
-      } catch {
-        error = messages.unreachable
+      } catch (e) {
+        error = String(e).includes('outdated') ? messages.outdated : messages.unreachable
       }
       busy = false
       return
@@ -224,7 +225,14 @@
       </label>
     {/if}
 
-    {#if error}<p class="error" role="alert">{error}</p>{/if}
+    {#if error}<p class="error" role="alert">
+        {error}
+        {#if error === messages.outdated}<a
+            href="https://github.com/pauferr/palique/releases"
+            target="_blank"
+            rel="noreferrer">Descargar</a
+          >{/if}
+      </p>{/if}
     {#if info}<p class="info" role="status">{info}</p>{/if}
 
     <button type="submit" class="submit" disabled={busy}>

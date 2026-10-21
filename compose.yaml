@@ -30,6 +30,7 @@ services:
       SMTP_PORT: "1025"
       DATA_DIR: /data
       SIGNIN_LIMIT: "1000" # sign-in lookups per IP a minute (production: 30)
+      MIN_APP_VERSION: ${MIN_APP_VERSION:-} # oldest app that may sign in; empty: any
       # Keep real keys out of git (.env file).
     volumes:
       - accounts-data:/data
