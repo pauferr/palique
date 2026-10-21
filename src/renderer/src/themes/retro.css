@@ -6,6 +6,7 @@
 :root[data-theme='retro'] {
   --font: 'IBM Plex Sans', sans-serif;
   --font-size: 13px;
+  --x-height: 0.516;
 
   --text: #000000;
   --text-strong: #000080;

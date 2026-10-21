@@ -7,6 +7,7 @@
 :root {
   --font: 'Noto Sans', sans-serif;
   --font-size: 13px;
+  --x-height: 0.536; /* Noto Sans's, so other fonts match it (base.css) */
 
   --text: #1b2a4a;
   --text-strong: #0b3c9e;

@@ -8,6 +8,7 @@
 :root[data-theme='glass'] {
   --font: 'Hind', sans-serif;
   --font-size: 14px;
+  --x-height: 0.508;
 
   --text: #0d3b4f;
   --text-strong: #0b6f7e;

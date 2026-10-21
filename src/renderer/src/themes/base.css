@@ -10,6 +10,9 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: var(--font-size);
+  /* Fonts differ in how big they look at one size: scale any font chosen in Options so
+     its lowercase is as tall as the theme's own. A no-op for the theme's font. */
+  font-size-adjust: var(--x-height);
 }
 
 button,
