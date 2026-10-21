@@ -54,6 +54,8 @@
   --group-radius: 12px;
   --group-bg: #ffffff;
   --popup-shadow: 0 8px 24px rgb(20 40 90 / 14%);
+  --scrollbar: #c9d4ea;
+  --scrollbar-width: thin;
 
   /* Default avatars: each user always gets the same one of these. */
   --avatar-0: #ff6b9d;

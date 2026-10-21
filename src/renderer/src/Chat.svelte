@@ -448,10 +448,13 @@
     margin-left: 4px;
   }
 
+  /* Under the transcript; a theme whose transcript fills the window (no card) gives it the
+     same background, so the two read as one. */
   .typing {
     min-height: 1.4em;
     margin: 0;
     padding: 2px 12px;
+    background: var(--typing-bg, transparent);
     color: var(--text-muted);
     font-size: 12px;
     font-style: italic;

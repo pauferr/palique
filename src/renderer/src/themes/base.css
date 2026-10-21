@@ -15,6 +15,13 @@ body {
   font-size-adjust: var(--x-height);
 }
 
+/* Thin scrollbars in the theme's color. A theme without --scrollbar keeps the system's
+   (Retro, whose chunky ones are part of the look). */
+* {
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: var(--scrollbar-width, auto);
+}
+
 button,
 input,
 select,
