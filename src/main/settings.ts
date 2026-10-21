@@ -27,6 +27,7 @@ export type Settings = {
   font: Font
   winks: boolean // play winks full screen
   show: OwnShow // last status, used at the next sign-in (like MSN)
+  status: string // last personal message, likewise
   email: string // last account signed in, pre-filled on the sign-in screen
   away: number // minutes without using the computer before showing as Away; 0 = never
   startup: boolean // open Palique when the computer starts
@@ -47,6 +48,7 @@ const DEFAULTS: Settings = {
   font: 'theme',
   winks: true,
   show: 'online',
+  status: '',
   email: '',
   away: 10,
   startup: false,

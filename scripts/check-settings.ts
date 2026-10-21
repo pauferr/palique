@@ -13,6 +13,7 @@ const defaults = {
   font: 'theme',
   winks: true,
   show: 'online',
+  status: '',
   email: '',
   away: 10,
   startup: false,
@@ -27,10 +28,10 @@ const defaults = {
 }
 assert.deepEqual(openSettings(file).get(), defaults, 'defaults on first run')
 openSettings(file).set({ winks: false })
-openSettings(file).set({ show: 'invisible' })
+openSettings(file).set({ show: 'invisible', status: 'De vacaciones' })
 assert.deepEqual(
   openSettings(file).get(),
-  { ...defaults, winks: false, show: 'invisible' },
+  { ...defaults, winks: false, show: 'invisible', status: 'De vacaciones' },
   'persists across restarts'
 )
 

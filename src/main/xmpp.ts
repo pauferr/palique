@@ -425,15 +425,20 @@ function toAuthError(e: unknown): AuthError {
 }
 
 // Signs in with the account's JID localpart (see accountFor). Passing an invite code
-// creates the account first, and `nick` publishes its display name. `show`: status to
-// sign in with, so an invisible user is never briefly visible.
+// creates the account first, and `nick` publishes its display name. `show` and `status`:
+// status and personal message to sign in with, so an invisible user is never briefly visible.
 export async function login(
   username: string,
   password: string,
-  { invite, show = 'online', nick }: { invite?: string; show?: OwnShow; nick?: string } = {}
+  {
+    invite,
+    show = 'online',
+    status = '',
+    nick
+  }: { invite?: string; show?: OwnShow; status?: string; nick?: string } = {}
 ): Promise<AuthResult> {
   await logout()
-  own = { show, status: '' }
+  own = { show, status: status.trim().slice(0, 140) }
   const entity = client({
     service: SERVICE,
     domain: DOMAIN,

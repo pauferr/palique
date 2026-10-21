@@ -528,10 +528,14 @@ app.whenReady().then(() => {
   setInterval(checkIdle, 15_000)
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
-  // Sign in with the last status, so an invisible user is never briefly visible.
-  const lastShow = (): OwnShow => {
-    const last = settings.get().show
-    return shows.includes(last) ? last : 'online'
+  // Sign in with the last status and personal message, so an invisible user is never
+  // briefly visible.
+  const lastPresence = (): { show: OwnShow; status: string } => {
+    const { show, status } = settings.get()
+    return {
+      show: shows.includes(show) ? show : 'online',
+      status: typeof status === 'string' ? status : ''
+    }
   }
   // Errors before reaching the XMPP server (the account service) as sign-in errors.
   const failed = (e: unknown): AuthResult => {
@@ -556,7 +560,7 @@ app.whenReady().then(() => {
   ipcMain.handle('auth:login', async (_, email: string, password: string, remember: unknown) => {
     try {
       const username = await accountFor(clean(email))
-      const result = await login(username, String(password), { show: lastShow() })
+      const result = await login(username, String(password), lastPresence())
       if (result.ok && typeof remember === 'boolean') {
         settings.set({ autoLogin: remember && canRemember() })
         if (remember) await rememberPassword(String(password))
@@ -577,7 +581,7 @@ app.whenReady().then(() => {
     const password = autoLogin && email ? await savedPassword() : ''
     if (!password) return null
     try {
-      const result = await login(await accountFor(email), password, { show: lastShow() })
+      const result = await login(await accountFor(email), password, lastPresence())
       // A changed password: forget the old one, the sign-in screen asks.
       if (!result.ok && result.error === 'not-authorized') forgetPassword()
       return signedIn(result, email)
@@ -609,7 +613,7 @@ app.whenReady().then(() => {
       const result = await login(invite.username, String(signup.password), {
         invite: token,
         nick,
-        show: lastShow()
+        ...lastPresence()
       })
       if (result.ok && signup.newsletter) await setNewsletter(true).catch(() => {})
       return signedIn(result, invite.email)
@@ -624,7 +628,7 @@ app.whenReady().then(() => {
       const username = await accountFor(clean(email))
       const result = await login(username, String(password), {
         invite: String(token).trim(),
-        show: lastShow()
+        ...lastPresence()
       })
       if (result.ok && settings.get().autoLogin) await rememberPassword(String(password))
       return signedIn(result, clean(email))
@@ -687,7 +691,7 @@ app.whenReady().then(() => {
   ipcMain.handle('presence:set', async (_, show: OwnShow, status: string) => {
     const valid = shows.includes(show) ? show : 'online'
     await setPresence(valid, String(status))
-    settings.set({ show: valid })
+    settings.set({ show: valid, status: snapshot().status })
   })
   onMessage((message) => {
     const effect = !message.mine && (message.buzz || message.wink)
