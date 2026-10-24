@@ -484,20 +484,19 @@ function setUnread(contact: string, count: number): void {
 
 // Messages for an open conversation go to it, and flash it if it isn't focused (taskbar
 // on Linux, dock bounce on macOS). With no conversation open they wait in the contact
-// list instead; only a buzz opens the window, without stealing focus.
+// list instead, buzzes too.
 // `quiet`: no shaking, sounds, flashing or toasts (old messages, e.g. while offline).
 // Busy (dnd): no sounds, shaking or toasts, but windows still flash.
 function deliver(message: ChatMessage, quiet = false): void {
   if (account) history.save(account, message)
   const dnd = !message.mine && ownShow() === 'dnd'
   const silent = quiet || dnd
-  // Only a buzz opens the conversation, and not in No molestar: there it waits like a message.
-  const opens = message.buzz && !message.mine && !dnd
-  if (!chats.has(message.with) && !opens) {
+  if (!chats.has(message.with)) {
     // Ours from another device are only history.
     if (message.mine) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
-    if (!silent && settings.get().sounds) mainWindow?.webContents.send('chat:incoming')
+    if (!silent && settings.get().sounds)
+      mainWindow?.webContents.send('chat:incoming', Boolean(message.buzz))
     if (quiet) return
     if (mainWindow?.isVisible() && !mainWindow.isFocused()) mainWindow.flashFrame(true)
     if (!notified.take(message.with)) notifyMessage(message)

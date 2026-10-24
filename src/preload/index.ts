@@ -99,8 +99,8 @@ const api = {
     return () => ipcRenderer.off('chat:unread', listener)
   },
   // A message arrived for a conversation that isn't open (the list plays the sound).
-  onIncoming: (callback: () => void): (() => void) => {
-    const listener = (): void => callback()
+  onIncoming: (callback: (buzz: boolean) => void): (() => void) => {
+    const listener = (_: unknown, buzz: boolean): void => callback(buzz)
     ipcRenderer.on('chat:incoming', listener)
     return () => ipcRenderer.off('chat:incoming', listener)
   },

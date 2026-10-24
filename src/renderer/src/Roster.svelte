@@ -65,7 +65,9 @@
     window.api.getUnread().then((value) => (unread = value))
     const offRoster = window.api.onRoster((value) => (roster = value))
     const offUnread = window.api.onUnread((value) => (unread = value))
-    const offIncoming = window.api.onIncoming(() => playSound(prefs.soundPack, 'message'))
+    const offIncoming = window.api.onIncoming((buzz) =>
+      playSound(prefs.soundPack, buzz ? 'buzz' : 'message')
+    )
     const offOnline = window.api.onContactOnline(() => playSound(prefs.soundPack, 'online'))
     return () => {
       offRoster()
