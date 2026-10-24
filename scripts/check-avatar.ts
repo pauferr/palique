@@ -15,7 +15,7 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const pass = 'check-password'
+const pass = 'Check-pass1'
 const at = (user: string): string => `${user}@localhost`
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 // 1×1 PNGs (red and blue).

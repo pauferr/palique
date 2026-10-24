@@ -29,6 +29,7 @@ modules_enabled = {
 	"offline";
 	"blocklist";
 	"palique_invisible";
+	"palique_passwords";
 	-- No "smacks" (see server/prosody.cfg.lua). No "mam": no server-side chat archive.
 }
 

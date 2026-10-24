@@ -14,7 +14,7 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const pass = 'check-password'
+const pass = 'Check-pass1'
 const mail = (name: string): string => `${name}@correo.test`
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 

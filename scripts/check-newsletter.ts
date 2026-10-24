@@ -14,7 +14,7 @@ tls.setDefaultCACertificates([
 const user = `news${Date.now()}`
 
 // The account comes with its (invited) address; the newsletter is off until chosen.
-await register(user, 'check-password')
+await register(user, 'Check-pass1')
 assert.equal((await A.emailStatus()).newsletter, false)
 
 assert.equal((await A.setNewsletter(true)).newsletter, true)

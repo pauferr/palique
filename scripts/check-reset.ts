@@ -17,7 +17,7 @@ const name = `rsta${id}`
 const email = `${name}@correo.test`
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-const a = await register(name, 'old-password')
+const a = await register(name, 'Old-pass1')
 await A.logout()
 
 // The request always "works"; only the account's address gets an email, with an app link
@@ -48,18 +48,24 @@ await A.requestPasswordReset(email)
 await sleep(500)
 assert.equal(await mailCount(email), 2)
 
+// A weak new password is refused, and the code stays usable.
+assert.deepEqual(await A.login(a, 'debil', { invite: code }), {
+  ok: false,
+  error: 'not-acceptable'
+})
+
 // The code sets a new password once (the app finds the account by email); the old one
 // stops working.
 assert.equal(await A.accountFor(email), a)
-assert.deepEqual(await A.login(a, 'new-password', { invite: code }), {
+assert.deepEqual(await A.login(a, 'New-pass1', { invite: code }), {
   ok: true,
   jid: `${a}@localhost`
 })
 await A.logout()
-assert.deepEqual(await A.login(a, 'old-password'), { ok: false, error: 'not-authorized' })
-assert.equal((await A.login(a, 'new-password')).ok, true)
+assert.deepEqual(await A.login(a, 'Old-pass1'), { ok: false, error: 'not-authorized' })
+assert.equal((await A.login(a, 'New-pass1')).ok, true)
 await A.logout()
-assert.deepEqual(await A.login(a, 'third-password', { invite: code }), {
+assert.deepEqual(await A.login(a, 'Third-pass1', { invite: code }), {
   ok: false,
   error: 'invalid-invite'
 })

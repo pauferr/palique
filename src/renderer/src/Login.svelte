@@ -2,13 +2,14 @@
   import { onMount } from 'svelte'
   import type { AuthLink } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import { PASSWORD_RULE, strongPassword } from './password'
   import UpdateNotice from './UpdateNotice.svelte'
 
   let { onlogin }: { onlogin: (jid: string) => void } = $props()
 
   const messages = {
     conflict: 'Esta invitación ya se usó para crear una cuenta. Inicia sesión.',
-    'not-acceptable': 'Esa contraseña no se puede usar. Prueba con otra.',
+    'not-acceptable': `Esa contraseña no es segura. ${PASSWORD_RULE}`,
     'not-authorized': 'Correo o contraseña incorrectos.',
     'invalid-invite': 'La invitación no es válida, ya se usó o ha caducado.',
     wait: 'Demasiados intentos. Espera un minuto.',
@@ -99,6 +100,10 @@
     event.preventDefault()
     error = ''
     if (mode === 'register' && !invitedEmail) return checkInvite()
+    if ((mode === 'register' || mode === 'reset') && !strongPassword(password)) {
+      error = `Esa contraseña no es segura. ${PASSWORD_RULE}`
+      return
+    }
     if ((mode === 'register' || mode === 'reset') && password !== confirm) {
       error = 'Las contraseñas no coinciden.'
       return
@@ -201,6 +206,7 @@
           required
           minlength={mode === 'login' ? undefined : 8}
         />
+        {#if mode !== 'login'}<small>{PASSWORD_RULE}</small>{/if}
       </label>
     {/if}
 

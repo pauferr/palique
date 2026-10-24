@@ -30,7 +30,7 @@ src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks 
   themes/          classic, retro, glass, night (CSS variables)
 server/
   prosody.cfg.lua  development Prosody config
-  modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible
+  modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible, mod_palique_passwords
   accounts/        account service (own package.json, Dockerfile)
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
@@ -67,6 +67,7 @@ compose.yaml       local server stack
 - **Adding contacts:** by email. Iq `lookup` to the account service → JID or nothing. If nothing, the user may explicitly invite them.
 - **Changing the email:** a link goes to the new address. Until it's opened, the old one still signs in. If the new one is taken, the app gets the same answer and that inbox is told instead.
 - **Password recovery:** `POST /recover {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails `palique://reset?e=EMAIL&t=TOKEN` plus the code. The app re-registers the same account with it.
+- **Passwords:** at least 8 characters, with a lowercase and an uppercase letter, a digit and a symbol (ASCII classes, so ñ counts as a symbol). The app checks it as you type (`src/renderer/src/password.ts`); Prosody enforces it (`mod_palique_passwords`). Existing passwords keep working.
 
 ### Account service (`server/accounts`)
 
@@ -95,6 +96,7 @@ compose.yaml       local server stack
   - `<reset for>`: password reset token
   - On `user-registered`, it messages the component `<registered username/>` and subscribes inviter ↔ invitee.
 - `mod_palique_invisible`: XEP-0186-style invisibility.
+- `mod_palique_passwords`: strong passwords only, on sign-up, reset and signed-in changes (`not-acceptable` otherwise). The invite or reset code survives a refused attempt.
 
 ### Protocols in use
 

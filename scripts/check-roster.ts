@@ -15,7 +15,7 @@ tls.setDefaultCACertificates([
 
 const id = Date.now()
 const [aName, bName, cName] = ['rostera', 'rosterb', 'rosterc'].map((n) => `${n}${id}`)
-const pass = 'check-password'
+const pass = 'Check-pass1'
 
 // Resolves once the module's snapshot satisfies `test`.
 function until(test: (s: A.Snapshot) => boolean, label: string): Promise<A.Snapshot> {

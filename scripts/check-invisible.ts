@@ -13,7 +13,7 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const pass = 'check-password'
+const pass = 'Check-pass1'
 const at = (user: string): string => `${user}@localhost`
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 

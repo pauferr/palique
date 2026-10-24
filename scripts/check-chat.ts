@@ -15,7 +15,7 @@ tls.setDefaultCACertificates([
 ])
 
 const id = Date.now()
-const pass = 'check-password'
+const pass = 'Check-pass1'
 const CHATSTATES = 'http://jabber.org/protocol/chatstates'
 const at = (user: string): string => `${user}@localhost`
 
