@@ -95,7 +95,9 @@
       if (typing) theirTimeout = setTimeout(() => (theyType = false), TYPING_TIMEOUT)
     })
     window.addEventListener('beforeunload', stopTyping)
-    const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
+    const offRoster = window.api.onRoster((s) => {
+      contact = s.contacts.find((c) => c.jid === jid)
+    })
     const offWink = window.api.onWinkPlay((id) => {
       if (!findWink(id)) return
       if (playing) queued.push(id)

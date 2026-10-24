@@ -62,8 +62,12 @@
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
     window.api.getUnread().then((value) => (unread = value))
-    const offRoster = window.api.onRoster((value) => (roster = value))
-    const offUnread = window.api.onUnread((value) => (unread = value))
+    const offRoster = window.api.onRoster((value) => {
+      roster = value
+    })
+    const offUnread = window.api.onUnread((value) => {
+      unread = value
+    })
     const offIncoming = window.api.onIncoming((buzz) =>
       playSound(prefs.soundPack, buzz ? 'buzz' : 'message')
     )

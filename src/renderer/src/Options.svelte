@@ -61,9 +61,15 @@
       .inviteStatus()
       .then((value) => (invites = value))
       .catch(() => {})
-    const offSettings = window.api.onSettings((value) => (settings = value))
-    const offRoster = window.api.onRoster((value) => (me = value))
-    const offEmail = window.api.onEmail((value) => (email = value))
+    const offSettings = window.api.onSettings((value) => {
+      settings = value
+    })
+    const offRoster = window.api.onRoster((value) => {
+      me = value
+    })
+    const offEmail = window.api.onEmail((value) => {
+      email = value
+    })
     return () => {
       offSettings()
       offRoster()

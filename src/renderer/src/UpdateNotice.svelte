@@ -9,7 +9,9 @@
 
   onMount(() => {
     window.api.update().then((status) => (update ??= status))
-    return window.api.onUpdate((status) => (update = status))
+    return window.api.onUpdate((status) => {
+      update = status
+    })
   })
 </script>
 

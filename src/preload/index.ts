@@ -62,7 +62,9 @@ const api = {
     ipcRenderer.invoke('invites:email', address),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   getRoster: (): Promise<Snapshot> => ipcRenderer.invoke('roster:snapshot'),
-  // Returns an unsubscribe function.
+  // Returns an unsubscribe function. Callbacks must not return a value: whatever they
+  // return crosses back over the bridge, and a Svelte $state proxy (what `(v) => (x = v)`
+  // returns) can't, which throws "An object could not be cloned".
   onRoster: (callback: (snapshot: Snapshot) => void): (() => void) => {
     const listener = (_: unknown, snapshot: Snapshot): void => callback(snapshot)
     ipcRenderer.on('roster:changed', listener)
