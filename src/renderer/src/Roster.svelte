@@ -515,19 +515,6 @@
     background: var(--warning-bg);
   }
 
-  .link {
-    padding: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
-    color: var(--text-strong);
-    text-decoration: underline;
-  }
-
-  .link:hover:not(:disabled) {
-    background: none;
-  }
-
   .list {
     flex: 1;
     margin: var(--panel-margin);
