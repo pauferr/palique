@@ -17,6 +17,8 @@ import { readFile, rm, writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import trayTemplate from '../../resources/trayTemplate.png?asset'
+import '../../resources/trayTemplate@2x.png?asset' // found next to trayTemplate.png
 import devCert from '../../server/certs/localhost.crt?raw'
 import {
   ARRIVAL_INTERVAL,
@@ -215,9 +217,14 @@ function showMain(): void {
   mainWindow.focus()
 }
 
+// macOS: the one-colour icon, which the menu bar tints (a "Template" image, with its @2x).
+// Elsewhere: the app icon.
 function createTray(): void {
-  const size = process.platform === 'darwin' ? 16 : 22
-  tray = new Tray(nativeImage.createFromPath(icon).resize({ width: size, height: size }))
+  tray = new Tray(
+    process.platform === 'darwin'
+      ? nativeImage.createFromPath(trayTemplate)
+      : nativeImage.createFromPath(icon).resize({ width: 22, height: 22 })
+  )
   tray.setToolTip('Palique')
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -590,6 +597,8 @@ function showWink(id: string, chat: BrowserWindow | null): void {
 app.whenReady().then(() => {
   setAppVersion(app.getVersion())
   electronApp.setAppUserModelId('com.palique.app')
+  // Packaged apps get theirs from the bundle; in development the dock shows Electron's.
+  if (is.dev) app.dock?.setIcon(icon)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

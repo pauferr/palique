@@ -34,6 +34,7 @@ server/
   accounts/        account service (own package.json, Dockerfile)
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
+build/             packaging: icon.svg and tray.svg are the icon sources; build/icons.sh makes the PNG/ICNS files
 scripts/           check-*.ts: runnable checks (see Checks), invite.ts, mailpit.ts helpers
 docs/              palique.md (plan and decisions), deployment.md (deployment guide)
 compose.yaml       local server stack
