@@ -32,6 +32,7 @@ import { installNow, startUpdates, type UpdateStatus } from './updates'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
+import { versionLabel } from '../renderer/src/version'
 import { winkLabel } from '../renderer/src/wink-labels'
 import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
@@ -792,9 +793,13 @@ app.whenReady().then(() => {
       Buffer.from(png.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
     return isPng ? setAvatar(png) : undefined
   })
-  // "v0.3.0-alpha". Releases get their version at build time (see release.yml).
   ipcMain.handle('logs:open', () => shell.showItemInFolder(logFile))
-  ipcMain.handle('app:version', () => (app.isPackaged ? `v${app.getVersion()}` : 'desarrollo'))
+  // "v0.3.0 (alpha)". Releases get their version at build time (see release.yml);
+  // development shows the next one.
+  ipcMain.handle('app:version', () => {
+    const version = app.isPackaged ? app.getVersion() : __DEV_VERSION__
+    return version ? versionLabel(version) : 'desarrollo'
+  })
   ipcMain.handle('settings:get', () => settings.get())
   // Only known keys with valid values; every window hears about the change (e.g. the theme).
   ipcMain.handle('settings:set', (_, patch: unknown) => {

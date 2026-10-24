@@ -1,10 +1,16 @@
 // Next release version from the commits (no server needed). Run: npm run check:version
 import assert from 'node:assert/strict'
 import { outdated } from '../server/accounts/src/version.ts'
+import { versionLabel } from '../src/renderer/src/version.ts'
 import { latest, nextVersion } from './next-version.ts'
 
 const next = (last: string | undefined, commits: string[], stage = 'alpha'): string =>
   nextVersion({ last, commits, stage })
+
+// How the app shows it.
+assert.equal(versionLabel('0.6.0-alpha'), 'v0.6.0 (alpha)')
+assert.equal(versionLabel('1.0.0-beta.2'), 'v1.0.0 (beta.2)')
+assert.equal(versionLabel('1.0.0'), 'v1.0.0')
 
 // First release.
 assert.equal(next(undefined, []), '0.3.0-alpha')

@@ -222,7 +222,7 @@ The installers go up with the update files the installed apps read (`latest*.yml
 | nothing | no release (the run fails) |
 
 - The first release is `0.3.0`. The **stage** in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable) goes on as a suffix (`v0.3.0-alpha`) and makes the release a pre-release.
-- Versions are never committed: `package.json` keeps `"version": "0.0.0-dev"`, and the app shows "desarrollo" in development and `v0.3.0-alpha` in releases (sign-in screen and Options). Don't use `npm version`.
+- Versions are never committed: `package.json` keeps `"version": "0.0.0-dev"`, and the app shows it as `v0.3.0 (alpha)` (`v1.0.0` when stable), in development the next one (sign-in screen, Options and About). Don't use `npm version`.
 - `node scripts/next-version.ts` prints what the next release would be. `npm run check:version` checks the rules.
 - To force a version (e.g. `1.0.0`), fill the workflow's **version** input.
 
