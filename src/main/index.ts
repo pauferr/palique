@@ -475,6 +475,8 @@ function checkIdle(): void {
 // Unread messages per contact, MSN style: the contact blinks in the list with a count
 // (and the dock icon shows the total) until its conversation is opened.
 const unread = new Map<string, number>()
+// Winks that came live while their conversation was closed: they play when it opens.
+const unseenWinks = new Map<string, string[]>()
 
 function setUnread(contact: string, count: number): void {
   if (count) unread.set(contact, count)
@@ -496,6 +498,9 @@ function deliver(message: ChatMessage, quiet = false): void {
     // Ours from another device are only history.
     if (message.mine) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
+    if (message.wink && !quiet) {
+      unseenWinks.set(message.with, [...(unseenWinks.get(message.with) ?? []), message.wink])
+    }
     if (!silent && settings.get().sounds)
       mainWindow?.webContents.send('chat:incoming', Boolean(message.buzz))
     if (quiet) return
@@ -718,6 +723,7 @@ app.whenReady().then(() => {
     await logout()
     account = ''
     for (const contact of [...unread.keys()]) setUnread(contact, 0)
+    unseenWinks.clear()
     chats.forEach((win) => win.close())
     options?.close()
     nickWindow?.close()
@@ -828,6 +834,10 @@ app.whenReady().then(() => {
       win?.webContents.send('chat:message', message, quiet)
     })
     pending.delete(String(contact))
+    // Unseen winks play now, in order (not while busy, like live ones).
+    const winks = unseenWinks.get(String(contact)) ?? []
+    unseenWinks.delete(String(contact))
+    if (ownShow() !== 'dnd') winks.forEach((id) => showWink(id, win ?? null))
   })
   ipcMain.handle('chat:unread', () => Object.fromEntries(unread))
   // Clicking a wink in a conversation plays it again.
