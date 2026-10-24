@@ -835,6 +835,26 @@ app.whenReady().then(() => {
   ipcMain.handle('history:export', (event) =>
     exportChats(BrowserWindow.fromWebContents(event.sender))
   )
+  // A buzz shakes the whole conversation window. Not on Wayland, where windows can't move
+  // themselves: the conversation shakes its contents instead (false).
+  ipcMain.handle('chat:shake', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (wayland || !win) return false
+    const [x, y] = win.getPosition()
+    for (const [dx, dy] of [
+      [-8, 3],
+      [8, -3],
+      [-8, 3],
+      [8, -3],
+      [-8, 3],
+      [0, 0]
+    ]) {
+      if (win.isDestroyed()) break
+      win.setPosition(x + dx, y + dy)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+    return true
+  })
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   // New releases: every window shows the notice (sign-in screen and contact list).

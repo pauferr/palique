@@ -105,7 +105,9 @@ const api = {
     return () => ipcRenderer.off('chat:incoming', listener)
   },
   replayWink: (wink: string): void => ipcRenderer.send('chat:replay-wink', wink),
-  // On Wayland winks play inside the conversation window (no full-screen overlay).
+  // False where the window can't move (Wayland).
+  shakeWindow: (): Promise<boolean> => ipcRenderer.invoke('chat:shake'),
+  // Winks inside the conversation window (on Wayland, or with full-screen winks off).
   onWinkPlay: (callback: (wink: string) => void): (() => void) => {
     const listener = (_: unknown, wink: string): void => callback(wink)
     ipcRenderer.on('chat:wink-play', listener)

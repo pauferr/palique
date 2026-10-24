@@ -56,7 +56,10 @@
     playSound(prefs.soundPack, event)
   }
 
-  function shake(): void {
+  // The whole window shakes; where it can't move (Wayland), its contents do.
+  async function shake(): Promise<void> {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (await window.api.shakeWindow()) return
     shaking = false
     requestAnimationFrame(() => (shaking = true))
   }
