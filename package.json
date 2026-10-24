@@ -4,6 +4,7 @@
   "stage": "alpha",
   "private": true,
   "description": "Desktop instant messenger inspired by MSN Messenger and AIM",
+  "license": "AGPL-3.0-or-later",
   "main": "./out/main/index.js",
   "author": {
     "name": "Paulo Ferreira",

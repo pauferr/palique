@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Palique account service: email verification, invites by email, password recovery",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/main.ts",

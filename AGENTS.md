@@ -190,6 +190,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
   - Prettier settings: single quotes, no semicolons, width 100, no trailing commas. The Svelte plugin is on.
   - Format only code: `npx prettier --write src scripts server/accounts/src`. Running it on `.` rewrites Markdown and YAML that aren't kept in Prettier style.
 - **Comments:** short and about *why*, in the existing tone. Keep them current when the code changes.
+- **License:** AGPL-3.0-or-later ([LICENSE](LICENSE)). Anything added (dependencies, fonts, sounds, images) must be compatible: permissive (MIT, BSD, ISC, Apache-2.0), OFL for fonts, or your own work.
 - **Simplicity:**
   - Prefer the standard library and platform features. Avoid new dependencies.
   - One module owns each concern: XMPP only in `xmpp.ts`, IPC only in `index.ts` and the preload.
