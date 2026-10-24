@@ -406,6 +406,11 @@
     color: var(--text-muted);
   }
 
+  /* Ours on the right, theirs on the left. */
+  li.mine {
+    text-align: right;
+  }
+
   .mine .meta {
     color: var(--text-strong);
   }
@@ -419,6 +424,10 @@
     margin: 2px 0 0 12px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  .mine p {
+    margin: 2px 12px 0 0;
   }
 
   /* Day separator and buzz/wink notices: small centered chips, not messages. */
