@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Font, Settings, SoundPack } from '../../main/settings'
+  import type { Font, Settings, SoundPack, Theme } from '../../main/settings'
   import type { EmailStatus, InviteStatus, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import { Bell, KeyRound, MessageCircle, Monitor, User } from '@lucide/svelte'
   import { avatarPng } from './picture'
   import { events, packs, playSound } from './sounds'
-  import { themes } from './themes/list'
 
   // Laid out like Windows Live Messenger's Options: sections on the left, one at a time on
   // the right. Every change applies at once; there's only "Cerrar". The name and personal
@@ -18,11 +17,14 @@
     { id: 'alerts', icon: Bell, label: 'Alertas' },
     { id: 'account', icon: KeyRound, label: 'Cuenta' }
   ] as const
-  type Section = (typeof sections)[number]['id']
-  // The menus can open it on a section (#options=account), also once it's open.
-  const isSection = (id: string | null): id is Section => sections.some((s) => s.id === id)
-  const asked = new URLSearchParams(location.hash.slice(1)).get('options')
-  let section: Section = $state(isSection(asked) ? asked : 'personal')
+  let section: (typeof sections)[number]['id'] = $state('personal')
+
+  const themes: { id: Theme; label: string; font: string }[] = [
+    { id: 'classic', label: 'Clásico', font: 'Noto Sans' },
+    { id: 'retro', label: 'Retro', font: 'IBM Plex Sans' },
+    { id: 'glass', label: 'Cristal', font: 'Hind' },
+    { id: 'night', label: 'Noche', font: 'Noto Sans' }
+  ]
 
   const fonts: { id: Font; label: string }[] = [
     // The theme's own font, named after it.
@@ -68,14 +70,10 @@
     const offEmail = window.api.onEmail((value) => {
       email = value
     })
-    const offSection = window.api.onOptionsSection((id) => {
-      if (isSection(id)) section = id
-    })
     return () => {
       offSettings()
       offRoster()
       offEmail()
-      offSection()
     }
   })
 

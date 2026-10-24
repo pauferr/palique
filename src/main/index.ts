@@ -347,10 +347,8 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
 
 let options: BrowserWindow | null = null
 
-// `section`: open on it (e.g. 'account' from Contactos → Mis invitaciones).
-function openOptions(section?: string): void {
+function openOptions(): void {
   if (options) {
-    if (section) options.webContents.send('options:section', section)
     options.focus()
     return
   }
@@ -366,7 +364,7 @@ function openOptions(section?: string): void {
   })
   options.on('closed', () => (options = null))
   options.once('ready-to-show', () => options?.show())
-  loadRenderer(options, section ? `options=${section}` : 'options')
+  loadRenderer(options, 'options')
 }
 
 // Changing our display name, with its Messenger Plus! colors: a small window of its own.
@@ -868,10 +866,7 @@ app.whenReady().then(() => {
     deliver(await sendBuzz(String(contact)))
     return BUZZ_INTERVAL
   })
-  const sections = ['personal', 'general', 'messages', 'alerts', 'account']
-  ipcMain.handle('options:open', (_, section: unknown) =>
-    openOptions(sections.includes(section as string) ? (section as string) : undefined)
-  )
+  ipcMain.handle('options:open', () => openOptions())
   ipcMain.handle('app:quit', () => app.quit())
   ipcMain.handle('nick:open', () => openNick())
   ipcMain.handle('about:open', () => openAbout())
@@ -899,29 +894,21 @@ app.whenReady().then(() => {
     return true
   })
   // Native menus, so they can reach past the window's edges. The renderer sends labels
-  // (an item, one with a ✓ when `checked` is set, one with a `submenu`, or '-') and gets
-  // back the index of the item picked, counting items without a submenu in order, or -1.
+  // (an item, one with a ✓ when `checked` is set, or '-') and gets back the index picked,
+  // or -1.
   ipcMain.handle('menu:popup', (event, items: unknown, x: number, y: number) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win || !Array.isArray(items)) return -1
     return new Promise<number>((resolve) => {
-      let picked = 0
-      const build = (items: unknown[], depth: number): Electron.MenuItemConstructorOptions[] =>
-        items.slice(0, 40).map((item) => {
-          if (item === '-') return { type: 'separator' }
-          const { label, checked, submenu } = (item ?? {}) as Record<string, unknown>
-          const text = String(label).slice(0, 100)
-          if (Array.isArray(submenu) && depth < 2) {
-            return { label: text, submenu: build(submenu, depth + 1) }
-          }
-          const index = picked++
-          return {
-            label: text,
-            ...(typeof checked === 'boolean' ? { type: 'checkbox', checked } : {}),
-            click: () => resolve(index)
-          }
-        })
-      const template = build(items, 1)
+      const template = items.slice(0, 20).map((item, i): Electron.MenuItemConstructorOptions => {
+        if (item === '-') return { type: 'separator' }
+        const { label, checked } = (item ?? {}) as { label?: unknown; checked?: unknown }
+        return {
+          label: String(label).slice(0, 100),
+          ...(typeof checked === 'boolean' ? { type: 'checkbox', checked } : {}),
+          click: () => resolve(i)
+        }
+      })
       // ponytail: clicks may land just after the menu closes; 100 ms covers it.
       Menu.buildFromTemplate(template).popup({
         window: win,

@@ -9,8 +9,6 @@
   import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
   import { playSound } from './sounds'
-  import { themes } from './themes/list'
-  import { winkLabel, winks } from './winks'
   import UpdateNotice from './UpdateNotice.svelte'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
@@ -102,10 +100,7 @@
   // Herramientas, Ayuda), your status under your name, and a right click on a contact.
   // Native, so they can go past the window.
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: 'Invisible' }
-  type MenuItem =
-    | { label: string; checked?: boolean; run: () => void }
-    | { label: string; submenu: MenuItem[] }
-    | '-'
+  type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
 
   // Under the button clicked, or where the right click was.
   async function popup(event: MouseEvent, items: MenuItem[]): Promise<void> {
@@ -113,54 +108,27 @@
       event.type === 'contextmenu'
         ? { left: event.clientX, bottom: event.clientY }
         : (event.currentTarget as HTMLElement).getBoundingClientRect()
-    // The main process numbers the items without a submenu in order: same order here.
-    const actions: (() => void)[] = []
-    const label = (item: MenuItem): MenuLabel => {
-      if (item === '-') return item
-      if ('submenu' in item) return { label: item.label, submenu: item.submenu.map(label) }
-      actions.push(item.run)
-      return { label: item.label, checked: item.checked }
-    }
-    const labels = items.map(label)
-    actions[await window.api.popupMenu(labels, at.left, at.bottom)]?.()
+    const labels = items.map((item): MenuLabel =>
+      item === '-' ? item : { label: item.label, checked: item.checked }
+    )
+    const item = items[await window.api.popupMenu(labels, at.left, at.bottom)]
+    if (item && item !== '-') item.run()
   }
 
   const fileMenu = (e: MouseEvent): Promise<void> =>
     popup(e, [
       { label: 'Cambiar mi nombre…', run: window.api.openNick },
-      { label: 'Cambiar mi imagen…', run: () => window.api.openOptions('personal') },
       { label: 'Cambiar mi mensaje personal…', run: () => (editing = true) },
-      '-',
-      { label: 'Guardar una copia de las conversaciones…', run: window.api.exportHistory },
       '-',
       { label: 'Cerrar sesión', run: onlogout },
       { label: 'Salir de Palique', run: window.api.quit }
     ])
 
   const contactsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [
-      { label: 'Añadir o invitar a un contacto…', run: openAdd },
-      { label: 'Mis invitaciones…', run: () => window.api.openOptions('account') }
-    ])
+    popup(e, [{ label: 'Añadir o invitar a un contacto…', run: openAdd }])
 
   const toolsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [
-      {
-        label: 'Tema',
-        submenu: themes.map((t) => ({
-          label: t.label,
-          checked: prefs.theme === t.id,
-          run: () => window.api.setSettings({ theme: t.id })
-        }))
-      },
-      {
-        label: 'Sonidos',
-        checked: prefs.sounds,
-        run: () => window.api.setSettings({ sounds: !prefs.sounds })
-      },
-      '-',
-      { label: 'Opciones…', run: () => window.api.openOptions() }
-    ])
+    popup(e, [{ label: 'Opciones…', run: window.api.openOptions }])
 
   const helpMenu = (e: MouseEvent): Promise<void> =>
     popup(e, [
@@ -178,27 +146,10 @@
       }))
     )
 
-  // Buzzes and winks open the conversation first, so they're seen there.
-  async function inChat(contact: Contact, send: () => Promise<unknown>): Promise<void> {
-    await window.api.openChat(contact.jid)
-    await send()
-  }
-
   function contactMenu(e: MouseEvent, contact: Contact): Promise<void> {
     e.preventDefault()
     return popup(e, [
       { label: 'Enviar un mensaje', run: () => window.api.openChat(contact.jid) },
-      {
-        label: 'Enviar un zumbido',
-        run: () => inChat(contact, () => window.api.sendBuzz(contact.jid))
-      },
-      {
-        label: 'Enviar un guiño',
-        submenu: winks.map(({ id }) => ({
-          label: winkLabel(id),
-          run: () => inChat(contact, () => window.api.sendWink(contact.jid, id))
-        }))
-      },
       '-',
       { label: 'Eliminar contacto…', run: () => remove(contact) }
     ])
