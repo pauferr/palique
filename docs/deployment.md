@@ -103,6 +103,8 @@ Comprobación rápida: abre `https://tu-dominio.com` en el navegador. Debe salir
 cd ~/palique && git pull && deploy/setup.sh
 ```
 
+Reinicia Prosody para cargar los módulos nuevos: quien esté conectado se desconecta unos segundos y la app vuelve a entrar sola.
+
 **Ver qué pasa:**
 
 ```bash

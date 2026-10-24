@@ -39,6 +39,9 @@ if ! docker compose exec -T caddy test -f "$src"; then
   exit 1
 fi
 ./certs.sh
+# Reloading the config (certs.sh) doesn't load new or changed modules: restart Prosody.
+# Signed-in users reconnect by themselves in a few seconds.
+docker compose restart prosody
 
 # Weekly certificate hand-over to Prosody (idempotent).
 job="0 4 * * 1 $(pwd)/certs.sh >> $(pwd)/certs.log 2>&1"
