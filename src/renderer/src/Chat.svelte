@@ -36,8 +36,11 @@
   let emoticonsOpen = $state(false)
   let input: HTMLTextAreaElement
   let theyType = $state(false)
-  // A wink playing inside this window (on Wayland, where there's no full-screen overlay).
+  // A wink playing inside this window (on Wayland, or with full-screen winks off),
+  // and the ones that arrived meanwhile, played after it in order.
   let playing = $state('')
+  const queued: string[] = []
+  const nextWink = (): string => (playing = queued.shift() ?? '')
   let list: HTMLElement
   let composing = false
   let idle: ReturnType<typeof setTimeout> | undefined
@@ -71,12 +74,8 @@
     if (!message.mine) theyType = false
     if (alert && !message.mine) {
       if (message.buzz && prefs.shake) shake()
-      if (message.wink) {
-        // The full-screen wink brings its own sound; with winks off, a plain chime.
-        if (!prefs.winks) play('message')
-      } else {
-        play(message.buzz ? 'buzz' : 'message')
-      }
+      // The wink brings its own sound.
+      if (!message.wink) play(message.buzz ? 'buzz' : 'message')
     }
     if (alert && message.mine && message.buzz) shake()
     await tick()
@@ -98,7 +97,9 @@
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     const offWink = window.api.onWinkPlay((id) => {
-      if (findWink(id)) playing = id
+      if (!findWink(id)) return
+      if (playing) queued.push(id)
+      else playing = id
     })
     window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
     // History never triggers effects; live messages (even the one that opened this window)
@@ -219,8 +220,10 @@
   {#if playing}
     <!-- A click closes it. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="wink-layer" onclick={() => (playing = '')}>
-      <WinkPlayer id={playing} playing sound={prefs.sounds} onended={() => (playing = '')} />
+    <div class="wink-layer" onclick={nextWink}>
+      {#key playing}
+        <WinkPlayer id={playing} playing sound={prefs.sounds} onended={nextWink} />
+      {/key}
     </div>
   {/if}
   <header>

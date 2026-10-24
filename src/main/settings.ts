@@ -25,7 +25,7 @@ export type SoundPack = (typeof SOUND_PACKS)[number]
 export type Settings = {
   theme: Theme
   font: Font
-  winks: boolean // play winks full screen
+  winks: boolean // play winks full screen (else inside the conversation)
   show: OwnShow // last status, used at the next sign-in (like MSN)
   status: string // last personal message, likewise
   email: string // last account signed in, pre-filled on the sign-in screen

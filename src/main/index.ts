@@ -533,15 +533,22 @@ const isLate = (message: ChatMessage): boolean =>
 function playWink(message: ChatMessage): void {
   // Only in an open conversation (otherwise it waits there, and can be replayed from it).
   // The wink video has sound, so not while busy either.
-  const show = settings.get().winks && !isLate(message) && ownShow() !== 'dnd'
+  const show = !isLate(message) && ownShow() !== 'dnd'
   const chat = chats.get(message.with)
   if (show && chat) showWink(message.wink, chat)
 }
 
-// Transparent, click-through window over the whole primary display. On Wayland, inside
-// the conversation window instead (see `wayland`).
+// Transparent, click-through window over the whole primary display. Inside the
+// conversation window instead on Wayland (see `wayland`) or with full-screen winks off. One at a time: winks that cross (ours
+// and theirs) wait and play after it, in the order they came.
+let winkWindow: BrowserWindow | null = null
+const winkQueue: string[] = []
+
 function showWink(id: string, chat: BrowserWindow | null): void {
-  if (wayland && chat) return chat.webContents.send('chat:wink-play', id)
+  if ((wayland || !settings.get().winks) && chat) {
+    return chat.webContents.send('chat:wink-play', id)
+  }
+  if (winkWindow) return void winkQueue.push(id)
   const win = new BrowserWindow({
     ...screen.getPrimaryDisplay().bounds,
     show: false,
@@ -563,6 +570,12 @@ function showWink(id: string, chat: BrowserWindow | null): void {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   win.setIgnoreMouseEvents(true)
   win.once('ready-to-show', () => win.showInactive())
+  winkWindow = win
+  win.on('closed', () => {
+    winkWindow = null
+    const next = winkQueue.shift()
+    if (next) showWink(next, null)
+  })
   loadRenderer(win, `wink=${encodeURIComponent(id)}`)
 }
 
@@ -812,7 +825,7 @@ app.whenReady().then(() => {
     pending.delete(String(contact))
   })
   ipcMain.handle('chat:unread', () => Object.fromEntries(unread))
-  // Clicking a wink in a conversation plays it again, even with full-screen winks off.
+  // Clicking a wink in a conversation plays it again.
   ipcMain.on('chat:replay-wink', (event, wink: string) => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })

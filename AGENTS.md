@@ -44,7 +44,7 @@ compose.yaml       local server stack
 ### App
 
 - **One XMPP connection** for the whole app, owned by `src/main/xmpp.ts`. It keeps the roster, presences, avatars and display names in memory and emits a `Snapshot` on every change. `index.ts` broadcasts it to every window (`roster:changed`).
-- **Windows:** contact list (main), one window per conversation (like MSN), Options, and a transparent click-through overlay for winks (on Wayland, where a window can't force itself on top everywhere, winks play inside the conversation window instead). Closing the contact list hides it (tray keeps the app running).
+- **Windows:** contact list (main), one window per conversation (like MSN), Options, and a transparent click-through overlay for winks (on Wayland, where a window can't force itself on top everywhere, or with «Mostrar los guiños a pantalla completa» off, winks play inside the conversation window instead). Closing the contact list hides it (tray keeps the app running).
 - **IPC:** `ipcMain.handle('area:action')` in `index.ts`, wrapped one-to-one in `src/preload/index.ts`. Validate everything that comes from the renderer in main (types, sizes, ids).
 - **Single instance** per data folder (`app.requestSingleInstanceLock`). To run a second copy for testing, give it its own folder (see Development).
 - **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
