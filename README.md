@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="build/icon.svg" width="128" alt="El logo de Palique: un bocadillo naranja que se ríe y tiembla con un zumbido, sobre fondo azul, con un punto verde de conectado">
+</p>
+
 # Palique
 
 Palique es el messenger de escritorio de toda la vida, hecho de nuevo. Tu lista de contactos, tu mensaje personal, los zumbidos, los guiños… y ese sonidito de cuando alguien se conecta.
