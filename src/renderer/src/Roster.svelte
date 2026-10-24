@@ -3,7 +3,6 @@
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
-  import { Bug, Download, Info, LogOut, Settings, UserPlus } from '@lucide/svelte'
   import { emojify } from './emoticons'
   import { avatarPng } from './picture'
   import { stripPlus } from './plus'
@@ -85,7 +84,6 @@
 
   async function updatePresence(show: OwnShow): Promise<void> {
     presenceError = ''
-    menu = ''
     try {
       await window.api.setPresence(show, status)
     } catch {
@@ -94,27 +92,45 @@
   }
 
   // Menus like MSN's: the bar on top (Contactos, Herramientas, Ayuda) and the one under
-  // your name (status, Opciones, Cerrar sesión). A click elsewhere or Escape closes them.
-  let menu: '' | 'contacts' | 'tools' | 'help' | 'me' = $state('')
+  // your name (status, Opciones, Cerrar sesión). Native, so they can go past the window.
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: 'Invisible' }
+  type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
 
-  function toggleMenu(name: typeof menu): void {
-    menu = menu === name ? '' : name
+  async function popup(event: MouseEvent, items: MenuItem[]): Promise<void> {
+    const { left, bottom } = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const labels = items.map((item) =>
+      item === '-' ? item : { label: item.label, checked: item.checked }
+    )
+    const item = items[await window.api.popupMenu(labels, left, bottom)]
+    if (item && item !== '-') item.run()
   }
 
-  function closeMenus(event: MouseEvent): void {
-    if (!(event.target as Element).closest('.menu, [aria-haspopup]')) menu = ''
-  }
+  const contactsMenu = (e: MouseEvent): Promise<void> =>
+    popup(e, [{ label: 'Añadir o invitar a un contacto…', run: openAdd }])
 
-  function exportHistory(): void {
-    menu = ''
-    window.api.exportHistory()
-  }
+  const toolsMenu = (e: MouseEvent): Promise<void> =>
+    popup(e, [
+      { label: 'Opciones…', run: window.api.openOptions },
+      { label: 'Guardar una copia de las conversaciones…', run: window.api.exportHistory }
+    ])
 
-  function help(open: () => Promise<void>): void {
-    menu = ''
-    open()
-  }
+  const helpMenu = (e: MouseEvent): Promise<void> =>
+    popup(e, [
+      { label: 'Registro de errores…', run: window.api.openLogs },
+      { label: 'Acerca de Palique', run: window.api.openAbout }
+    ])
+
+  const meMenu = (e: MouseEvent): Promise<void> =>
+    popup(e, [
+      ...(['online', 'away', 'dnd', 'invisible'] as const).map((show) => ({
+        label: ownLabels[show],
+        checked: roster.show === show,
+        run: () => updatePresence(show)
+      })),
+      '-',
+      { label: 'Opciones…', run: window.api.openOptions },
+      { label: 'Cerrar sesión', run: onlogout }
+    ])
 
   async function chooseAvatar(): Promise<void> {
     const file = picker.files?.[0]
@@ -138,7 +154,6 @@
   const left = $derived(invites ? Math.max(0, invites.max - invites.used) : 0)
 
   async function openAdd(): Promise<void> {
-    menu = ''
     addOpen = true
     addNote = ''
     notFound = ''
@@ -193,65 +208,11 @@
   }
 </script>
 
-<svelte:window
-  onclick={closeMenus}
-  onkeydown={(e) => {
-    if (e.key === 'Escape') menu = ''
-  }}
-/>
-
 <section class="roster">
   <div class="menubar" role="menubar">
-    <button
-      role="menuitem"
-      aria-haspopup="menu"
-      aria-expanded={menu === 'contacts'}
-      onclick={() => toggleMenu('contacts')}>Contactos</button
-    >
-    <button
-      role="menuitem"
-      aria-haspopup="menu"
-      aria-expanded={menu === 'tools'}
-      onclick={() => toggleMenu('tools')}>Herramientas</button
-    >
-    <button
-      role="menuitem"
-      aria-haspopup="menu"
-      aria-expanded={menu === 'help'}
-      onclick={() => toggleMenu('help')}>Ayuda</button
-    >
-    {#if menu === 'contacts'}
-      <div class="menu" role="menu" style:left="4px">
-        <button role="menuitem" onclick={openAdd}
-          ><UserPlus size={16} aria-hidden="true" />Añadir o invitar a un contacto…</button
-        >
-      </div>
-    {:else if menu === 'tools'}
-      <div class="menu" role="menu" style:left="80px">
-        <button
-          role="menuitem"
-          onclick={() => {
-            menu = ''
-            window.api.openOptions()
-          }}><Settings size={16} aria-hidden="true" />Opciones…</button
-        >
-        <button role="menuitem" onclick={exportHistory}
-          ><Download size={16} aria-hidden="true" />Guardar una copia de las conversaciones…</button
-        >
-      </div>
-    {:else if menu === 'help'}
-      <div class="menu" role="menu" style:right="4px">
-        <button
-          role="menuitem"
-          onclick={() => help(window.api.openLogs)}
-          title="Si algo falla, envíanos este archivo. No guarda contraseñas, mensajes ni direcciones."
-          ><Bug size={16} aria-hidden="true" />Registro de errores…</button
-        >
-        <button role="menuitem" onclick={() => help(window.api.openAbout)}
-          ><Info size={16} aria-hidden="true" />Acerca de Palique</button
-        >
-      </div>
-    {/if}
+    <button role="menuitem" aria-haspopup="menu" onclick={contactsMenu}>Contactos</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={toolsMenu}>Herramientas</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={helpMenu}>Ayuda</button>
   </div>
 
   <header>
@@ -277,35 +238,9 @@
         <button class="nick" onclick={() => window.api.openNick()} title="Cambiar tu nombre"
           ><Emoticons text={roster.name} plus /></button
         >
-        <button
-          class="show"
-          aria-haspopup="menu"
-          aria-expanded={menu === 'me'}
-          onclick={() => toggleMenu('me')}>({ownLabels[roster.show]}) ▾</button
+        <button class="show" aria-haspopup="menu" onclick={meMenu}
+          >({ownLabels[roster.show]}) ▾</button
         >
-        {#if menu === 'me'}
-          <div class="menu me-menu" role="menu">
-            {#each ['online', 'away', 'dnd', 'invisible'] as const as show (show)}
-              <button
-                role="menuitemradio"
-                aria-checked={roster.show === show}
-                onclick={() => updatePresence(show)}
-                ><span class="dot {show}"></span>{ownLabels[show]}</button
-              >
-            {/each}
-            <hr />
-            <button
-              role="menuitem"
-              onclick={() => {
-                menu = ''
-                window.api.openOptions()
-              }}><Settings size={16} aria-hidden="true" />Opciones…</button
-            >
-            <button role="menuitem" onclick={onlogout}
-              ><LogOut size={16} aria-hidden="true" />Cerrar sesión</button
-            >
-          </div>
-        {/if}
       </div>
       {#if editing}
         <input
@@ -521,8 +456,7 @@
     font-weight: normal;
   }
 
-  .show:hover:not(:disabled),
-  .show[aria-expanded='true'] {
+  .show:hover:not(:disabled) {
     background: var(--row-hover-bg);
   }
 
@@ -791,84 +725,8 @@
     color: var(--text);
   }
 
-  .menubar > button:hover:not(:disabled),
-  .menubar > button[aria-expanded='true'] {
+  .menubar > button:hover:not(:disabled) {
     background: var(--row-hover-bg);
-  }
-
-  .menu {
-    position: absolute;
-    top: 100%;
-    z-index: 10;
-    display: grid;
-    min-width: 200px;
-    padding: 3px;
-    background: var(--list-bg);
-    border: 1px solid var(--field-border-color);
-    box-shadow: var(--popup-shadow);
-  }
-
-  .me-menu {
-    left: 0;
-  }
-
-  .menu :global(svg) {
-    flex: none;
-  }
-
-  .menu button {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding: 5px 10px;
-    border-color: transparent;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-    color: var(--text);
-    font-weight: normal;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .menu button:hover:not(:disabled),
-  .menu button:focus-visible {
-    background: var(--row-hover-bg);
-    color: var(--text-strong);
-  }
-
-  .menu [aria-checked='true'] {
-    font-weight: bold;
-  }
-
-  .menu hr {
-    width: 100%;
-    margin: 3px 0;
-    border: 0;
-    border-top: 1px solid var(--line);
-  }
-
-  .dot {
-    width: 9px;
-    height: 9px;
-    margin: 0 3.5px; /* as wide as the menus' icons, so the labels line up */
-    border-radius: 50%;
-  }
-
-  .dot.online {
-    background: var(--status-online);
-  }
-
-  .dot.away {
-    background: var(--status-away);
-  }
-
-  .dot.dnd {
-    background: var(--status-dnd);
-  }
-
-  .dot.invisible {
-    border: 1px solid var(--status-offline);
   }
 
   /* Panels that rise from the bottom of the list: adding someone, About. */

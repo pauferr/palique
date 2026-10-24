@@ -868,6 +868,30 @@ app.whenReady().then(() => {
     }
     return true
   })
+  // Native menus, so they can reach past the window's edges. The renderer sends labels
+  // (an item, a radio with `checked`, or '-'), gets back the index picked, or -1.
+  ipcMain.handle('menu:popup', (event, items: unknown, x: number, y: number) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || !Array.isArray(items)) return -1
+    return new Promise<number>((resolve) => {
+      const template = items.slice(0, 20).map((item, i): Electron.MenuItemConstructorOptions => {
+        if (item === '-') return { type: 'separator' }
+        const { label, checked } = (item ?? {}) as { label?: unknown; checked?: unknown }
+        return {
+          label: String(label).slice(0, 100),
+          ...(typeof checked === 'boolean' ? { type: 'radio', checked } : {}),
+          click: () => resolve(i)
+        }
+      })
+      // ponytail: clicks may land just after the menu closes; 100 ms covers it.
+      Menu.buildFromTemplate(template).popup({
+        window: win,
+        x: Math.round(Number(x)) || 0,
+        y: Math.round(Number(y)) || 0,
+        callback: () => setTimeout(() => resolve(-1), 100)
+      })
+    })
+  })
   ipcMain.on('wink:done', (event) => BrowserWindow.fromWebContents(event.sender)?.close())
 
   // New releases: every window shows the notice (sign-in screen and contact list).

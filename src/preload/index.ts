@@ -152,7 +152,10 @@ const api = {
   },
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke('settings:set', patch),
-  winkDone: (): void => ipcRenderer.send('wink:done')
+  winkDone: (): void => ipcRenderer.send('wink:done'),
+  // A native menu at (x, y) in the window; resolves with the index picked, or -1.
+  popupMenu: (items: ({ label: string; checked?: boolean } | '-')[], x: number, y: number) =>
+    ipcRenderer.invoke('menu:popup', items, x, y) as Promise<number>
 }
 
 export type Api = typeof api
