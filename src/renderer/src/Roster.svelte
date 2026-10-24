@@ -240,7 +240,7 @@
         >
       </div>
     {:else if menu === 'help'}
-      <div class="menu" role="menu" style:left="180px">
+      <div class="menu" role="menu" style:right="4px">
         <button
           role="menuitem"
           onclick={() => help(window.api.openLogs)}
