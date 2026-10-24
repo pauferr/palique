@@ -135,7 +135,13 @@ const api = {
     ipcRenderer.on('chat:typing', listener)
     return () => ipcRenderer.off('chat:typing', listener)
   },
-  openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
+  openOptions: (section?: string): Promise<void> => ipcRenderer.invoke('options:open', section),
+  onOptionsSection: (callback: (section: string) => void): (() => void) => {
+    const listener = (_: unknown, section: string): void => callback(section)
+    ipcRenderer.on('options:section', listener)
+    return () => ipcRenderer.off('options:section', listener)
+  },
+  quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
   openNick: (): Promise<void> => ipcRenderer.invoke('nick:open'),
   openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),
   // The format is chosen in the save dialog.
@@ -155,12 +161,15 @@ const api = {
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke('settings:set', patch),
   winkDone: (): void => ipcRenderer.send('wink:done'),
-  // A native menu at (x, y) in the window; resolves with the index picked, or -1.
-  popupMenu: (items: ({ label: string; checked?: boolean } | '-')[], x: number, y: number) =>
+  // A native menu at (x, y) in the window; resolves with the index picked (items without a
+  // submenu, in order), or -1.
+  popupMenu: (items: MenuLabel[], x: number, y: number) =>
     ipcRenderer.invoke('menu:popup', items, x, y) as Promise<number>
 }
 
 export type Api = typeof api
+// A native menu item, as popupMenu sends it to the main process.
+export type MenuLabel = { label: string; checked?: boolean; submenu?: MenuLabel[] } | '-'
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
+  import type { MenuLabel } from '../../preload'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { emojify } from './emoticons'
@@ -8,6 +9,8 @@
   import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
   import { playSound } from './sounds'
+  import { themes } from './themes/list'
+  import { winkLabel, winks } from './winks'
   import UpdateNotice from './UpdateNotice.svelte'
 
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
@@ -95,27 +98,68 @@
     }
   }
 
-  // Menus like MSN's: the bar on top (Contactos, Herramientas, Ayuda) and the one under
-  // your name (status, Opciones, Cerrar sesión). Native, so they can go past the window.
+  // Menus like MSN's, each action in one place: the bar on top (Archivo, Contactos,
+  // Herramientas, Ayuda), your status under your name, and a right click on a contact.
+  // Native, so they can go past the window.
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: 'Invisible' }
-  type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
+  type MenuItem =
+    | { label: string; checked?: boolean; run: () => void }
+    | { label: string; submenu: MenuItem[] }
+    | '-'
 
+  // Under the button clicked, or where the right click was.
   async function popup(event: MouseEvent, items: MenuItem[]): Promise<void> {
-    const { left, bottom } = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    const labels = items.map((item) =>
-      item === '-' ? item : { label: item.label, checked: item.checked }
-    )
-    const item = items[await window.api.popupMenu(labels, left, bottom)]
-    if (item && item !== '-') item.run()
+    const at =
+      event.type === 'contextmenu'
+        ? { left: event.clientX, bottom: event.clientY }
+        : (event.currentTarget as HTMLElement).getBoundingClientRect()
+    // The main process numbers the items without a submenu in order: same order here.
+    const actions: (() => void)[] = []
+    const label = (item: MenuItem): MenuLabel => {
+      if (item === '-') return item
+      if ('submenu' in item) return { label: item.label, submenu: item.submenu.map(label) }
+      actions.push(item.run)
+      return { label: item.label, checked: item.checked }
+    }
+    const labels = items.map(label)
+    actions[await window.api.popupMenu(labels, at.left, at.bottom)]?.()
   }
 
+  const fileMenu = (e: MouseEvent): Promise<void> =>
+    popup(e, [
+      { label: 'Cambiar mi nombre…', run: window.api.openNick },
+      { label: 'Cambiar mi imagen…', run: () => window.api.openOptions('personal') },
+      { label: 'Cambiar mi mensaje personal…', run: () => (editing = true) },
+      '-',
+      { label: 'Guardar una copia de las conversaciones…', run: window.api.exportHistory },
+      '-',
+      { label: 'Cerrar sesión', run: onlogout },
+      { label: 'Salir de Palique', run: window.api.quit }
+    ])
+
   const contactsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [{ label: 'Añadir o invitar a un contacto…', run: openAdd }])
+    popup(e, [
+      { label: 'Añadir o invitar a un contacto…', run: openAdd },
+      { label: 'Mis invitaciones…', run: () => window.api.openOptions('account') }
+    ])
 
   const toolsMenu = (e: MouseEvent): Promise<void> =>
     popup(e, [
-      { label: 'Opciones…', run: window.api.openOptions },
-      { label: 'Guardar una copia de las conversaciones…', run: window.api.exportHistory }
+      {
+        label: 'Tema',
+        submenu: themes.map((t) => ({
+          label: t.label,
+          checked: prefs.theme === t.id,
+          run: () => window.api.setSettings({ theme: t.id })
+        }))
+      },
+      {
+        label: 'Sonidos',
+        checked: prefs.sounds,
+        run: () => window.api.setSettings({ sounds: !prefs.sounds })
+      },
+      '-',
+      { label: 'Opciones…', run: () => window.api.openOptions() }
     ])
 
   const helpMenu = (e: MouseEvent): Promise<void> =>
@@ -125,16 +169,40 @@
     ])
 
   const meMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [
-      ...(['online', 'away', 'dnd', 'invisible'] as const).map((show) => ({
+    popup(
+      e,
+      (['online', 'away', 'dnd', 'invisible'] as const).map((show) => ({
         label: ownLabels[show],
         checked: roster.show === show,
         run: () => updatePresence(show)
-      })),
+      }))
+    )
+
+  // Buzzes and winks open the conversation first, so they're seen there.
+  async function inChat(contact: Contact, send: () => Promise<unknown>): Promise<void> {
+    await window.api.openChat(contact.jid)
+    await send()
+  }
+
+  function contactMenu(e: MouseEvent, contact: Contact): Promise<void> {
+    e.preventDefault()
+    return popup(e, [
+      { label: 'Enviar un mensaje', run: () => window.api.openChat(contact.jid) },
+      {
+        label: 'Enviar un zumbido',
+        run: () => inChat(contact, () => window.api.sendBuzz(contact.jid))
+      },
+      {
+        label: 'Enviar un guiño',
+        submenu: winks.map(({ id }) => ({
+          label: winkLabel(id),
+          run: () => inChat(contact, () => window.api.sendWink(contact.jid, id))
+        }))
+      },
       '-',
-      { label: 'Opciones…', run: window.api.openOptions },
-      { label: 'Cerrar sesión', run: onlogout }
+      { label: 'Eliminar contacto…', run: () => remove(contact) }
     ])
+  }
 
   async function chooseAvatar(): Promise<void> {
     const file = picker.files?.[0]
@@ -214,6 +282,7 @@
 
 <section class="roster">
   <div class="menubar" role="menubar">
+    <button role="menuitem" aria-haspopup="menu" onclick={fileMenu}>Archivo</button>
     <button role="menuitem" aria-haspopup="menu" onclick={contactsMenu}>Contactos</button>
     <button role="menuitem" aria-haspopup="menu" onclick={toolsMenu}>Herramientas</button>
     <button role="menuitem" aria-haspopup="menu" onclick={helpMenu}>Ayuda</button>
@@ -306,7 +375,10 @@
             {#each group.contacts as contact (contact.jid)}
               <!-- Recreated on each new message, so the row blinks again. -->
               {#key unread[contact.jid]}
-                <li class:unread={unread[contact.jid]}>
+                <li
+                  class:unread={unread[contact.jid]}
+                  oncontextmenu={(e) => contactMenu(e, contact)}
+                >
                   <span title={labels[contact.show]}>
                     <Avatar
                       jid={contact.jid}
@@ -330,12 +402,6 @@
                       >{unread[contact.jid] > 9 ? '9+' : unread[contact.jid]}</span
                     >
                   {/if}
-                  <button
-                    class="remove"
-                    onclick={() => remove(contact)}
-                    title="Eliminar contacto"
-                    aria-label="Eliminar a {emojify(stripPlus(contact.name))}">×</button
-                  >
                 </li>
               {/key}
             {/each}
@@ -637,20 +703,6 @@
   small {
     color: var(--text-muted);
     font-size: inherit;
-  }
-
-  .remove {
-    padding: 0 4px;
-    background: none;
-    border: none;
-    box-shadow: none;
-    color: var(--text-muted);
-    visibility: hidden;
-  }
-
-  li:hover .remove,
-  .remove:focus-visible {
-    visibility: visible;
   }
 
   /* No contacts yet: with no bar at the bottom, say how to add someone, MSN's green link. */
