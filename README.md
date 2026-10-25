@@ -32,7 +32,7 @@ Palique quiere recuperar eso. Un sitio pequeño y tranquilo para hablar con tus 
 - **El móvil puede esperar.** Palique vive en el ordenador, para charlar con calma mientras haces tus cosas.
 - **Solo tus amigos.** Nadie te escribe si tú no le agregas. Se entra por invitación, de amigo a amigo.
 - **Sin feeds ni algoritmos.** No hay nada que deslizar, nada que te enganche, ningún anuncio. Solo conversaciones.
-- **Tus cosas son tuyas.** Las conversaciones se guardan en tu ordenador, no en un servidor, y tus contactos nunca ven tu correo.
+- **Tus cosas son tuyas.** Las conversaciones se guardan en tu ordenador, no en un servidor, y tu correo solo lo ven los contactos que tú también tienes agregados.
 - **Con cariño y con ruido.** Zumbidos, guiños, emoticonos y sonidos, porque hablar con tus amigos tiene que ser divertido.
 - **Libre, de verdad.** Palique es software libre: cualquiera puede ver el código, cambiarlo y montar su propio servidor, y lo que se haga a partir de Palique tiene que seguir siendo libre.
 

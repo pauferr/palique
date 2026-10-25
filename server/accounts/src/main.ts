@@ -79,8 +79,11 @@ const fakeLocalpart = (email: string): string =>
 
 const INVITES = 'urn:palique:invite:0'
 
-function prosodyIq(child: ReturnType<typeof xml>): Promise<ReturnType<typeof xml>> {
-  return xmpp.iqCaller.request(xml('iq', { type: 'set', to: USER_DOMAIN }, child))
+function prosodyIq(
+  child: ReturnType<typeof xml>,
+  type: 'get' | 'set' = 'set'
+): Promise<ReturnType<typeof xml>> {
+  return xmpp.iqCaller.request(xml('iq', { type, to: USER_DOMAIN }, child))
 }
 
 // Someone just created their account with an invite: from now on it's theirs (if we miss
@@ -178,6 +181,21 @@ xmpp.iqCallee.get(NS, 'lookup', (ctx) => {
   if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
   if (!allowLookup(jid)) return stanzaError('resource-constraint')
   return xml('lookup', { xmlns: NS, jid: db.accountByEmail(address)?.jid ?? '' })
+})
+
+// <contacts/>: the emails of the user's mutual contacts. Prosody says who they are (the
+// roster lives there); anyone else's address stays hidden.
+xmpp.iqCallee.get(NS, 'contacts', async (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  const res = await prosodyIq(xml('contacts', { xmlns: INVITES, username: ctx.from!.local }), 'get')
+  const reply = xml('contacts', { xmlns: NS })
+  for (const contact of res.getChild('contacts', INVITES)?.getChildren('contact') ?? []) {
+    const other = `${contact.attrs.username}@${USER_DOMAIN}`
+    const email = db.account(other)?.email
+    if (email) reply.c('contact', { jid: other, email })
+  }
+  return reply
 })
 
 // --- invites (by email only) ------------------------------------------------------------

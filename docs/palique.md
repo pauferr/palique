@@ -153,8 +153,8 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 
 **Decidido: la cuenta es el correo electrónico. Registro solo con invitación por correo.**
 
-- Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) y es lo único que ven sus contactos: el correo nunca se les muestra.
-- Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie.
+- Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) que es lo que ve todo el mundo. El correo solo lo ven los contactos mutuos (los dos os habéis agregado), como en MSN, para saber quién es quién aunque cambie de nombre; quien no te tiene agregado nunca lo ve.
+- Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID, y solo se lo da a los contactos mutuos: pregunta a Prosody quiénes son (el roster está allí) antes de responder. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie más. El JID no se muestra nunca.
 - El nombre visible es XEP-0172: se publica en PEP (lo leen los contactos, como el avatar) y viaja en cada presencia y en las solicitudes de amistad, para que se vea antes de aceptar.
 - Iniciar sesión: la app pregunta al servicio de cuentas (HTTP) qué JID corresponde al correo y entra con él (SASL normal). A un correo sin cuenta le responde un JID inventado y siempre el mismo, así que falla igual que una contraseña mal escrita y no se sabe si la cuenta existe. Limitado por IP.
 - Registro desde el cliente mediante XEP-0077 (*In-Band Registration*). Requisito de diseño: encapsular la autenticación en el cliente para poder añadir otros métodos sin rehacer el flujo.

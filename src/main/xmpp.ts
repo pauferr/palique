@@ -77,6 +77,7 @@ export type Contact = {
   subscription: 'none' | 'to' | 'from' | 'both'
   pending: boolean // we asked to see their presence, waiting for approval
   avatar: string // data: URL, '' for the default avatar
+  email: string // only for mutual contacts, '' otherwise
 }
 
 export type Snapshot = {
@@ -102,7 +103,7 @@ export type ChatMessage = {
 }
 
 type Presence = { show: Show; status: string }
-type RosterEntry = Omit<Contact, 'show' | 'status' | 'avatar' | 'name'> & {
+type RosterEntry = Omit<Contact, 'show' | 'status' | 'avatar' | 'name' | 'email'> & {
   resources: Map<string, Presence>
 }
 type Avatar = { hash: string; url: string }
@@ -114,6 +115,7 @@ let requests = new Set<string>()
 let own: { show: OwnShow; status: string } = { show: 'online', status: '' }
 let avatars = new Map<string, Avatar>() // by bare JID, ours included
 let nicks = new Map<string, string>() // display names by bare JID, ours included
+let emails = new Map<string, string>() // mutual contacts' emails, from the account service
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
@@ -133,7 +135,8 @@ export function snapshot(): Snapshot {
       show: best?.show ?? 'offline',
       status: best?.status ?? '',
       avatar: avatars.get(entry.jid)?.url ?? '',
-      name: nameOf(entry.jid)
+      name: nameOf(entry.jid),
+      email: entry.subscription === 'both' ? (emails.get(entry.jid) ?? '') : ''
     }
   })
   return {
@@ -471,6 +474,7 @@ export async function login(
       const bare = item.attrs.jid as string
       const sub = item.attrs.subscription
       if ((sub === 'to' || sub === 'both') && !nicks.has(bare)) loadNick(bare).then(emit, () => {})
+      if (sub === 'both' && !emails.has(bare)) loadEmails().then(emit, () => {})
     }
     emit()
     return true
@@ -497,6 +501,8 @@ export async function login(
       // Our name first, so the first presence already carries it.
       .then(() => (nick ? publishNick(nick) : loadNick(me).catch(() => {})))
       .then(() => send(presenceStanza()))
+      .then(emit)
+      .then(loadEmails)
       .then(emit)
       .catch(() => {})
     loadAvatar(me).then(emit, () => {})
@@ -530,6 +536,7 @@ export async function logout(): Promise<void> {
   own = { show: 'online', status: '' }
   avatars = new Map()
   nicks = new Map()
+  emails = new Map()
   if (!entity) return
   entity.reconnect.stop()
   await entity.stop().catch(() => {})
@@ -708,6 +715,21 @@ function unexpected(what: string, e: unknown): 'unknown' {
 
 function accountsIq(type: 'get' | 'set', child: Element): Promise<Element> {
   return xmpp!.iqCaller.request(xml('iq', { type, to: ACCOUNTS_JID }, child))
+}
+
+// Who our mutual contacts are is the server's call: it only gives us their emails.
+async function loadEmails(): Promise<void> {
+  try {
+    const res = await accountsIq('get', xml('contacts', { xmlns: ACCOUNTS }))
+    emails = new Map()
+    for (const c of res.getChild('contacts', ACCOUNTS)?.getChildren('contact') ?? []) {
+      if (typeof c.attrs.jid === 'string' && typeof c.attrs.email === 'string') {
+        emails.set(c.attrs.jid, c.attrs.email.slice(0, 254))
+      }
+    }
+  } catch (e) {
+    unexpected('contact emails', e)
+  }
 }
 
 export type InviteStatus = { max: number; used: number }

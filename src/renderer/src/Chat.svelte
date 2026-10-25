@@ -231,7 +231,11 @@
   <header>
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
-      <span>Para: <strong><Emoticons text={name} plus /></strong></span>
+      <span
+        >Para: <strong><Emoticons text={name} plus /></strong>{#if contact?.email}&ensp;<span
+            class="email">&lt;{contact.email}&gt;</span
+          >{/if}</span
+      >
       <small
         >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
             contact?.show ?? 'offline'
@@ -373,6 +377,11 @@
 
   .to strong {
     color: var(--text-strong);
+  }
+
+  /* As in MSN: «Para: Ana <ana@…>». */
+  .email {
+    color: var(--text-muted);
   }
 
   small {

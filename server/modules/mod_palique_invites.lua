@@ -7,12 +7,15 @@
 --     become mutual contacts.
 --   iq set <reset for='username'/>  -> a password reset code (valid 1 hour, single use;
 --     the app re-registers the same username with it, see mod_invites).
+--   iq get <contacts username='…'/>  -> its mutual contacts (subscription both), so the
+--     account service only shows emails to them.
 -- New accounts are announced to them: <message><registered username='…'/></message>.
 
 local st = require "prosody.util.stanza";
 local datetime = require "prosody.util.datetime";
 local usermanager = require "prosody.core.usermanager";
 local rostermanager = require "prosody.core.rostermanager";
+local jid = require "prosody.util.jid";
 
 local invites = module:depends("invites");
 local invites_register = module:depends("invites_register");
@@ -91,5 +94,27 @@ module:hook("iq-set/host/" .. xmlns .. ":reset", function (event)
 		token = invite.token;
 		expires = datetime.datetime(invite.expires);
 	}));
+	return true;
+end);
+
+module:hook("iq-get/host/" .. xmlns .. ":contacts", function (event)
+	if not is_trusted(event) then return; end
+	local origin, stanza = event.origin, event.stanza;
+	local username = stanza.tags[1].attr.username;
+	if not username or not usermanager.user_exists(username, module.host) then
+		origin.send(st.error_reply(stanza, "cancel", "item-not-found"));
+		return true;
+	end
+	local reply = st.reply(stanza):tag("contacts", { xmlns = xmlns });
+	for contact, item in pairs(rostermanager.load_roster(username, module.host) or {}) do
+		-- The roster's `false` key holds metadata, not a contact.
+		if contact and item.subscription == "both" then
+			local node, host = jid.split(contact);
+			if node and host == module.host then
+				reply:tag("contact", { username = node }):up();
+			end
+		end
+	end
+	origin.send(reply);
 	return true;
 end);

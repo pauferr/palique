@@ -74,6 +74,8 @@ let s = await until(
   'mutual + presence + name'
 )
 assert.equal(contact(s)?.status, 'currando')
+// Mutual contacts see each other's email.
+await until((s) => contact(s)?.email === `${bName}@correo.test`, 'email of a mutual contact')
 
 // B changes status, then goes offline.
 await B.send(xml('presence', {}, xml('show', {}, 'away')))
@@ -139,6 +141,15 @@ assert.ok(!A.snapshot().contacts.some((x) => x.jid === `${c}@localhost`))
 await A.rejectRequest(`${c}@localhost`)
 await new Promise((r) => setTimeout(r, 800))
 assert.ok(cGot.includes('unsubscribed'), 'C is told')
+// Not a contact: C gets no emails (A's least of all).
+const cContacts = await C.iqCaller.request(
+  xml(
+    'iq',
+    { type: 'get', to: 'accounts.localhost' },
+    xml('contacts', { xmlns: 'urn:palique:accounts:0' })
+  )
+)
+assert.deepEqual(cContacts.getChild('contacts')?.getChildren('contact'), [])
 assert.deepEqual(A.snapshot().requests, [])
 await C.stop()
 

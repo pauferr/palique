@@ -150,6 +150,9 @@
     e.preventDefault()
     return popup(e, [
       { label: 'Enviar un mensaje', run: () => window.api.openChat(contact.jid) },
+      ...(contact.email
+        ? [{ label: 'Copiar correo', run: () => navigator.clipboard.writeText(contact.email) }]
+        : []),
       '-',
       { label: 'Eliminar contacto…', run: () => remove(contact) }
     ])
@@ -328,6 +331,7 @@
               {#key unread[contact.jid]}
                 <li
                   class:unread={unread[contact.jid]}
+                  title={contact.email || undefined}
                   oncontextmenu={(e) => contactMenu(e, contact)}
                 >
                   <span title={labels[contact.show]}>

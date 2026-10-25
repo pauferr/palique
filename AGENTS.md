@@ -57,7 +57,7 @@ compose.yaml       local server stack
 
 ### Accounts and identity
 
-- **The email is the account.** Each account has a random, permanent JID localpart (10 chars, `[a-z2-7]`, e.g. `k3f9x2ab7q@domain`). Only the account service knows which email goes with which JID. Changing the email touches nothing else, and contacts never see it.
+- **The email is the account.** Each account has a random, permanent JID localpart (10 chars, `[a-z2-7]`, e.g. `k3f9x2ab7q@domain`). Only the account service knows which email goes with which JID, and it tells only mutual contacts (subscription `both`, asked to Prosody each time). Changing the email touches nothing else. Mutual contacts see it in the conversation header, as the contact list tooltip and in «Copiar correo».
 - **Display name:** XEP-0172 nick, published in PEP and sent in every presence and subscription request. The UI never shows JIDs; unknown names show as "Sin nombre". It may carry Messenger Plus!-style codes (`[b]`, `[c=#hex]…[/c]`, gradients `[c=A]…[/c=B]`, `[a=…]` backgrounds), parsed in `src/renderer/src/plus.ts` into styled text (never HTML) and stripped for plain-text places (titles, notifications). It's edited in its own window (`#nick`), opened by clicking the name in the contact list.
 - **Sign-in:** the app asks the account service `POST /cuenta {email}` → `{username}` and does normal SASL with it. Unknown addresses get a made-up, stable localpart (HMAC of the email), so a wrong address fails exactly like a wrong password.
 - **Registration is invite-only, by email:**
@@ -76,6 +76,7 @@ compose.yaml       local server stack
   - `email` get/set: status, or change the address
   - `resend`, `newsletter`
   - `lookup`
+  - `contacts`: the emails of your mutual contacts
   - `invites` get, `invite-email` set
 - **HTTP**, for the signed-out app and email links:
   - `POST /account`, `/signup`, `/recover`
@@ -95,6 +96,7 @@ compose.yaml       local server stack
 - `mod_palique_invites` is for trusted components only (`palique_invites_trusted`), via iqs to the host in `urn:palique:invite:0`:
   - `<account username inviter?>`: an invite tied to a localpart; the module enforces it, because stock `mod_invites_register` doesn't
   - `<reset for>`: password reset token
+  - `<contacts username>` (get): the user's mutual contacts, so emails go only to them
   - On `user-registered`, it messages the component `<registered username/>` and subscribes inviter ↔ invitee.
 - `mod_palique_invisible`: XEP-0186-style invisibility.
 - `mod_palique_passwords`: strong passwords only, on sign-up, reset and signed-in changes (`not-acceptable` otherwise). The invite or reset code survives a refused attempt.
@@ -163,7 +165,7 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | Check | Covers |
 |---|---|
 | `auth` | sign-up with an invite, sign-in by email, unknown address = wrong password |
-| `roster` | add by email, presence, names on requests, accept/reject |
+| `roster` | add by email, presence, names on requests, accept/reject, emails only for mutual contacts |
 | `chat` | messages, buzz, carbons, stranger filtering |
 | `avatar` | publish and fetch avatars |
 | `invites` | invites by email, 3-per-user limit, inviter becomes a contact, opt-out |
@@ -196,7 +198,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
   - One module owns each concern: XMPP only in `xmpp.ts`, IPC only in `index.ts` and the preload.
 - **Security and privacy:**
   - Anything from the network is untrusted: validate ids, sizes and types (see the avatar and wink checks).
-  - Never show JIDs or emails to other users.
+  - Never show JIDs to other users. Emails only to mutual contacts.
   - Responses must not reveal whether an address has an account, except the deliberate, rate-limited contact lookup.
 
 ## Releases
