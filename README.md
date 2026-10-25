@@ -15,9 +15,9 @@ y ese sonidito de cuando alguien se conecta.
 
 <br>
 
-<img src="docs/images/contactos.png" width="300" alt="La lista de contactos de Palique: Lucía con su nombre en degradado y sus amigos disponibles, ausentes o en No molestar, cada uno con su mensaje personal; Nerea, resaltada en naranja, acaba de escribirle">
+<img src="docs/images/contactos.png" width="346" alt="La lista de contactos de Palique: Lucía con su nombre en degradado y sus amigos disponibles, ausentes o en No molestar, cada uno con su mensaje personal; Nerea, resaltada en naranja, acaba de escribirle">
 &nbsp;&nbsp;
-<img src="docs/images/conversacion.png" width="380" alt="Una conversación con Marcos, con emoticonos, un guiño y un zumbido">
+<img src="docs/images/conversacion.png" width="359" alt="Una conversación con Marcos, con emoticonos, un guiño y un zumbido">
 
 </div>
 
@@ -40,27 +40,25 @@ Palique quiere recuperar eso. Un sitio pequeño y tranquilo para hablar con tus 
 
 <table>
   <tr>
-    <td width="50%">
+    <td width="50%" valign="top">
       <h3>Tu lista de contactos</h3>
       <p>Quién está conectado, quién se ha ido a merendar y quién está de exámenes, cada uno con su mensaje personal. Cuando alguien te escribe, su nombre parpadea en naranja hasta que lo abres. Y un buscador para encontrar a cualquiera.</p>
     </td>
-    <td width="50%">
+    <td width="50%" valign="top">
       <h3>Conversaciones con chispa</h3>
       <p>Zumbidos que hacen temblar la ventana entera, guiños a pantalla completa, los emoticonos de siempre y el mítico «está escribiendo…» mientras esperas el mensaje de la persona que te gusta 🤪</p>
     </td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/images/guinos.png" width="340" alt="El selector de guiños: Beso, Burbuja, Carcajada, Cerdo bailón, Chulo, Crío burlón y más"></td>
-    <td align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con colores, degradados y estilos rápidos"></td>
-  </tr>
-  <tr>
-    <td>
+    <td valign="top">
       <h3>Doce guiños, dibujados a mano</h3>
       <p>Del beso al cerdo bailón, pasando por el globo de agua. Se ven nítidos a cualquier tamaño y suenan con su propia musiquilla.</p>
+      <p align="center"><img src="docs/images/guinos.png" width="240" alt="El selector de guiños: Beso, Burbuja, Carcajada, Cerdo bailón, Chulo, Crío burlón y más"></p>
     </td>
-    <td>
+    <td valign="top">
       <h3>Tu nombre, con colores y degradados</h3>
       <p>¿Te acuerdas de los nombres de colores de Messenger Plus!? Aquí vienen de serie: negrita, colores, fondos y degradados, o un estilo rápido con un clic.</p>
+      <p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con colores, degradados y estilos rápidos"></p>
     </td>
   </tr>
 </table>
@@ -70,16 +68,16 @@ Palique quiere recuperar eso. Un sitio pequeño y tranquilo para hablar con tus 
 Clásico, con los azules de los 2000. Retro, como un escritorio de los 90. Cristal, todo cielo, hierba y brillo. Y Noche, el tema oscuro, para cuando se apagan las luces.
 
 <p align="center">
-  <img src="docs/images/tema-clasico.png" width="200" alt="La lista de contactos con el tema Clásico">
-  <img src="docs/images/tema-retro.png" width="200" alt="La lista de contactos con el tema Retro">
-  <img src="docs/images/tema-cristal.png" width="200" alt="La lista de contactos con el tema Cristal">
-  <img src="docs/images/tema-noche.png" width="200" alt="La lista de contactos con el tema Noche, oscuro">
+  <img src="docs/images/tema-clasico.png" width="180" alt="La lista de contactos con el tema Clásico">
+  <img src="docs/images/tema-retro.png" width="180" alt="La lista de contactos con el tema Retro">
+  <img src="docs/images/tema-cristal.png" width="180" alt="La lista de contactos con el tema Cristal">
+  <img src="docs/images/tema-noche.png" width="180" alt="La lista de contactos con el tema Noche, oscuro">
 </p>
 
 <p align="center">
-  <img src="docs/images/conversacion-retro.png" width="270" alt="Una conversación con el tema Retro">
-  <img src="docs/images/conversacion-cristal.png" width="270" alt="Una conversación con el tema Cristal">
-  <img src="docs/images/conversacion-noche.png" width="270" alt="Una conversación con el tema Noche">
+  <img src="docs/images/conversacion-retro.png" width="240" alt="Una conversación con el tema Retro">
+  <img src="docs/images/conversacion-cristal.png" width="240" alt="Una conversación con el tema Cristal">
+  <img src="docs/images/conversacion-noche.png" width="240" alt="Una conversación con el tema Noche">
 </p>
 
 ### A tu manera
@@ -87,8 +85,8 @@ Clásico, con los azules de los 2000. Retro, como un escritorio de los 90. Crist
 Elige tu fuente (sí, también hay una al estilo Comic Sans), tu colección de sonidos y tu estado: Disponible, Ausente, No molestar o Invisible.
 
 <p align="center">
-  <img src="docs/images/opciones-general.png" width="400" alt="Opciones: tema y fuente">
-  <img src="docs/images/opciones-sonidos.png" width="400" alt="Opciones: colecciones de sonidos">
+  <img src="docs/images/opciones-general.png" width="360" alt="Opciones: tema y fuente">
+  <img src="docs/images/opciones-sonidos.png" width="360" alt="Opciones: colecciones de sonidos">
 </p>
 
 ## Cómo empezar
