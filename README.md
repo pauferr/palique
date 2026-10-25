@@ -6,10 +6,13 @@
 
 **El messenger de toda la vida, hecho de nuevo.**
 
-Tu lista de contactos, tu frase, los guiños…<br>
+Tu lista de contactos, tu estado, los guiños…<br>
 y ese sonidito de cuando alguien se conecta.
 
 [**Descargar**](https://github.com/pauferr/palique/releases) · [Cómo empezar](#cómo-empezar) · [Contribuir](#contribuir)
+
+[![Última versión](https://img.shields.io/github/v/release/pauferr/palique?include_prereleases&label=versión)](https://github.com/pauferr/palique/releases)
+[![Licencia AGPL v3](https://img.shields.io/github/license/pauferr/palique?label=licencia)](LICENSE)
 
 <sub>macOS · Windows · Linux &nbsp;—&nbsp; en alpha, por invitación</sub>
 
@@ -29,39 +32,34 @@ Llegabas a casa, encendías el ordenador y mirabas quién estaba conectado. Pali
 
 - Solo tus amigos: se entra por invitación y nadie te escribe si no le has agregado.
 - Nada que deslizar: ni feeds, ni algoritmos, ni anuncios.
-- Tus conversaciones se quedan en tu ordenador.
-- Es software libre: puedes leer el código y montar tu propio servidor.
+- Tus conversaciones se guardan localmente, no en un servidor.
+- Es software libre: puedes leer el código y [montar tu propio servidor](docs/deployment.md).
 
 ## Lo que trae
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Tu lista de contactos</h3>
-      <p>Quién está conectado, quién se ha ido a merendar y quién está de exámenes. Si alguien te escribe, su nombre parpadea en naranja hasta que lo abres.</p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>Conversaciones con chispa</h3>
-      <p>Zumbidos que hacen temblar la ventana, los emoticonos de siempre y el mítico «está escribiendo…» 🤪</p>
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h3>Doce guiños</h3>
-      <p>Del beso al cerdo bailón, cada uno con su musiquilla. Nítidos a cualquier tamaño, también a pantalla completa.</p>
-      <p align="center"><img src="docs/images/guinos.png" width="240" alt="El selector de guiños"></p>
-    </td>
-    <td valign="top">
-      <h3>Tu nombre, a todo color</h3>
-      <p>Negrita, colores y degradados como en Messenger Plus!, sin instalar nada aparte.</p>
-      <p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con colores y degradados"></p>
-    </td>
-  </tr>
-</table>
+### Tu lista de contactos
 
-### Cuatro temas
+Quién está conectado, quién se ha ido a merendar y quién está de exámenes. Si alguien te escribe, su nombre parpadea en naranja hasta que lo abres.
 
-Clásico, Retro, Cristal y Noche: de los azules de los 2000 al escritorio de los 90, y uno oscuro para cuando se apagan las luces.
+### Conversaciones con chispa
+
+Zumbidos que hacen temblar la ventana, los emoticonos de siempre y el mítico «está escribiendo…» 🤪
+
+### Doce guiños
+
+Del beso al cerdo bailón, cada uno con su musiquilla. Nítidos a cualquier tamaño, también a pantalla completa.
+
+<p align="center"><img src="docs/images/guinos.png" width="240" alt="El selector de guiños"></p>
+
+### Tu nombre, a todo color
+
+Negrita, colores y degradados como en Messenger Plus!, sin instalar nada aparte.
+
+<p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con colores y degradados"></p>
+
+### Hazlo tuyo
+
+Cuatro temas: Clásico, Retro, Cristal y Noche, de los azules de los 2000 al escritorio de los 90, y uno oscuro para cuando se apagan las luces. Además, eliges fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluido.
 
 <p align="center">
   <img src="docs/images/tema-clasico.png" width="180" alt="Tema Clásico">
@@ -71,23 +69,13 @@ Clásico, Retro, Cristal y Noche: de los azules de los 2000 al escritorio de los
 </p>
 
 <p align="center">
-  <img src="docs/images/conversacion-retro.png" width="240" alt="Una conversación con el tema Retro">
-  <img src="docs/images/conversacion-cristal.png" width="240" alt="Una conversación con el tema Cristal">
-  <img src="docs/images/conversacion-noche.png" width="240" alt="Una conversación con el tema Noche">
-</p>
-
-### A tu manera
-
-Elige fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluido.
-
-<p align="center">
   <img src="docs/images/opciones-general.png" width="360" alt="Opciones: tema y fuente">
   <img src="docs/images/opciones-sonidos.png" width="360" alt="Opciones: colecciones de sonidos">
 </p>
 
 ## Cómo empezar
 
-1. Pide una invitación a alguien que ya esté en Palique. Te llega por correo.
+1. Recibe una invitación de un amigo que ya esté en Palique, o pídela en [chat@palique.io](mailto:chat@palique.io). Te llega por correo.
 2. Descarga Palique desde [Releases](https://github.com/pauferr/palique/releases).
 3. Abre el enlace del correo, o pega el código en *¿Tienes una invitación? Crea tu cuenta*, y elige nombre y contraseña.
 4. Añade a tus amigos por su correo. Si aún no están, invítales.
@@ -97,7 +85,7 @@ Elige fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluid
 
 ## Contribuir
 
-Es un proyecto pequeño y personal. Si te apetece echar una mano:
+Es un proyecto pequeño y personal, hecho con Electron y Svelte sobre XMPP (Prosody). Si te apetece echar una mano:
 
 - [AGENTS.md](AGENTS.md): documentación técnica.
 - [CONTRIBUTING.md](CONTRIBUTING.md): convenciones de commits.
