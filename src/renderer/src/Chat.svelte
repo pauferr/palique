@@ -575,7 +575,8 @@
     gap: 6px;
   }
 
-  .toolbar button,
+  /* Only the toolbar's own buttons: the pickers inside it have buttons of their own. */
+  .toolbar > button,
   summary {
     display: flex;
     gap: 6px;

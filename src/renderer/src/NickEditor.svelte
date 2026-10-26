@@ -112,7 +112,10 @@
   <div class="preview-block">
     <h2>{_('Así te verán')}</h2>
     <p class="preview" aria-label={_('Así te verán tus contactos')}>
-      {#if name.trim()}<Emoticons text={name} plus />{:else}&nbsp;{/if}
+      <!-- One inline run: as flex items the name's parts would lose the spaces between them. -->
+      <span
+        >{#if name.trim()}<Emoticons text={name} plus />{:else}&nbsp;{/if}</span
+      >
     </p>
   </div>
 
