@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="build/icon.svg" width="140" alt="El logo de Palique: un bocadillo naranja que se ríe y tiembla con un zumbido, sobre fondo azul">
+<img src="build/icon.svg" width="140" alt="El logo de Palique: tres amigos de los colores de estado de palique; el verde, con gafas de sol, suelta un bombazo, uno alucina y otro se parte de risa">
 
 # Palique
 
@@ -18,9 +18,9 @@ y ese sonidito de cuando alguien se conecta.
 
 <br>
 
-<img src="docs/images/contactos.png" width="346" alt="La lista de contactos de Palique, con nombres de colores, estados y mensajes personales">
+<img src="docs/images/contactos.png" width="290" alt="La lista de contactos de Palique: nombres con colores y degradados, fotos, estados, mensajes personales, una solicitud de amistad y un contacto con mensajes sin leer">
 &nbsp;&nbsp;
-<img src="docs/images/conversacion.png" width="359" alt="Una conversación con emoticonos, un guiño y un zumbido">
+<img src="docs/images/conversacion.png" width="370" alt="Una conversación con emoticonos, un guiño, un zumbido y el «está escribiendo…»">
 
 </div>
 
@@ -49,28 +49,27 @@ Zumbidos que hacen temblar la ventana, los emoticonos de siempre y el mítico «
 
 Del beso al cerdo bailón, cada uno con su musiquilla. Nítidos a cualquier tamaño, también a pantalla completa.
 
-<p align="center"><img src="docs/images/guinos.png" width="240" alt="El selector de guiños"></p>
+<p align="center"><img src="docs/images/guinos.png" width="300" alt="El selector de guiños, con los doce guiños dibujados"></p>
 
 ### Tu nombre, a todo color
 
 Negrita, colores y degradados como en Messenger Plus!, sin instalar nada aparte.
 
-<p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con colores y degradados"></p>
+<p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con negrita, colores, fondos y degradados"></p>
 
 ### Hazlo tuyo
 
-Cuatro temas: Clásico, Retro, Cristal y Noche, de los azules de los 2000 al escritorio de los 90, y uno oscuro para cuando se apagan las luces. Además, eliges fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluido.
+Tres temas con el cielo de siempre: Claro, Cálido para la tarde y Oscuro para cuando se apagan las luces. Además, eliges fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluido.
 
 <p align="center">
-  <img src="docs/images/tema-clasico.png" width="180" alt="Tema Clásico">
-  <img src="docs/images/tema-retro.png" width="180" alt="Tema Retro">
-  <img src="docs/images/tema-cristal.png" width="180" alt="Tema Cristal">
-  <img src="docs/images/tema-noche.png" width="180" alt="Tema Noche">
+  <img src="docs/images/tema-claro.png" width="200" alt="Tema Claro">
+  <img src="docs/images/tema-calido.png" width="200" alt="Tema Cálido">
+  <img src="docs/images/tema-oscuro.png" width="200" alt="Tema Oscuro">
 </p>
 
 <p align="center">
-  <img src="docs/images/opciones-general.png" width="360" alt="Opciones: tema y fuente">
-  <img src="docs/images/opciones-sonidos.png" width="360" alt="Opciones: colecciones de sonidos">
+  <img src="docs/images/opciones-general.png" width="360" alt="Opciones: inicio, tema, fuente e idioma">
+  <img src="docs/images/opciones-sonidos.png" width="360" alt="Opciones: alertas y colecciones de sonidos">
 </p>
 
 ## Cómo empezar

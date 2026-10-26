@@ -200,7 +200,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
 
 ## Conventions
 
-- **Language:** UI text and user-facing emails are written in **Spanish** (Spain) and translated (see Translations). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, taken from mock accounts (`@palique.com` addresses).
+- **Language:** UI text and user-facing emails are written in **Spanish** (Spain) and translated (see Translations). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, made by `npm run screenshots` (`scripts/screenshots/`: the built app, off-screen, with mock friends at `@palique.com` addresses and no server).
 - **Commits:**
   - Conventional Commits in English, as in [CONTRIBUTING.md](CONTRIBUTING.md).
   - Small commits straight to `main`, pushed as you go; no PRs.
