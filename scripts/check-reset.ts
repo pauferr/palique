@@ -86,5 +86,20 @@ const inEnglish = await lastMail(english)
 assert.equal(inEnglish.subject, 'Forgot your Palique password?')
 assert.match(inEnglish.text, /Open Palique and choose a password: palique:\/\/reset/)
 
+// Apps from before translations don't say which language: Spanish, as they were.
+const older = `rstc${id}@correo.test`
+await register(`rstc${id}`, 'Old-pass1')
+await A.logout()
+await fetch('http://localhost:8080/recover', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: older })
+})
+while ((await mailCount(older)) < 2) {
+  assert.ok(Date.now() < deadline + 20_000, 'recovery email for an older app arrives')
+  await sleep(100)
+}
+assert.equal((await lastMail(older)).subject, '¿Se te ha olvidado la contraseña de Palique?')
+
 console.log('reset check passed')
 process.exit(0)

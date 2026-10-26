@@ -10,7 +10,7 @@ import { component, xml } from '@xmpp/component'
 import { openDb, type Account } from './db.ts'
 import { outdated } from './version.ts'
 import { BUTTERFLY, escape, mailer } from './mail.ts'
-import { language, translator, type Language } from './i18n.ts'
+import { language, requested, translator, type Language } from './i18n.ts'
 
 const env = (name: string, fallback?: string): string => {
   const value = process.env[name] ?? fallback
@@ -143,7 +143,7 @@ xmpp.iqCallee.set(NS, 'email', async (ctx) => {
   if (address === account.email || address === account.pending) return status(account)
   const token = db.changeEmail(jid, address)
   if (token)
-    sendVerification(address, token, language(request.attrs.lang)).catch((e) =>
+    sendVerification(address, token, requested(request.attrs.lang)).catch((e) =>
       console.error('verify', e.message)
     )
   return status(db.account(jid))
@@ -159,7 +159,7 @@ xmpp.iqCallee.set(NS, 'resend', async (ctx) => {
   await sendVerification(
     account.pending,
     token,
-    language(ctx.stanza.getChild('resend', NS)!.attrs.lang)
+    requested(ctx.stanza.getChild('resend', NS)!.attrs.lang)
   )
   return true
 })
@@ -316,7 +316,7 @@ xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
         .replace(PLUS_CODES, '')
         .trim()
         .slice(0, 64),
-      language(request.attrs.lang)
+      requested(request.attrs.lang)
     )
   }
   return inviteStatus(jid)
@@ -467,7 +467,7 @@ createServer(async (req, res) => {
     const body = await readJson(req)
     const email = cleanEmail(body.email)
     if (validEmail(email) && allowReset(email, clientIp(req))) {
-      sendReset(email, language(body.lang)).catch((e) => console.error('reset', e.message))
+      sendReset(email, requested(body.lang)).catch((e) => console.error('reset', e.message))
     }
     return json(202, { ok: true })
   }
@@ -478,7 +478,7 @@ createServer(async (req, res) => {
     if (!validEmail(email)) return json(400, { error: 'invalid' })
     if (db.taken(email)) return json(409, { error: 'taken' })
     try {
-      await invite(email, null, '', language(body.lang))
+      await invite(email, null, '', requested(body.lang))
       return json(200, { ok: true })
     } catch (e) {
       return json(500, { error: (e as Error).message })

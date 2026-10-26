@@ -15,6 +15,10 @@ export const language = (code: unknown): Language =>
     ? 'es'
     : 'en'
 
+// The language an email was asked in. Apps from before translations don't say, and
+// they were Spanish only.
+export const requested = (code: unknown): Language => language(code || 'es')
+
 type Vars = Record<string, string | number>
 export type Translate = (text: string, vars?: Vars) => string
 
