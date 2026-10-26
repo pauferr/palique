@@ -359,8 +359,7 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
     return existing
   }
   const win = new BrowserWindow({
-    width: 440,
-    height: 520,
+    ...centered(440, 520),
     minWidth: 320,
     minHeight: 360,
     show: false,
@@ -383,6 +382,25 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
   return win
 }
 
+// The screen being used: the focused window's, else the cursor's. Windows open there,
+// centered; left to the system, they all go to the main screen.
+function activeDisplay(): Electron.Display {
+  const focused = BrowserWindow.getFocusedWindow()
+  return focused
+    ? screen.getDisplayMatching(focused.getBounds())
+    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+}
+
+function centered(width: number, height: number): Electron.Rectangle {
+  const area = activeDisplay().workArea
+  return {
+    x: Math.round(area.x + (area.width - width) / 2),
+    y: Math.round(area.y + (area.height - height) / 2),
+    width,
+    height
+  }
+}
+
 let options: BrowserWindow | null = null
 
 function openOptions(): void {
@@ -391,8 +409,7 @@ function openOptions(): void {
     return
   }
   options = new BrowserWindow({
-    width: 600,
-    height: 500,
+    ...centered(600, 500),
     show: false,
     resizable: false,
     autoHideMenuBar: true,
@@ -414,8 +431,7 @@ function openNick(): void {
     return
   }
   nickWindow = new BrowserWindow({
-    width: 480,
-    height: 640,
+    ...centered(480, 640),
     show: false,
     resizable: false,
     autoHideMenuBar: true,
@@ -436,8 +452,7 @@ function openAbout(): void {
     return
   }
   aboutWindow = new BrowserWindow({
-    width: 340,
-    height: 280,
+    ...centered(340, 280),
     show: false,
     resizable: false,
     minimizable: false,
@@ -585,9 +600,10 @@ function playWink(message: ChatMessage): void {
   if (show && chat) showWink(message.wink, chat)
 }
 
-// Transparent, click-through window over the whole primary display. Inside the
-// conversation window instead on Wayland (see `wayland`) or with full-screen winks off. One at a time: winks that cross (ours
-// and theirs) wait and play after it, in the order they came.
+// Transparent, click-through window over the whole screen of the conversation (or the
+// one being used). Inside the conversation window instead on Wayland (see `wayland`) or
+// with full-screen winks off. One at a time: winks that cross (ours and theirs) wait and
+// play after it, in the order they came.
 let winkWindow: BrowserWindow | null = null
 const winkQueue: string[] = []
 
@@ -597,7 +613,7 @@ function showWink(id: string, chat: BrowserWindow | null): void {
   }
   if (winkWindow) return void winkQueue.push(id)
   const win = new BrowserWindow({
-    ...screen.getPrimaryDisplay().bounds,
+    ...(chat ? screen.getDisplayMatching(chat.getBounds()) : activeDisplay()).bounds,
     show: false,
     transparent: true,
     frame: false,
