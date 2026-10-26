@@ -280,15 +280,12 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 
 - Referencias: MSN Messenger, AIM, interfaces de Windows 98/XP.
 - Principio: minimalista pero entrañable. Nostalgia sin caer en copia literal.
-- **Temas seleccionables por el usuario ("sabores"):**
-  - **XP / MSN 7, "Clásico" (tema por defecto):** glossy, azules intensos, botones tipo caramelo. Tipografía Noto Sans. `src/renderer/src/themes/classic.css`.
-  - **Win98 / AIM, "Retro":** gris #c0c0c0, azul marino, biseles 3D (botones en relieve, campos y paneles hundidos, cuadros de grupo tallados), esquinas rectas. Tipografía IBM Plex Sans (se descartaron las pixeladas por legibilidad). `src/renderer/src/themes/retro.css`.
-  - **Frutiger Aero, "Cristal":** fondo degradado de cielo a hierba, paneles de cristal translúcido redondeados, botones aguamarina brillantes y avatares circulares. Tipografía Hind (sin cursiva propia: se inclina de forma sintética). `src/renderer/src/themes/glass.css`.
-  - Descartado: moderno limpio con guiños retro.
-- Tipografías libres (OFL) incluidas en la app (alfabeto latino): Noto Sans (Clásico), IBM Plex Sans (Retro) y Hind (Cristal). Las fuentes de Windows (Tahoma, Segoe UI, MS Sans Serif) son de Microsoft y no se pueden distribuir.
-- Fuente elegible en Opciones, por encima de la del tema: Comic Relief (en lugar de Comic Sans, que es de Microsoft: misma métrica y trazo parecido; siempre la libre para que todos vean lo mismo), Nunito, Fira Sans, Patrick Hand, Atkinson Hyperlegible, Gelasio y Courier Prime. Todas OFL. `src/renderer/src/themes/fonts.css`. Cada fuente se escala con `font-size-adjust` para que sus minúsculas midan lo mismo que las de la fuente del tema (cada tema declara su `--x-height`); si no, unas parecen pequeñas o finas.
+- **Diseño "Cielo"** (elegido en octubre de 2026 entre tres propuestas: Cielo, Libreta y Nítido): el Messenger de 2005 hecho hoy. Cabeceras de cielo azul con nubes, botones redondos con brillo tipo «aqua», campos redondeados, verde césped para "conectado" y tipografía redonda (Nunito). La acción principal de cada ventana es el botón azul brillante (`button.primary`).
+- **Tres temas, variantes del mismo cielo:** Claro (por defecto), Cálido (atardecer) y Oscuro (noche). `src/renderer/src/themes/light.css`, `warm.css` y `dark.css`. Sustituyen a los cuatro anteriores (Clásico, Retro, Cristal y Noche): así cualquier tema sigue pareciendo Palique.
+- Tipografías libres (OFL) incluidas en la app (alfabeto latino): Nunito (la de los temas). Las fuentes de Windows (Tahoma, Segoe UI, MS Sans Serif) son de Microsoft y no se pueden distribuir.
+- Fuente elegible en Opciones, por encima de la del tema: Comic Relief (en lugar de Comic Sans, que es de Microsoft: misma métrica y trazo parecido; siempre la libre para que todos vean lo mismo), Noto Sans, Fira Sans, Patrick Hand, Atkinson Hyperlegible, Gelasio y Courier Prime. Todas OFL. `src/renderer/src/themes/fonts.css`. Cada fuente se escala con `font-size-adjust` para que sus minúsculas midan lo mismo que las de la fuente del tema (cada tema declara su `--x-height`); si no, unas parecen pequeñas o finas.
 - Estructura: `themes/base.css` define el aspecto común solo con variables; cada tema da valores a esas variables (`:root[data-theme="…"]`). El tema se elige en Opciones, se guarda en las preferencias y se aplica al momento en todas las ventanas.
-- En la interfaz los temas tienen nombres propios ("Clásico", "Retro", "Cristal"), sin marcas reales.
+- Los temas se llaman por lo que son ("Claro", "Cálido", "Oscuro"), sin marcas reales.
 - Avatares por defecto: inicial sobre una paleta fija de 8 colores vivos definida por el tema; cada usuario siempre tiene el mismo color. Un borde blanco separa la imagen del marco de estado.
 - Las ventanas usan el marco del sistema operativo; imitar la barra de título de XP queda descartado por ahora (coste alto y distinto por sistema).
 - Arquitectura de temas desde el MVP: variables CSS (design tokens) + hoja de estilos por tema. Los temas pueden cambiar también forma (biseles, radios, sombras), no solo colores.

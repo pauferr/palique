@@ -1,0 +1,49 @@
+/* Theme "Cálido": Claro at sunset. Peach sky, glossy orange buttons, warm whites. Same
+   font as Claro (imported there). */
+
+:root[data-theme='warm'] {
+  --text: #3b2414;
+  --text-strong: #b23f0c;
+  --text-muted: #7a5644;
+  --text-error: #a3200f;
+
+  --window-bg: #fff8f2;
+  --list-bg: #ffffff;
+  --field-bg: #ffffff;
+  --sky: linear-gradient(180deg, #ffb37c 0%, #ffd9b8 70%, #fff8f2 100%);
+  --cloud: rgb(255 255 255 / 70%);
+  --header-bg: linear-gradient(180deg, #ffd9b8 0%, #fff0e3 100%);
+  --bar-bg: #ffefe2;
+  --line: #f6d8c2;
+  --row-hover-bg: #fff0e3;
+  --warning-bg: #fff2cc;
+  --request-bg: #fff8dc;
+  --focus: #1f6fc4;
+
+  --button-bg: linear-gradient(180deg, #ffffff 0%, #ffe6d2 100%);
+  --button-bg-hover: linear-gradient(180deg, #ffffff 0%, #ffd9bd 100%);
+  --button-text: #b23f0c;
+  --button-border-color: #f5b98f;
+  --button-border-color-active: #b23f0c;
+  --button-shadow-active: inset 0 1px 3px rgb(59 36 20 / 20%);
+
+  --accent-bg: linear-gradient(180deg, #ff9c5c 0%, #c2410c 52%, #b03a0a 100%);
+  --accent-bg-hover: linear-gradient(180deg, #ffab70 0%, #cf4d14 52%, #c2410c 100%);
+  --accent-border: #9a330a;
+  --accent-shadow: inset 0 1px 0 rgb(255 255 255 / 60%), 0 3px 8px rgb(194 65 12 / 30%);
+
+  --field-border-color: #f6cfb3;
+
+  --group-border: 1px solid #f6d8c2;
+  --popup-shadow: 0 12px 32px rgb(59 36 20 / 22%);
+  --scrollbar: #f6cfb3;
+
+  --bubble-border: #f6d8c2;
+  --bubble-mine-bg: linear-gradient(180deg, #ffe6d2 0%, #ffd3b3 100%);
+  --bubble-mine-border: #f5b98f;
+
+  --status-online: #3daa4a;
+  --status-away: #f5a623;
+  --status-dnd: #e0443e;
+  --status-offline: #c9bdb4;
+}

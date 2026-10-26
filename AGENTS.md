@@ -27,7 +27,7 @@ src/main/          Electron main process
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
                    '' → App (Login / Roster), #chat=<jid>, #options, #nick, #about, #wink=<id>
-  themes/          classic, retro, glass, night (CSS variables)
+  themes/          light, warm, dark: «Claro», «Cálido», «Oscuro» (CSS variables; light.css defines them all)
 server/
   prosody.cfg.lua  development Prosody config
   modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible, mod_palique_passwords
@@ -52,6 +52,7 @@ compose.yaml       local server stack
 - **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
 - **Error log:** `console.error`/`console.warn` in main, uncaught errors and the renderer's console errors go to `palique.log` in the OS's logs folder (one older copy, ~1 MB each). Nothing is sent: Ayuda → «Registro de errores…» in the contact list opens its folder for the user to send it. `log.ts` writes errors as name, message and stack only and masks addresses, JIDs, link codes and the home folder; never log passwords or message bodies. Where xmpp.ts can only tell the UI 'unknown', `unexpected()` logs the real cause first.
 - **Icons:** [Lucide](https://lucide.dev) through `@lucide/svelte`, imported one by one (`import { Bell } from '@lucide/svelte'`, `size={16}`), so only those end up in the app. Line icons in `currentColor`, so they follow every theme.
+- **Design "Cielo":** the 2005 messenger made today: sky headers (`--sky`, `--header-bg`), glossy pill buttons, rounded fields, Nunito. A window's main action is `<button class="primary">`. Components use theme variables only, never colors of their own, so every theme works.
 - **Theme and font:** chosen in Options, applied as `data-theme` / `data-font` on every window's root. A font overrides the theme's `--font` (`themes/fonts.css`) and is scaled to the theme font's x-height (`--x-height`, `font-size-adjust` in `base.css`), so every font looks the same size. All bundled fonts are free (OFL): Comic Relief stands in for Comic Sans.
 - **Messages:** contacts only; strangers can't message you. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).

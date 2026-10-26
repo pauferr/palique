@@ -137,21 +137,24 @@
   }
 </script>
 
-<div class="login" style:--overlap={mode === 'login' ? '56px' : '36px'}>
+<div class="login">
   <UpdateNotice />
-  <header>
-    <h1>Palique</h1>
-    <p>{_('¿Echamos un palique?')}</p>
+  <!-- The sky: tall when signing in, shorter for the longer forms. -->
+  <header class:tall={mode === 'login'}>
+    <span class="cloud c1" aria-hidden="true"></span>
+    <span class="cloud c2" aria-hidden="true"></span>
+    <span class="cloud c3" aria-hidden="true"></span>
+    <span class="cloud c4" aria-hidden="true"></span>
+    <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
+    <div class="frame">
+      <Avatar
+        jid={(mode === 'register' ? nick : email).trim() || 'palique'}
+        show="online"
+        size={mode === 'login' ? 96 : 56}
+      />
+    </div>
   </header>
-
-  <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
-  <div class="frame">
-    <Avatar
-      jid={(mode === 'register' ? nick : email).trim() || 'palique'}
-      show="online"
-      size={mode === 'login' ? 96 : 56}
-    />
-  </div>
+  <h1>{_('¿Echamos un palique?')}</h1>
 
   <form onsubmit={submit}>
     {#if mode === 'forgot'}
@@ -254,7 +257,7 @@
       </p>{/if}
     {#if info}<p class="info" role="status">{info}</p>{/if}
 
-    <button type="submit" class="submit" disabled={busy}>
+    <button type="submit" class="primary" disabled={busy}>
       {busy ? _('Un momento…') : submitLabel[mode]}
     </button>
 
@@ -278,7 +281,7 @@
         ← {_('Volver')}
       </button>
     {/if}
-    <small class="version">{version}</small>
+    <small class="version">Palique {version}</small>
   </footer>
 </div>
 
@@ -292,58 +295,118 @@
   }
 
   header {
+    position: relative;
+    display: flex;
     align-self: stretch;
-    padding: 28px 16px var(--overlap, 56px);
-    text-align: center;
-    background: var(--header-bg);
-    border-bottom: 1px solid var(--line);
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 120px;
+    padding-bottom: 14px;
+    overflow: hidden;
+    background: var(--sky);
+    box-sizing: border-box;
+  }
+
+  header.tall {
+    min-height: 250px;
+    padding-bottom: 18px;
+  }
+
+  .cloud {
+    position: absolute;
+    border-radius: 40px;
+    background: var(--cloud);
+  }
+
+  .c1 {
+    left: -30px;
+    top: 40px;
+    width: 150px;
+    height: 46px;
+  }
+
+  .c2 {
+    left: 30px;
+    top: 22px;
+    width: 70px;
+    height: 56px;
+  }
+
+  .c3 {
+    right: -20px;
+    top: 92px;
+    width: 120px;
+    height: 36px;
+    opacity: 0.8;
+  }
+
+  .c4 {
+    right: 30px;
+    top: 78px;
+    width: 54px;
+    height: 44px;
+    opacity: 0.8;
+  }
+
+  /* The picture in a glossy green frame: you, online. */
+  .frame {
+    position: relative;
+    display: grid;
+    padding: 8px;
+    border-radius: var(--radius-large);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 40%), transparent 60%), var(--status-online);
+    box-shadow:
+      0 6px 18px rgb(19 41 75 / 25%),
+      inset 0 2px 0 rgb(255 255 255 / 60%);
+  }
+
+  .tall .frame {
+    border-radius: 26px;
   }
 
   h1 {
-    margin: 0;
-    color: var(--text-strong);
-    font-size: 34px;
-    font-style: italic;
-    letter-spacing: -0.5px;
-  }
-
-  header p {
-    margin: 2px 0 0;
-    color: var(--text-muted);
-  }
-
-  /* The picture frame overlaps the header, like the old sign-in screens. */
-  .frame {
-    margin-top: calc(8px - var(--overlap, 56px));
-    padding: 4px;
-    border-radius: var(--radius-large);
-    background: var(--window-bg);
+    margin: 4px 16px 0;
+    color: var(--text);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-align: center;
   }
 
   form {
     display: grid;
-    gap: 10px;
-    width: min(16rem, 100% - 2rem);
-    margin-top: 16px;
+    gap: 12px;
+    width: min(19rem, 100% - 3.5rem);
+    margin-top: 14px;
   }
 
   label {
     display: grid;
-    gap: 2px;
-    color: var(--text-strong);
+    gap: 4px;
+    color: var(--text);
+    font-weight: 700;
   }
 
   label small {
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .check {
     display: flex;
-    gap: 6px;
-    align-items: flex-start;
-    color: var(--text);
-    font-size: 12px;
+    gap: 8px;
+    align-items: center;
+    font-weight: 600;
+  }
+
+  .check input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    flex: none;
+    accent-color: var(--status-online);
   }
 
   .error {
@@ -351,11 +414,10 @@
     color: var(--text-error);
   }
 
-  .submit {
-    justify-self: center;
+  .primary {
     margin-top: 4px;
-    padding: 4px 20px;
-    font-weight: bold;
+    padding: 12px;
+    font-size: 16px;
   }
 
   footer {
@@ -363,12 +425,13 @@
     gap: 6px;
     justify-items: center;
     margin-top: auto;
-    padding: 12px;
+    padding: 14px 16px 20px;
   }
 
   .version {
+    margin-top: 8px;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .intro {
@@ -387,10 +450,21 @@
     border: none;
     box-shadow: none;
     color: var(--text-strong);
-    text-decoration: underline;
+    font-weight: 700;
+  }
+
+  form .link {
+    justify-self: center;
   }
 
   .link:hover:not(:disabled) {
     background: none;
+    color: var(--text);
+    text-decoration: underline;
+  }
+
+  .error a {
+    color: inherit;
+    font-weight: 700;
   }
 </style>

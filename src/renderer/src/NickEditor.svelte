@@ -187,7 +187,7 @@
           class="chip"
           onclick={() => restyle(`[c=${p.from}]`, `[/c=${p.to}]`)}
           title={_('Degradado {from} → {to}', { from: p.from, to: p.to })}
-          ><span class="sample" style:background="linear-gradient(90deg, {p.from}, {p.to})"
+          ><span class="sample" style:background="linear-gradient(135deg, {p.from}, {p.to})"
           ></span>{p.label}</button
         >
       {/each}
@@ -213,7 +213,7 @@
 
   <footer>
     <button onclick={() => window.close()}>{_('Cancelar')}</button>
-    <button class="apply" onclick={apply} disabled={busy}>{_('Aplicar')}</button>
+    <button class="primary" onclick={apply} disabled={busy}>{_('Aplicar')}</button>
   </footer>
 </main>
 
@@ -221,35 +221,54 @@
   main {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     box-sizing: border-box;
     min-height: 100vh;
-    padding: 14px 16px;
+    padding: 20px 22px 18px;
+    background: var(--list-bg);
   }
 
   h2 {
-    margin: 0 0 4px;
-    color: var(--text-strong);
-    font-size: 1em;
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 800;
   }
 
   label {
     display: block;
-    margin-bottom: 4px;
-    color: var(--text-strong);
-    font-weight: bold;
+    margin-bottom: 6px;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 72px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-large);
+    background: var(--header-bg);
+    font-size: 1.5em;
+    font-weight: 800;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
   }
 
   .group {
     display: flex;
-    gap: 4px;
+    flex-wrap: wrap;
+    gap: 6px;
     align-items: center;
   }
 
@@ -258,54 +277,80 @@
     border-left: 1px solid var(--line);
   }
 
-  .bar button {
-    padding: 2px 8px;
+  /* Round format buttons. */
+  .group > button {
+    width: 36px;
+    height: 34px;
+    padding: 0;
   }
 
+  /* Color, Fondo and Degradado: one pill holding the swatches and the button, since a
+     color input can't go inside a button. */
   .pick {
     display: flex;
     gap: 2px;
     align-items: center;
+    height: 34px;
+    box-sizing: border-box;
+    padding-left: 5px;
+    border: var(--button-border-width) solid var(--button-border-color);
+    border-radius: var(--button-radius);
+    background: var(--button-bg);
+    box-shadow: var(--button-shadow);
+  }
+
+  .pick:has(button:hover) {
+    background: var(--button-bg-hover);
+  }
+
+  .pick button,
+  .pick button:hover:not(:disabled) {
+    height: 100%;
+    padding: 0 12px 0 4px;
+    border: none;
+    background: none;
+    box-shadow: none;
   }
 
   input[type='color'] {
     width: 22px;
     height: 22px;
     padding: 0;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border: 1px solid var(--button-border-color);
+    border-radius: 50%;
     background: none;
     cursor: pointer;
+  }
+
+  input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 2px;
+  }
+
+  input[type='color']::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
   }
 
   #nick {
     box-sizing: border-box;
     width: 100%;
+    padding: 10px 12px;
     resize: none;
+    font-size: 15px;
+    font-weight: 600;
   }
 
   .hint {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     justify-content: space-between;
     margin: 4px 0 0;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .count {
     flex: none;
-  }
-
-  .preview {
-    margin: 0;
-    padding: 18px 14px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--list-bg);
-    font-size: 1.5em;
-    text-align: center;
-    overflow-wrap: anywhere;
   }
 
   .chips {
@@ -314,22 +359,33 @@
     gap: 6px;
   }
 
+  /* Quick styles: plain pills, so the gradient dot is what stands out. */
   .chip {
     display: flex;
     gap: 6px;
     align-items: center;
-    padding: 2px 10px 2px 4px;
+    height: 32px;
+    padding: 0 12px 0 5px;
+    border-color: var(--line);
+    background: var(--list-bg);
+    box-shadow: none;
+    color: var(--text);
+  }
+
+  .chip:hover:not(:disabled) {
+    background: var(--row-hover-bg);
   }
 
   .sample {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
   }
 
   summary {
     color: var(--text-strong);
-    font-weight: bold;
+    font-size: 15px;
+    font-weight: 800;
     cursor: pointer;
   }
 
@@ -352,7 +408,8 @@
     color: var(--text-muted);
   }
 
-  .link {
+  .link,
+  .link:hover:not(:disabled) {
     padding: 0;
     border: none;
     background: none;
@@ -374,7 +431,8 @@
     margin-top: auto;
   }
 
-  .apply {
-    font-weight: bold;
+  footer button {
+    padding: 8px 20px;
+    font-size: 15px;
   }
 </style>

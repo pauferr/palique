@@ -3,14 +3,14 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
 import { LANGUAGES, type Language } from '../renderer/src/i18n.ts'
 
-export const THEMES = ['classic', 'retro', 'glass', 'night'] as const
+export const THEMES = ['light', 'warm', 'dark'] as const
 export type Theme = (typeof THEMES)[number]
 
 // 'theme' = the theme's own font; the rest are bundled (themes/fonts.css).
 export const FONTS = [
   'theme',
   'comic',
-  'nunito',
+  'noto',
   'fira',
   'hand',
   'legible',
@@ -47,7 +47,7 @@ export const AWAY_MINUTES = [0, 5, 10, 15, 30]
 
 const DEFAULTS: Settings = {
   language: 'auto',
-  theme: 'classic',
+  theme: 'light',
   font: 'theme',
   winks: true,
   show: 'online',

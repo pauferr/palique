@@ -1,9 +1,8 @@
 import { mount } from 'svelte'
 
-import './themes/classic.css'
-import './themes/retro.css'
-import './themes/glass.css'
-import './themes/night.css'
+import './themes/light.css'
+import './themes/warm.css'
+import './themes/dark.css'
 import './themes/fonts.css'
 import './themes/base.css'
 

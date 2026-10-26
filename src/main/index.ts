@@ -415,7 +415,7 @@ function openNick(): void {
   }
   nickWindow = new BrowserWindow({
     width: 480,
-    height: 560,
+    height: 640,
     show: false,
     resizable: false,
     autoHideMenuBar: true,

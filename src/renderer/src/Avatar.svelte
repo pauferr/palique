@@ -29,24 +29,24 @@
 </span>
 
 <style>
-  /* The frame shows the status, like MSN. */
+  /* The frame shows the status, like MSN: a glossy rounded square in the status color,
+     the picture inset with a gap in the list's color so the frame reads on any picture. */
   .avatar {
     display: inline-grid;
     flex: none;
     place-items: center;
     width: var(--size);
     height: var(--size);
-    overflow: hidden;
-    /* A gap keeps the status frame visible whatever the picture's color. Transparent, so
-       it takes whatever is behind (header, list, conversation) in every theme. */
-    padding: 2px;
-    border: 3px solid;
+    padding: max(3px, calc(var(--size) * 0.08));
     border-radius: var(--avatar-radius);
-    background: transparent;
+    background: linear-gradient(rgb(255 255 255 / 35%), transparent 60%) var(--ring);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 50%),
+      0 2px 6px rgb(0 0 0 / 15%);
     color: #fff;
-    font-weight: bold;
+    font-weight: 800;
     text-shadow: 0 1px 1px rgb(0 0 0 / 25%);
-    font-size: calc(var(--size) * 0.45);
+    font-size: calc(var(--size) * 0.4);
     box-sizing: border-box;
   }
 
@@ -56,8 +56,10 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+    border: max(2px, calc(var(--size) * 0.045)) solid var(--list-bg);
     border-radius: var(--avatar-face-radius);
     background: var(--color);
+    box-sizing: border-box;
   }
 
   img {
@@ -67,19 +69,19 @@
   }
 
   .online {
-    border-color: var(--status-online);
+    --ring: var(--status-online);
   }
 
   .away {
-    border-color: var(--status-away);
+    --ring: var(--status-away);
   }
 
   .dnd {
-    border-color: var(--status-dnd);
+    --ring: var(--status-dnd);
   }
 
   .offline {
-    border-color: var(--status-offline);
+    --ring: var(--status-offline);
     filter: grayscale(0.6);
   }
 </style>

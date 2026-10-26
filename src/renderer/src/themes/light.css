@@ -1,0 +1,108 @@
+/* Theme "Claro" (default): a 2005 messenger made today. Sky-blue headers with clouds,
+   glossy pill buttons, rounded fields and grass-green for "online". Every other theme
+   sets these same variables. Plain :root so it also applies before a theme is picked. */
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-400-italic.css';
+@import '@fontsource/nunito/latin-600.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/latin-800.css';
+
+:root {
+  --font: 'Nunito', sans-serif;
+  --font-size: 14px;
+  --x-height: 0.484; /* Nunito's, so other fonts match it (base.css) */
+
+  --text: #13294b;
+  --text-strong: #1f6fc4;
+  --text-muted: #4d6584;
+  --text-error: #b42318;
+
+  --window-bg: #f4f9ff;
+  --list-bg: #ffffff;
+  --field-bg: #ffffff;
+  /* The sky: big on the sign-in screen and About, a strip on headers. */
+  --sky: linear-gradient(180deg, #7cc4ff 0%, #bfe3ff 70%, #f4f9ff 100%);
+  --cloud: rgb(255 255 255 / 75%);
+  --header-bg: linear-gradient(180deg, #bfe3ff 0%, #e6f4ff 100%);
+  --bar-bg: #e9f3fd;
+  --line: #cfe3f7;
+  --row-hover-bg: #e9f3fd;
+  --warning-bg: #fff2cc;
+  --request-bg: #fff8dc;
+  --focus: #ffc83d;
+
+  --radius: 12px;
+  --radius-large: 16px;
+  --avatar-radius: 26%;
+  --avatar-face-radius: 20%;
+
+  /* Ordinary buttons: white-to-sky pills. */
+  --button-bg: linear-gradient(180deg, #ffffff 0%, #dceeff 100%);
+  --button-bg-hover: linear-gradient(180deg, #ffffff 0%, #c9e4ff 100%);
+  --button-text: #1f6fc4;
+  --button-border-width: 1px;
+  --button-border-color: #9fcdf5;
+  --button-border-color-active: #1f6fc4;
+  --button-radius: 999px;
+  --button-shadow: inset 0 1px 0 #ffffff;
+  --button-shadow-active: inset 0 1px 3px rgb(19 41 75 / 20%);
+
+  /* The main action of a window (Iniciar sesión, Enviar, Aplicar): glossy blue. */
+  --accent-bg: linear-gradient(180deg, #5db2ff 0%, #1f6fc4 52%, #1a63b3 100%);
+  --accent-bg-hover: linear-gradient(180deg, #6fbcff 0%, #2a7bd2 52%, #1f6fc4 100%);
+  --accent-border: #1a5fa8;
+  --accent-text: #ffffff;
+  --accent-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), 0 3px 8px rgb(31 111 196 / 30%);
+
+  --field-border-width: 2px;
+  --field-border-color: #bfddf7;
+  --field-shadow: none;
+
+  /* Lists and transcripts sit flush in the window. */
+  --panel-border-width: 0;
+  --panel-border-color: transparent;
+  --panel-shadow: none;
+  --panel-margin: 0;
+  --panel-radius: 0;
+
+  --group-border: 1px solid #cfe3f7;
+  --group-radius: 16px;
+  --group-bg: #ffffff;
+  --popup-shadow: 0 12px 32px rgb(19 41 75 / 25%);
+  --scrollbar: #bfddf7;
+  --scrollbar-width: thin;
+
+  /* Conversation bubbles and the lines for winks and buzzes. */
+  --bubble-bg: #ffffff;
+  --bubble-border: #cfe3f7;
+  --bubble-mine-bg: linear-gradient(180deg, #d7edff 0%, #bfe1ff 100%);
+  --bubble-mine-border: #9fcdf5;
+  --wink-bg: linear-gradient(180deg, #fff2cc 0%, #ffe09a 100%);
+  --wink-border: #f0c25b;
+  --wink-text: #6b4a00;
+  --buzz-bg: #ffe4e1;
+  --buzz-border: #f3b1aa;
+  --buzz-text: #8a1c17;
+
+  /* A contact with unread messages, and its count. */
+  --unread: linear-gradient(180deg, #ffe3a8 0%, #ffc65c 100%);
+  --unread-border: #f0a93b;
+  --unread-text: #5a4310;
+  --badge-bg: #c2410c;
+  --badge-text: #ffffff;
+
+  /* Default avatars: each user always gets the same one of these. */
+  --avatar-0: #e85f93;
+  --avatar-1: #f59a23;
+  --avatar-2: #e0b420;
+  --avatar-3: #5bbe6e;
+  --avatar-4: #5ec4d6;
+  --avatar-5: #4c7fe8;
+  --avatar-6: #8a5ce6;
+  --avatar-7: #e0443e;
+
+  --status-online: #3daa4a;
+  --status-away: #f5a623;
+  --status-dnd: #e0443e;
+  --status-offline: #b8c2ce;
+}

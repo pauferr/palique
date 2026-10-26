@@ -21,17 +21,16 @@
   let section: (typeof sections)[number]['id'] = $state('personal')
 
   const themes: { id: Theme; label: string; font: string }[] = [
-    { id: 'classic', label: _('Clásico'), font: 'Noto Sans' },
-    { id: 'retro', label: _('Retro'), font: 'IBM Plex Sans' },
-    { id: 'glass', label: _p('tema', 'Cristal'), font: 'Hind' },
-    { id: 'night', label: _('Noche'), font: 'Noto Sans' }
+    { id: 'light', label: _p('tema', 'Claro'), font: 'Nunito' },
+    { id: 'warm', label: _p('tema', 'Cálido'), font: 'Nunito' },
+    { id: 'dark', label: _p('tema', 'Oscuro'), font: 'Nunito' }
   ]
 
   const fonts: { id: Font; label: string }[] = [
     // The theme's own font, named after it.
     { id: 'theme', label: '' },
     { id: 'comic', label: 'Comic Relief' },
-    { id: 'nunito', label: 'Nunito' },
+    { id: 'noto', label: 'Noto Sans' },
     { id: 'fira', label: 'Fira Sans' },
     { id: 'hand', label: 'Patrick Hand' },
     { id: 'legible', label: 'Atkinson Hyperlegible' },
@@ -170,7 +169,7 @@
         onclick={() => {
           section = item.id
           note = ''
-        }}><item.icon size={16} aria-hidden="true" />{item.label}</button
+        }}><item.icon size={18} aria-hidden="true" />{item.label}</button
       >
     {/each}
   </nav>
@@ -274,36 +273,38 @@
           {/each}
         </div>
       </section>
-      <section>
-        <h2>{_('Fuente')}</h2>
-        <label>
-          <select
-            value={settings?.font}
-            onchange={(e) => set({ font: e.currentTarget.value as Font })}
-            aria-label={_('Fuente')}
-          >
-            {#each fonts as item (item.id)}<option value={item.id}
-                >{item.label || _('{font} (predeterminada)', { font: themeFont })}</option
-              >{/each}
-          </select>
-        </label>
-        <p class="hint">{_('Vista previa: ¡Hola! ¿Hablamos luego? 😎')}</p>
-      </section>
-      <section>
-        <h2>{_('Idioma')}</h2>
-        <label>
-          <select
-            value={settings?.language}
-            onchange={(e) => set({ language: e.currentTarget.value as Settings['language'] })}
-            aria-label={_('Idioma')}
-          >
-            <option value="auto">{_('La del sistema')}</option>
-            <!-- Each language named in itself. -->
-            <option value="es">Español</option>
-            <option value="en">English</option>
-          </select>
-        </label>
-      </section>
+      <div class="pair">
+        <section>
+          <h2>{_('Fuente')}</h2>
+          <label>
+            <select
+              value={settings?.font}
+              onchange={(e) => set({ font: e.currentTarget.value as Font })}
+              aria-label={_('Fuente')}
+            >
+              {#each fonts as item (item.id)}<option value={item.id}
+                  >{item.label || _('{font} (predeterminada)', { font: themeFont })}</option
+                >{/each}
+            </select>
+          </label>
+        </section>
+        <section>
+          <h2>{_('Idioma')}</h2>
+          <label>
+            <select
+              value={settings?.language}
+              onchange={(e) => set({ language: e.currentTarget.value as Settings['language'] })}
+              aria-label={_('Idioma')}
+            >
+              <option value="auto">{_('Automático')}</option>
+              <!-- Each language named in itself. -->
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </section>
+      </div>
+      <p class="hint">{_('Vista previa: ¡Hola! ¿Hablamos luego? 😎')}</p>
     {:else if section === 'messages'}
       <h1>{_('Mensajes')}</h1>
       <section>
@@ -486,16 +487,16 @@
   /* Windows Live Messenger's layout, in the current theme's colors. */
   .options {
     display: grid;
-    grid-template-columns: 136px 1fr;
+    grid-template-columns: 168px 1fr;
     grid-template-rows: 1fr auto;
     height: 100vh;
   }
 
   nav {
     display: grid;
-    gap: 2px;
+    gap: 4px;
     align-content: start;
-    padding: 10px 6px;
+    padding: 14px 10px;
     background: var(--header-bg);
     border-right: 1px solid var(--line);
   }
@@ -506,13 +507,15 @@
 
   nav button {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
-    padding: 6px 8px;
+    padding: 8px 12px;
     border-color: transparent;
+    border-radius: var(--radius);
     background: none;
     box-shadow: none;
     color: var(--text);
+    font-size: 15px;
     text-align: left;
   }
 
@@ -520,37 +523,41 @@
     background: var(--row-hover-bg);
   }
 
-  nav button[aria-current='page'] {
-    border-color: var(--line);
-    background: var(--list-bg);
-    color: var(--text-strong);
-    font-weight: bold;
+  /* The current section looks like the window's main action. */
+  nav button[aria-current='page'],
+  nav button[aria-current='page']:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    box-shadow: var(--accent-shadow);
+    color: var(--accent-text);
+    font-weight: 800;
   }
 
   main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     overflow: auto;
-    padding: 14px 18px;
+    padding: 18px 24px;
     background: var(--list-bg);
   }
 
   h1 {
-    margin: 0 0 10px;
+    margin: 0;
     color: var(--text-strong);
-    font-size: 20px;
-    font-weight: normal;
+    font-size: 26px;
+    font-weight: 800;
   }
 
   section {
     display: grid;
-    gap: 6px;
-    padding: 8px 0 12px;
-    border-top: 1px solid var(--line);
+    gap: 8px;
   }
 
   h2 {
     margin: 0;
-    color: var(--text-strong);
-    font-size: inherit;
+    font-size: 15px;
+    font-weight: 800;
   }
 
   p {
@@ -559,18 +566,25 @@
 
   .hint {
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .error {
-    margin-top: 8px;
     color: var(--text-error);
   }
 
   label {
     display: flex;
-    gap: 6px;
-    align-items: baseline;
+    gap: 10px;
+    align-items: center;
+  }
+
+  input[type='checkbox'] {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--status-online);
   }
 
   .row {
@@ -584,39 +598,56 @@
     min-width: 0;
   }
 
+  /* Fuente and Idioma side by side, each select as wide as its column. */
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .pair select {
+    flex: 1;
+    min-width: 0;
+  }
+
   .themes {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
   }
 
-  .theme {
+  .theme,
+  .theme:hover:not(:disabled) {
     display: grid;
-    gap: 4px;
+    gap: 6px;
     justify-items: center;
-    padding: 4px;
-    border: 2px solid transparent;
-    border-radius: 6px;
+    padding: 0;
+    border: none;
     background: none;
     box-shadow: none;
     color: var(--text);
   }
 
-  .theme:hover:not(:disabled) {
-    background: var(--row-hover-bg);
+  .theme[aria-checked='true'] {
+    font-weight: 800;
   }
 
-  .theme[aria-checked='true'] {
+  .theme[aria-checked='true'] .thumb {
+    outline: 3px solid var(--text-strong);
+    outline-offset: 2px;
+  }
+
+  .theme:hover .thumb {
     border-color: var(--text-strong);
-    background: var(--row-hover-bg);
   }
 
   /* Small pictures of each theme, drawn with its own colors. */
   .thumb {
     display: grid;
-    grid-template-rows: 14px 1fr;
-    width: 76px;
-    height: 56px;
+    grid-template-rows: 34px 1fr;
+    box-sizing: border-box;
+    width: 96px;
+    height: 64px;
     overflow: hidden;
     border: 1px solid #8a9ab5;
   }
@@ -625,56 +656,44 @@
     display: block;
   }
 
-  .thumb.classic {
-    border-color: #c9d4ea;
-    border-radius: 6px;
+  /* Each theme: its sky over its window. */
+  .thumb.light {
+    border-color: #9fcdf5;
+    border-radius: 10px;
   }
 
-  .thumb.classic i:first-child {
-    background: linear-gradient(#eef3fd, #d3e0f8);
+  .thumb.light i:first-child {
+    background: linear-gradient(#7cc4ff, #bfe3ff);
   }
 
-  .thumb.classic i:last-child {
+  .thumb.light i:last-child {
     background: #fff;
   }
 
-  .thumb.retro {
-    border: 2px solid;
-    border-color: #fff #404040 #404040 #fff;
+  .thumb.warm {
+    border-color: #f5b98f;
+    border-radius: 10px;
   }
 
-  .thumb.retro i:first-child {
-    background: linear-gradient(90deg, #000080, #1084d0);
+  .thumb.warm i:first-child {
+    background: linear-gradient(#ffb37c, #ffd9b8);
   }
 
-  .thumb.retro i:last-child {
-    background: #c0c0c0;
+  .thumb.warm i:last-child {
+    background: #fff8f2;
   }
 
-  .thumb.night {
-    border-color: #4a5468;
-    border-radius: 6px;
+  .thumb.dark {
+    border-color: #3d5690;
+    border-radius: 10px;
   }
 
-  .thumb.night i:first-child {
-    background: linear-gradient(#34405a, #263044);
+  .thumb.dark i:first-child {
+    background: linear-gradient(#0b1633, #24407a);
   }
 
-  .thumb.night i:last-child {
-    background: #1b1f27;
-  }
-
-  .thumb.glass {
-    background: linear-gradient(160deg, #6fcff2, #b6ecdc 55%, #6cc286);
-  }
-
-  .thumb.glass i:first-child {
-    background: rgb(255 255 255 / 50%);
-  }
-
-  .thumb.glass i:last-child {
-    margin: 4px;
-    background: rgb(255 255 255 / 70%);
+  .thumb.dark i:last-child {
+    background: #16213c;
   }
 
   .sounds {
@@ -684,6 +703,10 @@
 
   .sounds td {
     padding: 2px 12px 2px 0;
+  }
+
+  .sounds button {
+    padding: 3px 12px;
   }
 
   .link {
@@ -704,9 +727,18 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: 10px 16px;
     border-top: 1px solid var(--line);
     background: var(--bar-bg);
     color: var(--text-muted);
+  }
+
+  footer small {
+    font-size: 13px;
+  }
+
+  footer button {
+    padding: 7px 20px;
+    font-size: 15px;
   }
 </style>

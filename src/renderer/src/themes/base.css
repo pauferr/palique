@@ -1,4 +1,5 @@
-/* Shared look built only from theme variables (see classic.css, retro.css, glass.css). */
+/* Shared look built only from theme variables (light.css defines them all; warm.css and
+   dark.css change some). */
 html {
   /* So gradient window backgrounds cover short pages without repeating. */
   min-height: 100%;
@@ -15,8 +16,7 @@ body {
   font-size-adjust: var(--x-height);
 }
 
-/* Thin scrollbars in the theme's color. A theme without --scrollbar keeps the system's
-   (Retro, whose chunky ones are part of the look). */
+/* Thin scrollbars in the theme's color. */
 * {
   scrollbar-color: var(--scrollbar) transparent;
   scrollbar-width: var(--scrollbar-width, auto);
@@ -31,15 +31,34 @@ textarea {
 }
 
 button {
-  padding: 3px 12px;
+  padding: 5px 14px;
   border: 1px solid;
   border-width: var(--button-border-width);
   border-color: var(--button-border-color);
   border-radius: var(--button-radius);
   background: var(--button-bg);
   box-shadow: var(--button-shadow);
-  color: var(--text-strong);
+  color: var(--button-text);
+  font-weight: 700;
   cursor: pointer;
+}
+
+/* The window's main action: glossy, in the theme's accent. */
+button.primary {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  box-shadow: var(--accent-shadow);
+  color: var(--accent-text);
+  font-weight: 800;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-bg-hover);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 button:hover:not(:disabled) {
@@ -59,7 +78,7 @@ button:disabled {
 input:not([type='checkbox'], [type='radio']),
 select,
 textarea {
-  padding: 3px 5px;
+  padding: 6px 10px;
   border: 1px solid;
   border-width: var(--field-border-width);
   border-color: var(--field-border-color);

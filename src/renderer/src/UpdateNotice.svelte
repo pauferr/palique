@@ -30,31 +30,35 @@
     {_('Palique se ha actualizado a la {version}. Se aplicará al cerrarlo.', {
       version: versionLabel(update.version)
     })}
-    <button onclick={() => window.api.installUpdate()}>{_('Reiniciar ahora')}</button>
+    <button class="primary" onclick={() => window.api.installUpdate()}
+      >{_('Reiniciar ahora')}</button
+    >
   </p>
 {/if}
 
 <style>
+  /* A soft note across the top of the window. */
   .update {
     align-self: stretch;
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 8px;
+    gap: 6px 10px;
     align-items: center;
     margin: 0;
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
     background: var(--warning-bg);
     border-bottom: 1px solid var(--line);
   }
 
   a {
     color: var(--text-strong);
-    font-weight: bold;
+    font-weight: 800;
   }
 
   button {
-    padding: 2px 8px;
+    padding: 3px 12px;
     font-size: 12px;
   }
 </style>

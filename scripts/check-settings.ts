@@ -10,7 +10,7 @@ const file = join(dir, 'settings.json')
 
 const defaults = {
   language: 'auto',
-  theme: 'classic',
+  theme: 'light',
   font: 'theme',
   winks: true,
   show: 'online',
@@ -50,7 +50,7 @@ assert.deepEqual(
 assert.deepEqual(
   validPatch({
     sounds: false,
-    theme: 'glass',
+    theme: 'warm',
     font: 'comic',
     away: 15,
     soundPack: 'bubble',
@@ -61,7 +61,7 @@ assert.deepEqual(
     font: 'comic',
     sounds: false,
     soundPack: 'bubble',
-    theme: 'glass',
+    theme: 'warm',
     away: 15
   }
 )
@@ -81,5 +81,5 @@ assert.deepEqual(
 )
 assert.deepEqual(validPatch(null), {})
 
-assert.deepEqual(validPatch({ theme: 'night' }), { theme: 'night' }, 'the dark theme')
+assert.deepEqual(validPatch({ theme: 'dark' }), { theme: 'dark' }, 'the dark theme')
 console.log('settings check passed')

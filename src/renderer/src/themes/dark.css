@@ -1,0 +1,75 @@
+/* Theme "Oscuro": Claro at night. Deep blue night sky, the same glossy buttons in a
+   brighter blue, light text. Same font as Claro (imported there). */
+
+:root[data-theme='dark'] {
+  color-scheme: dark; /* native fields, menus and scrollbars go dark too */
+
+  --text: #e6eeff;
+  --text-strong: #8cc2ff;
+  --text-muted: #a3b4d3;
+  --text-error: #ff9a8c;
+
+  --window-bg: #111a30;
+  --list-bg: #16213c;
+  --field-bg: #16213c;
+  --sky: linear-gradient(180deg, #0b1633 0%, #24407a 70%, #111a30 100%);
+  --cloud: rgb(255 255 255 / 12%);
+  --header-bg: linear-gradient(180deg, #1d3266 0%, #172a52 100%);
+  --bar-bg: #142041;
+  --line: #2a3d68;
+  --row-hover-bg: #1d2c50;
+  --warning-bg: #4a3712;
+  --request-bg: #3d3416;
+  --focus: #ffc83d;
+
+  --button-bg: linear-gradient(180deg, #2a3d68 0%, #1f2f55 100%);
+  --button-bg-hover: linear-gradient(180deg, #33497a 0%, #253864 100%);
+  --button-text: #bcd8ff;
+  --button-border-color: #3d5690;
+  --button-border-color-active: #8cc2ff;
+  --button-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
+  --button-shadow-active: inset 0 1px 3px rgb(0 0 0 / 40%);
+
+  --accent-bg: linear-gradient(180deg, #6aa8ff 0%, #2f6fe0 52%, #2a62c8 100%);
+  --accent-bg-hover: linear-gradient(180deg, #7db4ff 0%, #3b7bea 52%, #2f6fe0 100%);
+  --accent-border: #1f4fa8;
+  --accent-shadow: inset 0 1px 0 rgb(255 255 255 / 35%), 0 3px 8px rgb(0 0 0 / 40%);
+
+  --field-border-color: #34508a;
+
+  --group-border: 1px solid #2a3d68;
+  --group-bg: #16213c;
+  --popup-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+  --scrollbar: #34508a;
+
+  --bubble-bg: #1d2a49;
+  --bubble-border: #2f4373;
+  --bubble-mine-bg: linear-gradient(180deg, #2b4c8a 0%, #22407a 100%);
+  --bubble-mine-border: #3d63a8;
+  --wink-bg: linear-gradient(180deg, #4d3c12 0%, #3f310e 100%);
+  --wink-border: #7a5f1c;
+  --wink-text: #ffd98a;
+  --buzz-bg: #4a1d1a;
+  --buzz-border: #7a2e28;
+  --buzz-text: #ffb3ab;
+
+  --unread: linear-gradient(180deg, #7a5414 0%, #5e400f 100%);
+  --unread-border: #a8761f;
+  --unread-text: #ffe2a8;
+  --badge-bg: #f08a24;
+  --badge-text: #1a1205;
+
+  --avatar-0: #d4557f;
+  --avatar-1: #db8a20;
+  --avatar-2: #c9a21c;
+  --avatar-3: #4aa95c;
+  --avatar-4: #3fa9ba;
+  --avatar-5: #4a74d6;
+  --avatar-6: #7a52d1;
+  --avatar-7: #cf3f3a;
+
+  --status-online: #4cd35c;
+  --status-away: #ffb627;
+  --status-dnd: #ff5a4e;
+  --status-offline: #5f6f8f;
+}

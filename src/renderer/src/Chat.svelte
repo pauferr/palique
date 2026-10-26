@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
+  import { Smile, Star, Vibrate } from '@lucide/svelte'
   import type { ChatMessage, Contact } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
@@ -237,18 +238,15 @@
     </div>
   {/if}
   <header>
-    <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
+    <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={60} />
     <div class="to">
-      <span
-        >{_('Para:')} <strong><Emoticons text={name} plus /></strong>{#if contact?.email}&ensp;<span
-            class="email">&lt;{contact.email}&gt;</span
-          >{/if}</span
-      >
+      <span class="name">{_('Para:')} <strong><Emoticons text={name} plus /></strong></span>
       <small
         >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
             contact?.show ?? 'offline'
           ]}{/if}</small
       >
+      {#if contact?.email}<small class="email">{contact.email}</small>{/if}
     </div>
   </header>
 
@@ -257,14 +255,14 @@
     {#each messages as message, i (message.id)}
       {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
       {#if message.buzz}
-        <li class="event">
+        <li class="event buzz">
           🫨 {#if message.mine}{_('Has enviado un zumbido')}{:else}{@render named(
               _('{name} te ha enviado un zumbido')
             )}{/if}
           <time>{time(message.at)}</time>
         </li>
       {:else if message.wink}
-        <li class="event">
+        <li class="event wink-line">
           🎬 {#if message.mine}{_('Has enviado el guiño')}{:else}{@render named(
               _('{name} te ha enviado el guiño')
             )}{/if}
@@ -296,7 +294,7 @@
   <div class="compose">
     <div class="toolbar">
       <details class="picker" bind:open={emoticonsOpen}>
-        <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}>🙂</summary>
+        <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}><Smile size={18} /></summary>
         <ul class="emoticons">
           {#each EMOTICONS as { codes, emoji, name } (codes[0])}
             <li>
@@ -313,10 +311,13 @@
         <summary
           class:disabled={!canWink}
           title={canWink ? _('Enviar un guiño') : _('Espera un poco para enviar otro guiño')}
-          >🎬 {_('Guiño')}</summary
+        >
+          <Star size={16} />
+          {_('Guiño')}</summary
         >
         <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
         <div class="popup">
+          <h2>{_('Enviar un guiño')}</h2>
           <ul class="winks">
             {#each winks() as { id } (id)}
               <li>
@@ -345,7 +346,9 @@
         onclick={buzz}
         disabled={!canBuzz}
         title={canBuzz ? _('Enviar un zumbido') : _('Espera un poco para enviar otro zumbido')}
-        >🫨 {_('Zumbido')}</button
+      >
+        <Vibrate size={16} />
+        {_('Zumbido')}</button
       >
     </div>
     <div class="write">
@@ -359,7 +362,7 @@
         placeholder={_('Escribe un mensaje…')}
         aria-label={_('Mensaje')}
       ></textarea>
-      <button class="send" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
+      <button class="send primary" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
     </div>
   </div>
 </div>
@@ -373,25 +376,29 @@
 
   header {
     display: flex;
-    gap: 10px;
+    gap: 14px;
     align-items: center;
-    padding: 8px 10px;
+    padding: 12px 16px;
     background: var(--header-bg);
     border-bottom: 1px solid var(--line);
   }
 
+  /* «Para: Ana», then their personal message and their email. */
   .to {
     display: grid;
+    gap: 2px;
     min-width: 0;
+  }
+
+  .name {
+    color: var(--text-muted);
+    font-weight: 600;
   }
 
   .to strong {
     color: var(--text-strong);
-  }
-
-  /* As in MSN: «Para: Ana <ana@…>». */
-  .email {
-    color: var(--text-muted);
+    font-size: 18px;
+    font-weight: 800;
   }
 
   small {
@@ -402,21 +409,38 @@
     white-space: nowrap;
   }
 
+  .email {
+    font-size: 12px;
+  }
+
   ol {
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    gap: 10px;
     margin: var(--panel-margin);
     border: solid var(--panel-border-width);
     border-color: var(--panel-border-color);
     border-radius: var(--panel-radius);
     box-shadow: var(--panel-shadow);
-    padding: 8px 12px;
+    padding: 12px 16px;
     overflow-y: auto;
     list-style: none;
-    background: var(--list-bg);
+    background: var(--window-bg);
   }
 
+  /* Theirs on the left, ours on the right: a small line, then the bubble. */
   li {
-    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    max-width: 78%;
+  }
+
+  li.mine {
+    align-self: flex-end;
+    align-items: flex-end;
   }
 
   li.continues {
@@ -424,101 +448,142 @@
   }
 
   .notice {
+    align-self: center;
+    max-width: none;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
     text-align: center;
   }
 
   .meta {
     color: var(--text-muted);
-  }
-
-  /* Ours on the right, theirs on the left. */
-  li.mine {
-    text-align: right;
-  }
-
-  .mine .meta {
-    color: var(--text-strong);
+    font-size: 12px;
+    font-weight: 700;
   }
 
   time {
     font-size: 11px;
+    font-weight: 600;
     opacity: 0.8;
   }
 
-  p {
-    margin: 2px 0 0 12px;
+  /* Message bubbles only: the typing line and notices are paragraphs too. */
+  li p {
+    margin: 0;
+    padding: 7px 12px;
+    border: 1px solid var(--bubble-border);
+    border-radius: 4px var(--radius-large) var(--radius-large) var(--radius-large);
+    background: var(--bubble-bg);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   .mine p {
-    margin: 2px 12px 0 0;
+    border-color: var(--bubble-mine-border);
+    border-radius: var(--radius-large) 4px var(--radius-large) var(--radius-large);
+    background: var(--bubble-mine-bg);
   }
 
-  /* Day separator and buzz/wink notices: small centered chips, not messages. */
+  /* Only a group's first bubble points at who's talking. */
+  .continues p {
+    border-radius: var(--radius-large);
+  }
+
+  /* Day separator and buzz/wink lines: centered pills, not messages. */
   .day,
   .event {
-    color: var(--text-muted);
+    align-self: center;
+    max-width: none;
     text-align: center;
   }
 
-  .day {
-    margin: 12px 0;
-    font-size: 11px;
-  }
-
-  .day span,
-  .event {
-    width: fit-content;
-    margin-inline: auto;
-    padding: 2px 10px;
-    border-radius: var(--button-radius);
+  .day span {
+    padding: 2px 12px;
+    border-radius: 999px;
     background: var(--bar-bg);
+    color: var(--text-strong);
+    font-size: 12px;
+    font-weight: 800;
   }
 
   .event {
-    font-size: 12px;
+    display: block;
+    padding: 5px 14px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .buzz {
+    border-color: var(--buzz-border);
+    background: var(--buzz-bg);
+    color: var(--buzz-text);
+  }
+
+  .wink-line {
+    padding-right: 6px;
+    border-color: var(--wink-border);
+    background: var(--wink-bg);
+    color: var(--wink-text);
   }
 
   .event time {
     margin-left: 4px;
   }
 
-  /* Under the transcript; a theme whose transcript fills the window (no card) gives it the
-     same background, so the two read as one. */
+  /* The wink's name in the conversation: a small pill that plays it again. */
+  .replay {
+    margin-left: 4px;
+    padding: 2px 10px;
+    border: none;
+    background: var(--badge-bg);
+    box-shadow: none;
+    color: var(--badge-text);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .replay:hover:not(:disabled) {
+    background: var(--badge-bg);
+    filter: brightness(1.1);
+  }
+
+  /* Under the transcript, on its background, so the two read as one. */
   .typing {
     min-height: 1.4em;
     margin: 0;
-    padding: 2px 12px;
-    background: var(--typing-bg, transparent);
+    padding: 2px 16px 6px;
+    background: var(--window-bg);
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 13px;
     font-style: italic;
   }
 
   .compose {
     display: grid;
-    gap: 6px;
-    padding: 6px 10px 10px;
+    gap: 8px;
+    padding: 10px 14px 14px;
     background: var(--bar-bg);
     border-top: 1px solid var(--line);
   }
 
+  /* The pickers open above it, as wide as it. */
   .toolbar {
+    position: relative;
     display: flex;
-    gap: 4px;
+    gap: 6px;
   }
 
   .toolbar button,
   summary {
-    padding: 1px 8px;
-    font-size: 12px;
-  }
-
-  .picker {
-    position: relative;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    height: 34px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    font-weight: 800;
   }
 
   /* <details> pickers styled like the toolbar buttons. */
@@ -528,13 +593,25 @@
     border-radius: var(--button-radius);
     background: var(--button-bg);
     box-shadow: var(--button-shadow);
-    color: var(--text-strong);
+    color: var(--button-text);
     list-style: none;
     cursor: pointer;
   }
 
+  summary:hover {
+    background: var(--button-bg-hover);
+  }
+
   summary::-webkit-details-marker {
     display: none;
+  }
+
+  /* An open picker's button stays pressed, in the accent. */
+  .picker[open] > summary {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    box-shadow: var(--accent-shadow);
+    color: var(--accent-text);
   }
 
   summary.disabled {
@@ -544,17 +621,33 @@
   .picker > ul,
   .popup {
     position: absolute;
-    bottom: calc(100% + 4px);
+    bottom: calc(100% + 8px);
     left: 0;
     z-index: 1;
     display: grid;
     gap: 4px;
     margin: 0;
-    padding: 6px;
+    padding: 8px;
     list-style: none;
-    background: var(--list-bg);
-    border: 1px solid var(--line);
+    background: var(--group-bg);
+    border: var(--group-border);
+    border-radius: var(--group-radius);
     box-shadow: var(--popup-shadow);
+  }
+
+  .popup {
+    right: 0;
+    gap: 10px;
+    max-height: 70vh;
+    padding: 14px;
+    overflow-y: auto;
+    border-radius: 20px;
+  }
+
+  h2 {
+    margin: 0 4px;
+    font-size: 16px;
+    font-weight: 800;
   }
 
   .wink-layer {
@@ -571,26 +664,10 @@
     inset: 0;
   }
 
-  /* The wink's name in the conversation: looks like text, plays it again. */
-  .replay {
-    padding: 0;
-    border: none;
-    background: none;
-    box-shadow: none;
-    color: inherit;
-    font: inherit;
-    text-decoration: underline dotted;
-  }
-
-  .replay:hover:not(:disabled) {
-    background: none;
-    text-decoration: underline;
-  }
-
   .winks {
     display: grid;
-    grid-template-columns: repeat(3, 96px);
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -599,22 +676,21 @@
   /* Just the thumbnail and its name: no button chrome, a soft highlight on hover/focus. */
   .wink {
     display: grid;
-    gap: 2px;
+    gap: 4px;
     justify-items: center;
     width: 100%;
     padding: 4px;
     background: none;
     border: none;
-    border-radius: var(--radius);
+    border-radius: var(--radius-large);
     box-shadow: none;
     color: var(--text);
-    font-size: 11px;
+    font-size: 13px;
+    font-weight: 700;
   }
 
-  .wink:hover:not(:disabled),
-  .wink:focus-visible {
+  .wink:hover:not(:disabled) {
     background: var(--row-hover-bg);
-    outline: none;
   }
 
   .thumb {
@@ -622,6 +698,7 @@
     box-sizing: border-box;
     width: 100%;
     aspect-ratio: 4 / 3;
+    overflow: hidden;
     pointer-events: none;
     background: var(--field-bg);
     border: 1px solid var(--line);
@@ -629,12 +706,13 @@
   }
 
   .wait {
-    margin: 0;
+    margin: 0 4px;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .picker li {
+    max-width: none;
     margin: 0;
   }
 
@@ -652,13 +730,13 @@
   }
 
   .emoticons button:hover:not(:disabled) {
-    background: var(--bar-bg);
+    background: var(--row-hover-bg);
     border-color: var(--line);
   }
 
   .write {
     display: flex;
-    gap: 6px;
+    gap: 8px;
   }
 
   /* Grows with what's written, up to a point, then scrolls. */
@@ -671,13 +749,9 @@
   }
 
   .send {
-    align-self: flex-end;
-    min-height: calc(2lh + 10px);
-    font-weight: bold;
-  }
-
-  .send:disabled {
-    opacity: 0.5;
+    align-self: stretch;
+    min-width: 92px;
+    border-radius: var(--radius);
   }
 
   .shaking {

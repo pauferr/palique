@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ChevronDown, Plus, Search } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import type { MenuLabel } from '../../preload'
@@ -99,7 +100,7 @@
   }
 
   // Menus like MSN's, each action in one place: the bar on top (Archivo, Contactos,
-  // Herramientas, Ayuda), your status under your name, and a right click on a contact.
+  // Herramientas, Ayuda), your picture (status and picture), and a right click on a contact.
   // Native, so they can go past the window.
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: _('Invisible') }
   type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
@@ -138,15 +139,17 @@
       { label: _('Acerca de Palique'), run: window.api.openAbout }
     ])
 
+  // Your picture: your status (its frame shows it) or another picture.
   const meMenu = (e: MouseEvent): Promise<void> =>
-    popup(
-      e,
-      (['online', 'away', 'dnd', 'invisible'] as const).map((show) => ({
+    popup(e, [
+      ...(['online', 'away', 'dnd', 'invisible'] as const).map((show) => ({
         label: ownLabels[show],
         checked: roster.show === show,
         run: () => updatePresence(show)
-      }))
-    )
+      })),
+      '-',
+      { label: _('Cambiar imagen…'), run: () => picker.click() }
+    ])
 
   function contactMenu(e: MouseEvent, contact: Contact): Promise<void> {
     e.preventDefault()
@@ -262,13 +265,18 @@
   </div>
 
   <header>
-    <button class="me" onclick={() => picker.click()} title={_('Cambiar tu imagen')}>
+    <button
+      class="me"
+      aria-haspopup="menu"
+      onclick={meMenu}
+      title={_('{status}. Cambiar tu estado o tu imagen', { status: ownLabels[roster.show] })}
+    >
       <Avatar
         {jid}
         name={roster.name}
         url={roster.avatar}
         show={roster.show === 'invisible' ? 'offline' : roster.show}
-        size={56}
+        size={72}
       />
     </button>
     <input
@@ -283,9 +291,6 @@
         <!-- The name opens its own window, with the Messenger Plus! formatting tools. -->
         <button class="nick" onclick={() => window.api.openNick()} title={_('Cambiar tu nombre')}
           ><Emoticons text={roster.name} plus /></button
-        >
-        <button class="show" aria-haspopup="menu" onclick={meMenu}
-          >({ownLabels[roster.show]}) ▾</button
         >
       </div>
       {#if editing}
@@ -340,24 +345,30 @@
     {/each}
 
     {#if roster.contacts.length}
-      <input
-        class="search"
-        type="search"
-        bind:value={query}
-        placeholder={_('Buscar contactos')}
-        aria-label={_('Buscar contactos')}
-      />
+      <label class="search">
+        <Search size={16} aria-hidden="true" />
+        <input
+          type="search"
+          bind:value={query}
+          placeholder={_('Buscar contactos')}
+          aria-label={_('Buscar contactos')}
+        />
+      </label>
       {#if !found.length}<p class="no-match">{_('Nadie se llama así.')}</p>{/if}
       <!-- While searching, only the groups with someone in them. -->
       {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
         <details open>
-          <summary>{group.label} ({group.contacts.length})</summary>
+          <summary
+            ><ChevronDown size={14} strokeWidth={3} aria-hidden="true" />{group.label} ({group
+              .contacts.length})</summary
+          >
           <ul>
             {#each group.contacts as contact (contact.jid)}
               <!-- Recreated on each new message, so the row blinks again. -->
               {#key unread[contact.jid]}
                 <li
                   class:unread={unread[contact.jid]}
+                  class:offline={contact.show === 'offline'}
                   title={contact.email || undefined}
                   oncontextmenu={(e) => contactMenu(e, contact)}
                 >
@@ -367,7 +378,7 @@
                       name={contact.name}
                       url={contact.avatar}
                       show={contact.show}
-                      size={36}
+                      size={46}
                     />
                   </span>
                   <!-- Name, and the personal message under it. -->
@@ -404,6 +415,15 @@
     {/if}
   </div>
 
+  <!-- With no contacts, the empty list offers it already. -->
+  {#if roster.contacts.length && !addOpen}
+    <footer class="add-bar">
+      <button onclick={openAdd}
+        ><Plus size={18} aria-hidden="true" />{_('Añadir o invitar a un contacto')}</button
+      >
+    </footer>
+  {/if}
+
   {#if addOpen}
     <div class="sheet" role="dialog" aria-label={_('Añadir un contacto')}>
       <h3>
@@ -423,7 +443,7 @@
           aria-label={_('Correo del contacto')}
           autofocus
         />
-        <button type="submit">{_('Añadir')}</button>
+        <button class="primary" type="submit">{_('Añadir')}</button>
       </form>
       {#if notFound}
         <div class="result" role="status">
@@ -458,9 +478,9 @@
 
   header {
     display: flex;
-    gap: 10px;
+    gap: 14px;
     align-items: center;
-    padding: 10px;
+    padding: 16px 16px 18px;
     background: var(--header-bg);
     border-bottom: 1px solid var(--line);
   }
@@ -480,16 +500,16 @@
     min-width: 0;
   }
 
+  /* Name, and the personal message under it. */
   .line {
-    position: relative;
-    display: flex;
+    display: grid;
     gap: 4px;
-    align-items: center;
+    justify-items: start;
   }
 
   /* Our name reads as bold text until you click it. */
   .nick {
-    flex: 1;
+    max-width: 100%;
     overflow: hidden;
     text-align: left;
     text-overflow: ellipsis;
@@ -500,22 +520,8 @@
     box-shadow: none;
     background: transparent;
     color: var(--text-strong);
-    font-weight: bold;
-  }
-
-  /* Status reads like text next to the name and opens your menu, MSN style. */
-  .show {
-    flex: none;
-    padding: 0 2px;
-    border-color: transparent;
-    background: none;
-    box-shadow: none;
-    color: var(--text-muted);
-    font-weight: normal;
-  }
-
-  .show:hover:not(:disabled) {
-    background: var(--row-hover-bg);
+    font-size: 19px;
+    font-weight: 800;
   }
 
   /* Reads as text until you click it, like MSN's personal message. */
@@ -569,8 +575,26 @@
     background: var(--warning-bg);
   }
 
+  .add-bar {
+    padding: 12px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--bar-bg);
+  }
+
+  .add-bar button {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 10px;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
   .list {
     flex: 1;
+    padding: 0 8px;
     margin: var(--panel-margin);
     overflow-y: auto;
     border: solid var(--panel-border-width);
@@ -594,10 +618,23 @@
   }
 
   summary {
-    padding: 6px 10px 2px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 10px 8px 6px;
     color: var(--text-strong);
-    font-weight: bold;
+    font-weight: 800;
+    list-style: none;
     cursor: pointer;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* The chevron points right while the group is folded. */
+  details:not([open]) summary :global(svg) {
+    transform: rotate(-90deg);
   }
 
   ul {
@@ -606,17 +643,50 @@
     list-style: none;
   }
 
+  /* Transparent border, so the unread one doesn't shift the row. */
   li {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 7px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+  }
+
+  li.offline .name {
+    color: var(--text-muted);
+  }
+
+  li.offline .name > span {
+    font-weight: 600;
+  }
+
+  /* A pill with a magnifier; the ring goes around the whole pill. */
+  .search {
     display: flex;
     gap: 8px;
     align-items: center;
-    padding: 4px 10px 4px 18px;
+    margin: 12px 6px 6px;
+    padding: 8px 12px;
+    border: var(--field-border-width) solid var(--line);
+    border-radius: 999px;
+    background: var(--window-bg);
+    color: var(--text-muted);
   }
 
-  .search {
-    box-sizing: border-box;
-    width: calc(100% - 16px);
-    margin: 8px 8px 2px;
+  .search:focus-within {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--text);
   }
 
   .no-match {
@@ -633,8 +703,15 @@
      row blinks orange three times, then stays lit until the conversation is opened. Kept
      with "reduce motion" too: it's a plain color switch, once a second. */
   li.unread {
-    --unread: linear-gradient(#ffd79a, #f8a73a 55%, #ef8a14);
     animation: unread 1s steps(1, end) 3 forwards;
+  }
+
+  li.unread .name > span {
+    font-weight: 800;
+  }
+
+  li.unread small {
+    color: var(--unread-text);
   }
 
   @keyframes unread {
@@ -644,20 +721,23 @@
     50%,
     100% {
       background: var(--unread);
+      border-color: var(--unread-border);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%);
     }
   }
 
   .badge {
     flex: none;
-    min-width: 1.5em;
-    padding: 0 5px;
+    box-sizing: border-box;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
     border-radius: 999px;
-    background: linear-gradient(#ffb24d, #e6700a);
-    box-shadow: inset 0 1px rgb(255 255 255 / 45%);
-    color: #fff;
-    font-size: 0.85em;
-    font-weight: bold;
-    line-height: 1.5;
+    background: var(--badge-bg);
+    color: var(--badge-text);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 24px;
     text-align: center;
   }
 
@@ -679,8 +759,14 @@
     white-space: nowrap;
   }
 
+  .name > span {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
   .name small {
-    font-size: 0.9em;
+    font-size: 13px;
+    font-weight: 400;
   }
 
   .name:hover:not(:disabled) {
@@ -743,17 +829,19 @@
     position: relative;
     display: flex;
     gap: 2px;
-    padding: 2px 4px;
+    padding: 4px 8px;
     background: var(--bar-bg);
     border-bottom: 1px solid var(--line);
   }
 
   .menubar > button {
-    padding: 2px 8px;
+    padding: 6px 8px;
     border-color: transparent;
+    border-radius: 6px;
     background: none;
     box-shadow: none;
     color: var(--text);
+    font-weight: 600;
   }
 
   .menubar > button:hover:not(:disabled) {
