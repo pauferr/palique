@@ -83,7 +83,9 @@ El script construye y arranca todo, espera al certificado de Let's Encrypt, se l
 docker compose exec accounts node src/invite.ts tu@correo.com
 ```
 
-Comprobación rápida: abre `https://tu-dominio.com` en el navegador. Debe salir una página de Palique que dice "Página no encontrada": significa que HTTPS y el servicio de cuentas funcionan.
+El correo sale en español; para enviarlo en inglés, añade `en` al final.
+
+Comprobación rápida: abre `https://tu-dominio.com` en el navegador. Debe salir una página de Palique que dice "Página no encontrada" (o "Page not found" si tu navegador está en otro idioma): significa que HTTPS y el servicio de cuentas funcionan.
 
 ## 8. Compilar la app apuntando a tu servidor
 

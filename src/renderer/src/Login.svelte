@@ -4,18 +4,19 @@
   import Avatar from './Avatar.svelte'
   import { PASSWORD_RULE, strongPassword } from './password'
   import UpdateNotice from './UpdateNotice.svelte'
+  import { _ } from './i18n'
 
   let { onlogin }: { onlogin: (jid: string) => void } = $props()
 
   const messages = {
-    conflict: 'Esta invitación ya se usó para crear una cuenta. Inicia sesión.',
-    'not-acceptable': `Esa contraseña no es segura. ${PASSWORD_RULE}`,
-    'not-authorized': 'Correo o contraseña incorrectos.',
-    'invalid-invite': 'La invitación no es válida, ya se usó o ha caducado.',
-    wait: 'Demasiados intentos. Espera un minuto.',
-    outdated: 'Esta versión de Palique ya no funciona. Descarga la nueva para entrar.',
-    unreachable: 'No se puede conectar con el servidor.',
-    unknown: 'Algo ha fallado. Inténtalo de nuevo.'
+    conflict: _('Esta invitación ya se usó para crear una cuenta. Inicia sesión.'),
+    'not-acceptable': _('Esa contraseña no es segura. {rule}', { rule: _(PASSWORD_RULE) }),
+    'not-authorized': _('Correo o contraseña incorrectos.'),
+    'invalid-invite': _('La invitación no es válida, ya se usó o ha caducado.'),
+    wait: _('Demasiados intentos. Espera un minuto.'),
+    outdated: _('Esta versión de Palique ya no funciona. Descarga la nueva para entrar.'),
+    unreachable: _('No se puede conectar con el servidor.'),
+    unknown: _('Algo ha fallado. Inténtalo de nuevo.')
   }
 
   // register: with an invite from an email. forgot: ask for a recovery email.
@@ -41,10 +42,10 @@
   // The invite code can be pasted bare or as the whole link (palique://signup?t=CODE).
   const inviteCode = (): string => invite.trim().match(/[?&]t=([^&\s]+)/)?.[1] ?? invite.trim()
   const submitLabel = $derived({
-    login: 'Iniciar sesión',
-    register: invitedEmail ? 'Crear cuenta' : 'Continuar',
-    forgot: 'Enviar enlace',
-    reset: 'Cambiar contraseña'
+    login: _('Iniciar sesión'),
+    register: invitedEmail ? _('Crear cuenta') : _('Continuar'),
+    forgot: _('Enviar enlace'),
+    reset: _('Cambiar contraseña')
   })
 
   function go(next: typeof mode): void {
@@ -101,18 +102,21 @@
     error = ''
     if (mode === 'register' && !invitedEmail) return checkInvite()
     if ((mode === 'register' || mode === 'reset') && !strongPassword(password)) {
-      error = `Esa contraseña no es segura. ${PASSWORD_RULE}`
+      error = messages['not-acceptable']
       return
     }
     if ((mode === 'register' || mode === 'reset') && password !== confirm) {
-      error = 'Las contraseñas no coinciden.'
+      error = _('Las contraseñas no coinciden.')
       return
     }
     busy = true
     if (mode === 'forgot') {
       try {
         await window.api.forgotPassword(address())
-        info = `Si ${address()} tiene cuenta, te hemos enviado un enlace y un código. Caducan en una hora.`
+        info = _(
+          'Si {email} tiene cuenta, te hemos enviado un enlace y un código. Caducan en una hora.',
+          { email: address() }
+        )
       } catch (e) {
         error = String(e).includes('outdated') ? messages.outdated : messages.unreachable
       }
@@ -128,7 +132,7 @@
     busy = false
     if ('jid' in result) onlogin(result.jid)
     else if (mode === 'reset' && result.error === 'invalid-invite') {
-      error = 'El código no es válido o ha caducado. Pide otro.'
+      error = _('El código no es válido o ha caducado. Pide otro.')
     } else error = messages[result.error]
   }
 </script>
@@ -137,7 +141,7 @@
   <UpdateNotice />
   <header>
     <h1>Palique</h1>
-    <p>¿Echamos un palique?</p>
+    <p>{_('¿Echamos un palique?')}</p>
   </header>
 
   <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
@@ -151,33 +155,42 @@
 
   <form onsubmit={submit}>
     {#if mode === 'forgot'}
-      <p class="intro">Escribe tu correo y te enviaremos un enlace para elegir otra contraseña.</p>
+      <p class="intro">
+        {_('Escribe tu correo y te enviaremos un enlace para elegir otra contraseña.')}
+      </p>
     {:else if mode === 'reset'}
-      <p class="intro">Elige tu nueva contraseña. El código está en el correo que te enviamos.</p>
+      <p class="intro">
+        {_('Elige tu nueva contraseña. El código está en el correo que te enviamos.')}
+      </p>
     {:else if mode === 'register' && !invitedEmail}
       <p class="intro">
-        Para crear una cuenta hace falta una invitación. Pulsa el botón del correo que te llegó o
-        pega aquí su código.
+        {_(
+          'Para crear una cuenta hace falta una invitación. Pulsa el botón del correo que te llegó o pega aquí su código.'
+        )}
       </p>
     {/if}
 
     {#if mode === 'register'}
       {#if invitedEmail}
-        <p class="intro">Entrarás con <strong>{invitedEmail}</strong>.</p>
+        <p class="intro">
+          {#each _('Entrarás con {email}.').split('{email}') as part, i (i)}{#if i}<strong
+                >{invitedEmail}</strong
+              >{/if}{part}{/each}
+        </p>
         <label>
-          Tu nombre
+          {_('Tu nombre')}
           <input bind:value={nick} required maxlength="128" autocomplete="nickname" />
-          <small>Es lo que verán tus contactos. Puedes cambiarlo cuando quieras.</small>
+          <small>{_('Es lo que verán tus contactos. Puedes cambiarlo cuando quieras.')}</small>
         </label>
       {:else}
         <label>
-          Código de invitación
+          {_('Código de invitación')}
           <input spellcheck="false" bind:value={invite} required autocomplete="off" />
         </label>
       {/if}
     {:else}
       <label>
-        Correo electrónico
+        {_('Correo electrónico')}
         <input
           type="email"
           spellcheck="false"
@@ -191,14 +204,14 @@
 
     {#if mode === 'reset'}
       <label>
-        Código del correo
+        {_('Código del correo')}
         <input spellcheck="false" bind:value={code} required autocomplete="one-time-code" />
       </label>
     {/if}
 
     {#if mode === 'login' || mode === 'reset' || invitedEmail}
       <label>
-        {mode === 'reset' ? 'Nueva contraseña' : 'Contraseña'}
+        {mode === 'reset' ? _('Nueva contraseña') : _('Contraseña')}
         <input
           type="password"
           bind:value={password}
@@ -206,13 +219,13 @@
           required
           minlength={mode === 'login' ? undefined : 8}
         />
-        {#if mode !== 'login'}<small>{PASSWORD_RULE}</small>{/if}
+        {#if mode !== 'login'}<small>{_(PASSWORD_RULE)}</small>{/if}
       </label>
     {/if}
 
     {#if mode === 'reset' || invitedEmail}
       <label>
-        Repite la contraseña
+        {_('Repite la contraseña')}
         <input type="password" bind:value={confirm} autocomplete="new-password" required />
       </label>
     {/if}
@@ -220,14 +233,14 @@
     {#if mode === 'login' && canRemember}
       <label class="check">
         <input type="checkbox" bind:checked={remember} />
-        Iniciar sesión automáticamente
+        {_('Iniciar sesión automáticamente')}
       </label>
     {/if}
 
     {#if invitedEmail}
       <label class="check">
         <input type="checkbox" bind:checked={newsletter} />
-        Quiero recibir novedades de Palique por correo
+        {_('Quiero recibir novedades de Palique por correo')}
       </label>
     {/if}
 
@@ -236,31 +249,33 @@
         {#if error === messages.outdated}<a
             href="https://github.com/pauferr/palique/releases"
             target="_blank"
-            rel="noreferrer">Descargar</a
+            rel="noreferrer">{_('Descargar')}</a
           >{/if}
       </p>{/if}
     {#if info}<p class="info" role="status">{info}</p>{/if}
 
     <button type="submit" class="submit" disabled={busy}>
-      {busy ? 'Un momento…' : submitLabel[mode]}
+      {busy ? _('Un momento…') : submitLabel[mode]}
     </button>
 
     {#if mode === 'forgot'}
-      <button type="button" class="link" onclick={() => go('reset')}>Ya tengo un código</button>
+      <button type="button" class="link" onclick={() => go('reset')}
+        >{_('Ya tengo un código')}</button
+      >
     {/if}
   </form>
 
   <footer>
     {#if mode === 'login'}
       <button type="button" class="link" onclick={() => go('forgot')} disabled={busy}>
-        ¿Olvidaste tu contraseña?
+        {_('¿Olvidaste tu contraseña?')}
       </button>
       <button type="button" class="link" onclick={() => go('register')} disabled={busy}>
-        ¿Tienes una invitación? Crea tu cuenta
+        {_('¿Tienes una invitación? Crea tu cuenta')}
       </button>
     {:else}
       <button type="button" class="link" onclick={() => go('login')} disabled={busy}>
-        ← Volver
+        ← {_('Volver')}
       </button>
     {/if}
     <small class="version">{version}</small>

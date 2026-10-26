@@ -36,6 +36,7 @@ import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
 import { versionLabel } from '../renderer/src/version'
 import { winkLabel } from '../renderer/src/wink-labels'
+import { _, lang, setLanguage } from '../renderer/src/i18n'
 import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
@@ -53,6 +54,7 @@ import {
   requestPasswordReset,
   resendVerification,
   setNewsletter,
+  setAccountLanguage,
   setNick,
   login,
   logout,
@@ -63,7 +65,6 @@ import {
   ownShow,
   ownStatus,
   rejectRequest,
-  winkId,
   removeContact,
   sendBuzz,
   sendMessage,
@@ -106,8 +107,10 @@ log.write(
 )
 process.on('uncaughtException', (e) => log.write('error', 'uncaught:', e))
 process.on('unhandledRejection', (e) => log.write('error', 'unhandled rejection:', e))
-app.on('render-process-gone', (_, __, details) => log.write('error', 'renderer gone:', details))
-app.on('child-process-gone', (_, details) => log.write('error', 'process gone:', details))
+app.on('render-process-gone', (_event, __, details) =>
+  log.write('error', 'renderer gone:', details)
+)
+app.on('child-process-gone', (_event, details) => log.write('error', 'process gone:', details))
 
 // palique:// links (invite and password recovery emails). In development Electron itself
 // is the handler, so it needs the app's path to know what to open.
@@ -226,14 +229,46 @@ function createTray(): void {
       : nativeImage.createFromPath(icon).resize({ width: 22, height: 22 })
   )
   tray.setToolTip('Palique')
-  tray.setContextMenu(
+  trayMenu()
+  tray.on('click', showMain)
+}
+
+// Rebuilt when the language changes.
+function trayMenu(): void {
+  tray?.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Abrir Palique', click: showMain },
+      { label: _('Abrir Palique'), click: showMain },
       { type: 'separator' },
-      { label: 'Salir', click: () => app.quit() }
+      { label: _('Salir'), click: () => app.quit() }
     ])
   )
-  tray.on('click', showMain)
+}
+
+// 'auto' follows the computer's language; any other than Spanish or English gets English.
+function applyLanguage(): void {
+  const { language } = settings.get()
+  setLanguage(language === 'auto' ? app.getLocale() : language)
+}
+
+// ponytail: texts aren't reactive; every window is drawn again in the new language
+// (a half-typed message is lost, but this is rare).
+function redrawInLanguage(): void {
+  applyLanguage()
+  trayMenu()
+  BrowserWindow.getAllWindows().forEach((win) => win.webContents.reload())
+}
+
+// The language goes with the account (chosen on another computer, say). This computer
+// keeps the last one too, for the sign-in screen.
+async function useAccountLanguage(): Promise<void> {
+  try {
+    const { language } = validPatch({ language: (await emailStatus()).language || 'auto' })
+    if (!language || language === settings.get().language) return
+    settings.set({ language })
+    redrawInLanguage()
+  } catch (e) {
+    console.error('account language:', e)
+  }
 }
 
 // Desktop notifications. Silent: the app plays its own sounds. Muted while busy.
@@ -255,16 +290,17 @@ function notify(title: string, body: string, onClick: () => void): void {
 // Native titles can't hold images or colors: emoticon codes become plain emoji, and
 // Messenger Plus! codes go.
 const contactName = (jid: string): string => {
-  const name = stripPlus(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '') || 'Sin nombre'
+  const name =
+    stripPlus(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '') || _('Sin nombre')
   return settings.get().emoticons ? emojify(name) : name
 }
 
 function notifyMessage(message: ChatMessage): void {
   if (!settings.get().alertMessages) return
   const body = message.buzz
-    ? '¡Te ha enviado un zumbido!'
+    ? _('¡Te ha enviado un zumbido!')
     : message.wink
-      ? 'Te ha enviado un guiño'
+      ? _('Te ha enviado un guiño')
       : message.body.length > 120
         ? `${message.body.slice(0, 120)}…`
         : message.body
@@ -296,7 +332,9 @@ function announceArrivals(state: Snapshot): void {
         mainWindow?.webContents.send('contact:online', jid)
       }
       if (settings.get().alertOnline) {
-        notify(`${contactName(jid)} se ha conectado`, '', () => openChat(jid, true))
+        notify(_('{name} se ha conectado', { name: contactName(jid) }), '', () =>
+          openChat(jid, true)
+        )
       }
     }
   }
@@ -358,7 +396,7 @@ function openOptions(): void {
     show: false,
     resizable: false,
     autoHideMenuBar: true,
-    title: 'Opciones',
+    title: _('Opciones'),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: { preload, sandbox: false }
   })
@@ -381,7 +419,7 @@ function openNick(): void {
     show: false,
     resizable: false,
     autoHideMenuBar: true,
-    title: 'Cambiar tu nombre',
+    title: _('Cambiar tu nombre'),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: { preload, sandbox: false }
   })
@@ -405,7 +443,7 @@ function openAbout(): void {
     minimizable: false,
     maximizable: false,
     autoHideMenuBar: true,
-    title: 'Acerca de Palique',
+    title: _('Acerca de Palique'),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: { preload, sandbox: false }
   })
@@ -415,17 +453,17 @@ function openAbout(): void {
 }
 
 // The format is picked in the save dialog, by file type (HTML unless another one).
-const EXPORT_TYPES = [
-  { name: 'Página web', extensions: ['html'] },
-  { name: 'Texto', extensions: ['txt'] },
-  { name: 'Datos (JSON)', extensions: ['json'] }
+const exportTypes = (): Electron.FileFilter[] => [
+  { name: _('Página web'), extensions: ['html'] },
+  { name: _('Texto'), extensions: ['txt'] },
+  { name: _('Datos (JSON)'), extensions: ['json'] }
 ]
 
 async function exportChats(win: BrowserWindow | null): Promise<ExportResult> {
-  const messages = account ? history.all(account).map(currentWink) : []
+  const messages = account ? history.all(account) : []
   if (!messages.length) return 'empty'
   const day = new Date().toISOString().slice(0, 10)
-  const save = { defaultPath: `palique-conversaciones-${day}.html`, filters: EXPORT_TYPES }
+  const save = { defaultPath: `${_('palique-conversaciones')}-${day}.html`, filters: exportTypes() }
   const { canceled, filePath } = win
     ? await dialog.showSaveDialog(win, save)
     : await dialog.showSaveDialog(save)
@@ -534,10 +572,6 @@ const gotWinks = cooldown(WINK_INTERVAL)
 const gotBuzzes = cooldown(BUZZ_INTERVAL)
 const notified = cooldown(NOTIFY_INTERVAL)
 
-// History may hold winks saved with their old Spanish ids.
-const currentWink = (message: ChatMessage): ChatMessage =>
-  message.wink ? { ...message, wink: winkId(message.wink) } : message
-
 // Stored by the server while we were offline (or just old): delivered quietly. They wait
 // in the contact list at sign-in, with no sounds, flashing or a toast storm.
 const isLate = (message: ChatMessage): boolean =>
@@ -601,7 +635,7 @@ app.whenReady().then(() => {
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
+  app.on('browser-window-created', (_event, window) => {
     optimizer.watchWindowShortcuts(window)
     // The renderer's errors (exceptions, failed IPC calls) end up in the log too.
     window.webContents.on('console-message', ({ level, message, sourceId, lineNumber }) => {
@@ -611,6 +645,7 @@ app.whenReady().then(() => {
 
   history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
+  applyLanguage()
   setInterval(checkIdle, 15_000)
 
   const shows: OwnShow[] = ['online', 'away', 'dnd', 'invisible']
@@ -640,26 +675,30 @@ app.whenReady().then(() => {
       account = result.jid
       pendingLink = null
       settings.set({ email })
+      useAccountLanguage()
     }
     return result
   }
   const clean = (email: unknown): string => String(email).trim().toLowerCase()
 
   // `remember`: the sign-in screen's "Iniciar sesión automáticamente" box.
-  ipcMain.handle('auth:login', async (_, email: string, password: string, remember: unknown) => {
-    try {
-      const username = await accountFor(clean(email))
-      const result = await login(username, String(password), lastPresence())
-      if (result.ok && typeof remember === 'boolean') {
-        settings.set({ autoLogin: remember && canRemember() })
-        if (remember) await rememberPassword(String(password))
-        else forgetPassword()
+  ipcMain.handle(
+    'auth:login',
+    async (_event, email: string, password: string, remember: unknown) => {
+      try {
+        const username = await accountFor(clean(email))
+        const result = await login(username, String(password), lastPresence())
+        if (result.ok && typeof remember === 'boolean') {
+          settings.set({ autoLogin: remember && canRemember() })
+          if (remember) await rememberPassword(String(password))
+          else forgetPassword()
+        }
+        return signedIn(result, clean(email))
+      } catch (e) {
+        return failed(e)
       }
-      return signedIn(result, clean(email))
-    } catch (e) {
-      return failed(e)
     }
-  })
+  )
   // Once per launch, before the sign-in screen shows: sign in by itself if asked to.
   // After signing out, the screen stays (null means "nothing to do").
   let triedAuto = false
@@ -685,7 +724,7 @@ app.whenReady().then(() => {
     saved: canRemember() && (await savedPassword()) !== ''
   }))
   // Which address an invite is for (the sign-up form shows it).
-  ipcMain.handle('auth:invite', async (_, token: string) => {
+  ipcMain.handle('auth:invite', async (_event, token: string) => {
     try {
       return { ok: true, email: (await inviteInfo(String(token).trim())).email }
     } catch (e) {
@@ -693,7 +732,7 @@ app.whenReady().then(() => {
     }
   })
   type Signup = { token: string; nick: string; password: string; newsletter: boolean }
-  ipcMain.handle('auth:register', async (_, signup: Signup) => {
+  ipcMain.handle('auth:register', async (_event, signup: Signup) => {
     try {
       const token = String(signup.token).trim()
       const nick = cleanNick(signup.nick)
@@ -710,9 +749,9 @@ app.whenReady().then(() => {
       return failed(e)
     }
   })
-  ipcMain.handle('auth:forgot', (_, email: string) => requestPasswordReset(clean(email)))
+  ipcMain.handle('auth:forgot', (_event, email: string) => requestPasswordReset(clean(email)))
   // Sets a new password with the emailed code, then signs in with it.
-  ipcMain.handle('auth:reset', async (_, email: string, token: string, password: string) => {
+  ipcMain.handle('auth:reset', async (_event, email: string, token: string, password: string) => {
     try {
       const username = await accountFor(clean(email))
       const result = await login(username, String(password), {
@@ -728,6 +767,8 @@ app.whenReady().then(() => {
   // A link may have opened the app before the sign-in screen was listening.
   ipcMain.handle('auth:pending-link', () => pendingLink)
   ipcMain.handle('auth:last-email', () => settings.get().email)
+  // Who's signed in ('' if nobody): a reloaded window goes back to the contact list.
+  ipcMain.handle('auth:current', () => account)
   ipcMain.handle('auth:logout', async () => {
     await logout()
     account = ''
@@ -747,27 +788,27 @@ app.whenReady().then(() => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
   })
   ipcMain.handle('account:email', () => emailStatus())
-  ipcMain.handle('account:set-email', (_, address: string) =>
+  ipcMain.handle('account:set-email', (_event, address: string) =>
     changeEmail(clean(address)).then((email) => {
       BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
       return email
     })
   )
   ipcMain.handle('account:resend', () => resendVerification())
-  ipcMain.handle('account:newsletter', (_, subscribe: boolean) =>
+  ipcMain.handle('account:newsletter', (_event, subscribe: boolean) =>
     setNewsletter(Boolean(subscribe)).then((email) => {
       BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
       return email
     })
   )
-  ipcMain.handle('account:nick', (_, name: string) => setNick(String(name)))
+  ipcMain.handle('account:nick', (_event, name: string) => setNick(String(name)))
   ipcMain.handle('invites:status', () => inviteStatus())
-  ipcMain.handle('invites:email', (_, address: string) => inviteByEmail(clean(address)))
+  ipcMain.handle('invites:email', (_event, address: string) => inviteByEmail(clean(address)))
   ipcMain.handle('roster:snapshot', () => snapshot())
   // By email. Inviting someone without an account is a separate, explicit step.
   ipcMain.handle(
     'roster:add',
-    async (_, address: string): Promise<'added' | 'not-found' | 'self'> => {
+    async (_event, address: string): Promise<'added' | 'not-found' | 'self'> => {
       const jid = await lookupContact(clean(address))
       if (!jid) return 'not-found'
       if (jid === account) return 'self'
@@ -775,10 +816,10 @@ app.whenReady().then(() => {
       return 'added'
     }
   )
-  ipcMain.handle('roster:accept', (_, jid: string) => acceptRequest(String(jid)))
-  ipcMain.handle('roster:reject', (_, jid: string) => rejectRequest(String(jid)))
-  ipcMain.handle('roster:remove', (_, jid: string) => removeContact(String(jid)))
-  ipcMain.handle('presence:set', async (_, show: OwnShow, status: string) => {
+  ipcMain.handle('roster:accept', (_event, jid: string) => acceptRequest(String(jid)))
+  ipcMain.handle('roster:reject', (_event, jid: string) => rejectRequest(String(jid)))
+  ipcMain.handle('roster:remove', (_event, jid: string) => removeContact(String(jid)))
+  ipcMain.handle('presence:set', async (_event, show: OwnShow, status: string) => {
     const valid = shows.includes(show) ? show : 'online'
     await setPresence(valid, String(status))
     settings.set({ show: valid, status: snapshot().status })
@@ -791,7 +832,7 @@ app.whenReady().then(() => {
     if (message.wink && !message.mine) playWink(message)
   })
   // Both return the ms until the next one is allowed (refused if that's not 0 yet).
-  ipcMain.handle('chat:wink', async (_, contact: string, wink: string) => {
+  ipcMain.handle('chat:wink', async (_event, contact: string, wink: string) => {
     if (!isWinkId(wink)) return 0
     const wait = sentWinks.take(String(contact))
     if (wait) return wait
@@ -801,7 +842,7 @@ app.whenReady().then(() => {
     return WINK_INTERVAL
   })
   // The renderer resizes the picture to a small PNG; still check it here.
-  ipcMain.handle('avatar:set', (_, png: unknown) => {
+  ipcMain.handle('avatar:set', (_event, png: unknown) => {
     const isPng =
       png instanceof Uint8Array &&
       png.length <= AVATAR_MAX_BYTES &&
@@ -813,31 +854,43 @@ app.whenReady().then(() => {
   // development shows the next one.
   ipcMain.handle('app:version', () => {
     const version = app.isPackaged ? app.getVersion() : __DEV_VERSION__
-    return version ? versionLabel(version) : 'desarrollo'
+    return version ? versionLabel(version) : _('desarrollo')
   })
   ipcMain.handle('settings:get', () => settings.get())
+  // The language in use ('auto' resolved), set before each window draws anything.
+  ipcMain.handle('app:language', () => lang)
   // Only known keys with valid values; every window hears about the change (e.g. the theme).
-  ipcMain.handle('settings:set', (_, patch: unknown) => {
+  ipcMain.handle('settings:set', (_event, patch: unknown) => {
     const valid = validPatch(patch)
     if (valid.startup !== undefined) app.setLoginItemSettings({ openAtLogin: valid.startup })
     if (valid.autoLogin === false) forgetPassword()
+    const languageChanged =
+      valid.language !== undefined && valid.language !== settings.get().language
     const current = settings.set(valid)
     BrowserWindow.getAllWindows().forEach((win) =>
       win.webContents.send('settings:changed', current)
     )
+    if (languageChanged) {
+      redrawInLanguage()
+      if (account) {
+        setAccountLanguage(current.language === 'auto' ? '' : current.language).catch((e) =>
+          console.error('account language:', e)
+        )
+      }
+    }
     return current
   })
   // Typing only matters if the conversation is open; it never opens a window.
   onTyping((contact, typing) =>
     chats.get(contact)?.webContents.send('chat:typing', contact, typing)
   )
-  ipcMain.handle('chat:typing', (_, contact: string, typing: boolean) =>
+  ipcMain.handle('chat:typing', (_event, contact: string, typing: boolean) =>
     sendTyping(String(contact), Boolean(typing))
   )
-  ipcMain.handle('chat:open', (_, contact: string) => {
+  ipcMain.handle('chat:open', (_event, contact: string) => {
     openChat(String(contact), true)
   })
-  ipcMain.on('chat:ready', (_, contact: string) => {
+  ipcMain.on('chat:ready', (_event, contact: string) => {
     const win = chats.get(String(contact))
     pending.get(String(contact))?.forEach(([message, quiet]) => {
       win?.webContents.send('chat:message', message, quiet)
@@ -853,14 +906,14 @@ app.whenReady().then(() => {
   ipcMain.on('chat:replay-wink', (event, wink: string) => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })
-  ipcMain.handle('chat:history', (_, contact: string) =>
-    account ? history.load(account, String(contact)).map(currentWink) : []
+  ipcMain.handle('chat:history', (_event, contact: string) =>
+    account ? history.load(account, String(contact)) : []
   )
-  ipcMain.handle('chat:send', async (_, contact: string, body: string) => {
+  ipcMain.handle('chat:send', async (_event, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)
     if (text) deliver(await sendMessage(String(contact), text))
   })
-  ipcMain.handle('chat:buzz', async (_, contact: string) => {
+  ipcMain.handle('chat:buzz', async (_event, contact: string) => {
     const wait = sentBuzzes.take(String(contact))
     if (wait) return wait
     deliver(await sendBuzz(String(contact)))
@@ -933,7 +986,7 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
-  app.on('second-instance', (_, argv) => {
+  app.on('second-instance', (_event, argv) => {
     showMain()
     openLink(parseLink(argv.find((arg) => arg.startsWith('palique://'))))
   })

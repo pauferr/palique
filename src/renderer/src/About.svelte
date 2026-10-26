@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { _ } from './i18n'
 
   let version = $state('')
   onMount(() => {
@@ -7,16 +8,16 @@
   })
 </script>
 
-<svelte:head><title>Acerca de Palique</title></svelte:head>
+<svelte:head><title>{_('Acerca de Palique')}</title></svelte:head>
 
 <main>
   <header>
     <h1>Palique</h1>
     <p class="version">{version}</p>
   </header>
-  <p>¿Echamos un palique? Un mensajero como los de antes.</p>
+  <p>{_('¿Echamos un palique? Un mensajero como los de antes.')}</p>
   <footer>
-    <button onclick={() => window.close()}>Cerrar</button>
+    <button onclick={() => window.close()}>{_('Cerrar')}</button>
   </footer>
 </main>
 

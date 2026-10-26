@@ -1,27 +1,29 @@
+import { N_ } from './i18n.ts'
+
 // Classic MSN shortcuts, shown as emoji. The text sent stays as typed, so other XMPP
 // clients still see ":)". ponytail: system emoji for now; themes can swap in images later.
 export const EMOTICONS: { codes: string[]; emoji: string; name: string }[] = [
-  { codes: [':)', ':-)'], emoji: '🙂', name: 'Sonrisa' },
-  { codes: [':D', ':-D'], emoji: '😃', name: 'Carcajada' },
-  { codes: [';)', ';-)'], emoji: '😉', name: 'Guiño' },
-  { codes: [':P', ':-P'], emoji: '😛', name: 'Lengua' },
-  { codes: [':O', ':-O'], emoji: '😮', name: 'Sorpresa' },
-  { codes: [':(', ':-('], emoji: '🙁', name: 'Triste' },
-  { codes: [":'("], emoji: '😢', name: 'Llorando' },
-  { codes: [':S', ':-S'], emoji: '😕', name: 'Confundido' },
-  { codes: [':|', ':-|'], emoji: '😐', name: 'Serio' },
-  { codes: [':@', ':-@'], emoji: '😠', name: 'Enfadado' },
-  { codes: ['(H)'], emoji: '😎', name: 'Chulo' },
-  { codes: ['(L)'], emoji: '❤️', name: 'Corazón' },
-  { codes: ['(U)'], emoji: '💔', name: 'Corazón roto' },
-  { codes: ['(K)'], emoji: '💋', name: 'Beso' },
-  { codes: ['(Y)'], emoji: '👍', name: 'Sí' },
-  { codes: ['(N)'], emoji: '👎', name: 'No' },
-  { codes: ['(F)'], emoji: '🌹', name: 'Rosa' },
-  { codes: ['(*)'], emoji: '⭐', name: 'Estrella' },
-  { codes: ['(8)'], emoji: '🎵', name: 'Música' },
-  { codes: ['(^)'], emoji: '🎂', name: 'Tarta' },
-  { codes: ['(C)'], emoji: '☕', name: 'Café' }
+  { codes: [':)', ':-)'], emoji: '🙂', name: N_('Sonrisa') },
+  { codes: [':D', ':-D'], emoji: '😃', name: N_('Carcajada') },
+  { codes: [';)', ';-)'], emoji: '😉', name: N_('Guiño') },
+  { codes: [':P', ':-P'], emoji: '😛', name: N_('Lengua') },
+  { codes: [':O', ':-O'], emoji: '😮', name: N_('Sorpresa') },
+  { codes: [':(', ':-('], emoji: '🙁', name: N_('Triste') },
+  { codes: [":'("], emoji: '😢', name: N_('Llorando') },
+  { codes: [':S', ':-S'], emoji: '😕', name: N_('Confundido') },
+  { codes: [':|', ':-|'], emoji: '😐', name: N_('Serio') },
+  { codes: [':@', ':-@'], emoji: '😠', name: N_('Enfadado') },
+  { codes: ['(H)'], emoji: '😎', name: N_('Chulo') },
+  { codes: ['(L)'], emoji: '❤️', name: N_('Corazón') },
+  { codes: ['(U)'], emoji: '💔', name: N_('Corazón roto') },
+  { codes: ['(K)'], emoji: '💋', name: N_('Beso') },
+  { codes: ['(Y)'], emoji: '👍', name: N_('Sí') },
+  { codes: ['(N)'], emoji: '👎', name: N_('No') },
+  { codes: ['(F)'], emoji: '🌹', name: N_('Rosa') },
+  { codes: ['(*)'], emoji: '⭐', name: N_('Estrella') },
+  { codes: ['(8)'], emoji: '🎵', name: N_('Música') },
+  { codes: ['(^)'], emoji: '🎂', name: N_('Tarta') },
+  { codes: ['(C)'], emoji: '☕', name: N_('Café') }
 ]
 
 const byCode = new Map(

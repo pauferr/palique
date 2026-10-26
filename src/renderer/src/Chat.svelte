@@ -9,16 +9,17 @@
   import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
   import { findWink, winkLabel, winks } from './winks'
+  import { _, lang } from './i18n'
 
   let { jid }: { jid: string } = $props()
 
   const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
   const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
   const labels: Record<Contact['show'], string> = {
-    online: 'Disponible',
-    away: 'Ausente',
-    dnd: 'No molestar',
-    offline: 'Sin conexión'
+    online: _('Disponible'),
+    away: _('Ausente'),
+    dnd: _('No molestar'),
+    offline: _('Sin conexión')
   }
 
   let messages: ChatMessage[] = $state([])
@@ -184,16 +185,16 @@
   const GROUP_GAP = 5 * 60 * 1000 // messages closer than this share one "X dice:"
 
   const time = (at: number): string =>
-    new Date(at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+    new Date(at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
 
   // "Hoy", "Ayer" or "3 de octubre" (with the year when it isn't this one).
   function day(at: number): string {
     const date = new Date(at)
     const today = new Date()
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
-    if (date.toDateString() === today.toDateString()) return 'Hoy'
-    if (date.toDateString() === yesterday.toDateString()) return 'Ayer'
-    return date.toLocaleDateString('es', {
+    if (date.toDateString() === today.toDateString()) return _('Hoy')
+    if (date.toDateString() === yesterday.toDateString()) return _('Ayer')
+    return date.toLocaleDateString(lang, {
       day: 'numeric',
       month: 'long',
       year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric'
@@ -218,6 +219,13 @@
   }
 </script>
 
+<!-- A sentence with the contact's name, which a component draws: split the translated
+     text around {name}. -->
+{#snippet named(text: string)}{@const [before, after] = text.split('{name}')}{before}<Emoticons
+    text={name}
+    plus
+  />{after}{/snippet}
+
 <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
   {#if playing}
     <!-- A click closes it. -->
@@ -232,7 +240,7 @@
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={48} />
     <div class="to">
       <span
-        >Para: <strong><Emoticons text={name} plus /></strong>{#if contact?.email}&ensp;<span
+        >{_('Para:')} <strong><Emoticons text={name} plus /></strong>{#if contact?.email}&ensp;<span
             class="email">&lt;{contact.email}&gt;</span
           >{/if}</span
       >
@@ -245,23 +253,25 @@
   </header>
 
   <ol bind:this={list} aria-live="polite">
-    <li class="notice">Esta conversación solo se guarda en este ordenador.</li>
+    <li class="notice">{_('Esta conversación solo se guarda en este ordenador.')}</li>
     {#each messages as message, i (message.id)}
       {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
       {#if message.buzz}
         <li class="event">
-          🫨 {#if message.mine}Has enviado un zumbido{:else}<Emoticons text={name} plus /> te ha enviado
-            un zumbido{/if}
+          🫨 {#if message.mine}{_('Has enviado un zumbido')}{:else}{@render named(
+              _('{name} te ha enviado un zumbido')
+            )}{/if}
           <time>{time(message.at)}</time>
         </li>
       {:else if message.wink}
         <li class="event">
-          🎬 {#if message.mine}Has enviado el guiño{:else}<Emoticons text={name} plus /> te ha enviado
-            el guiño{/if}
+          🎬 {#if message.mine}{_('Has enviado el guiño')}{:else}{@render named(
+              _('{name} te ha enviado el guiño')
+            )}{/if}
           <button
             class="replay"
             onclick={() => window.api.replayWink(message.wink!)}
-            title="Volver a ver el guiño">«{winkLabel(message.wink)}» ▶</button
+            title={_('Volver a ver el guiño')}>«{winkLabel(message.wink)}» ▶</button
           >
           <time>{time(message.at)}</time>
         </li>
@@ -269,7 +279,7 @@
         <li class:mine={message.mine} class:continues={continues(i)}>
           {#if !continues(i)}
             <span class="meta"
-              >{#if message.mine}Tú dices{:else}<Emoticons text={name} plus /> dice{/if}:
+              >{#if message.mine}{_('Tú dices:')}{:else}{@render named(_('{name} dice:'))}{/if}
               <time>{time(message.at)}</time></span
             >
           {/if}
@@ -280,20 +290,20 @@
   </ol>
 
   <p class="typing" aria-live="polite">
-    {#if theyType && prefs.typing}<Emoticons text={name} plus /> está escribiendo…{/if}
+    {#if theyType && prefs.typing}{@render named(_('{name} está escribiendo…'))}{/if}
   </p>
 
   <div class="compose">
     <div class="toolbar">
       <details class="picker" bind:open={emoticonsOpen}>
-        <summary title="Emoticonos" aria-label="Emoticonos">🙂</summary>
+        <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}>🙂</summary>
         <ul class="emoticons">
           {#each EMOTICONS as { codes, emoji, name } (codes[0])}
             <li>
               <button
                 onclick={() => insertEmoticon(codes[0])}
-                title="{name} {codes[0]}"
-                aria-label="{name} {codes[0]}">{emoji}</button
+                title="{_(name)} {codes[0]}"
+                aria-label="{_(name)} {codes[0]}">{emoji}</button
               >
             </li>
           {/each}
@@ -302,19 +312,19 @@
       <details class="picker" bind:open={pickerOpen}>
         <summary
           class:disabled={!canWink}
-          title={canWink ? 'Enviar un guiño' : 'Espera un poco para enviar otro guiño'}
-          >🎬 Guiño</summary
+          title={canWink ? _('Enviar un guiño') : _('Espera un poco para enviar otro guiño')}
+          >🎬 {_('Guiño')}</summary
         >
         <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
         <div class="popup">
           <ul class="winks">
-            {#each winks as { id } (id)}
+            {#each winks() as { id } (id)}
               <li>
                 <button
                   class="wink"
                   onclick={() => wink(id)}
                   disabled={!canWink}
-                  aria-label="Enviar el guiño {winkLabel(id)}"
+                  aria-label={_('Enviar el guiño {name}', { name: winkLabel(id) })}
                   onmouseenter={() => (previewing = id)}
                   onmouseleave={() => (previewing = '')}
                   onfocus={() => (previewing = id)}
@@ -328,14 +338,14 @@
               </li>
             {/each}
           </ul>
-          {#if !canWink}<p class="wait">Espera un poco para enviar otro guiño.</p>{/if}
+          {#if !canWink}<p class="wait">{_('Espera un poco para enviar otro guiño.')}</p>{/if}
         </div>
       </details>
       <button
         onclick={buzz}
         disabled={!canBuzz}
-        title={canBuzz ? 'Enviar un zumbido' : 'Espera un poco para enviar otro zumbido'}
-        >🫨 Zumbido</button
+        title={canBuzz ? _('Enviar un zumbido') : _('Espera un poco para enviar otro zumbido')}
+        >🫨 {_('Zumbido')}</button
       >
     </div>
     <div class="write">
@@ -346,10 +356,10 @@
         oninput={onInput}
         maxlength="4000"
         rows="2"
-        placeholder="Escribe un mensaje…"
-        aria-label="Mensaje"
+        placeholder={_('Escribe un mensaje…')}
+        aria-label={_('Mensaje')}
       ></textarea>
-      <button class="send" onclick={send} disabled={!draft.trim()}>Enviar</button>
+      <button class="send" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
     </div>
   </div>
 </div>

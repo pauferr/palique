@@ -10,6 +10,7 @@ import { component, xml } from '@xmpp/component'
 import { openDb, type Account } from './db.ts'
 import { outdated } from './version.ts'
 import { BUTTERFLY, escape, mailer } from './mail.ts'
+import { language, translator, type Language } from './i18n.ts'
 
 const env = (name: string, fallback?: string): string => {
   const value = process.env[name] ?? fallback
@@ -102,19 +103,24 @@ const status = (account: Account | undefined): ReturnType<typeof xml> =>
     xmlns: NS,
     address: account?.email ?? '',
     pending: account?.pending ?? '',
-    newsletter: String(account?.newsletter ?? false)
+    newsletter: String(account?.newsletter ?? false),
+    language: account?.language ?? ''
   })
 
-function sendVerification(email: string, token: string): Promise<unknown> {
+// Emails go out in `lang`, the language the app asking for them is in; the pages their
+// links open too (`l` in the link).
+function sendVerification(email: string, token: string, lang: Language): Promise<unknown> {
+  const _ = translator(lang)
   return send({
     to: email,
-    subject: 'Confirma tu nuevo correo de Palique',
+    lang,
+    subject: _('Confirma tu nuevo correo de Palique'),
     paragraphs: [
-      '¡Correo nuevo! Has pedido entrar en Palique con esta dirección.',
-      'Pulsa el botón para confirmarla. Hasta que lo hagas, seguirás entrando con la de antes.'
+      _('¡Correo nuevo! Has pedido entrar en Palique con esta dirección.'),
+      _('Pulsa el botón para confirmarla. Hasta que lo hagas, seguirás entrando con la de antes.')
     ],
-    link: { href: `${PUBLIC_URL}/verify?t=${token}`, label: 'Confirmar mi correo' },
-    footer: 'Si no has sido tú, ignora este correo y aquí no ha pasado nada.'
+    link: { href: `${PUBLIC_URL}/verify?t=${token}&l=${lang}`, label: _('Confirmar mi correo') },
+    footer: _('Si no has sido tú, ignora este correo y aquí no ha pasado nada.')
   })
 }
 
@@ -131,11 +137,15 @@ xmpp.iqCallee.set(NS, 'email', async (ctx) => {
   const jid = user(ctx.from)
   const account = jid && db.account(jid)
   if (!jid || !account) return stanzaError('forbidden')
-  const address = cleanEmail(ctx.stanza.getChild('email', NS)!.attrs.address)
+  const request = ctx.stanza.getChild('email', NS)!
+  const address = cleanEmail(request.attrs.address)
   if (!validEmail(address)) return stanzaError('bad-request', 'invalid email')
   if (address === account.email || address === account.pending) return status(account)
   const token = db.changeEmail(jid, address)
-  if (token) sendVerification(address, token).catch((e) => console.error('verify', e.message))
+  if (token)
+    sendVerification(address, token, language(request.attrs.lang)).catch((e) =>
+      console.error('verify', e.message)
+    )
   return status(db.account(jid))
 })
 
@@ -146,7 +156,11 @@ xmpp.iqCallee.set(NS, 'resend', async (ctx) => {
   if (!jid || !account) return stanzaError('forbidden')
   const token = db.resendToken(jid)
   if (!token) return stanzaError('resource-constraint')
-  await sendVerification(account.pending, token)
+  await sendVerification(
+    account.pending,
+    token,
+    language(ctx.stanza.getChild('resend', NS)!.attrs.lang)
+  )
   return true
 })
 
@@ -157,6 +171,17 @@ xmpp.iqCallee.set(NS, 'newsletter', (ctx) => {
   if (!jid || !db.account(jid)) return stanzaError('forbidden')
   const wanted = ctx.stanza.getChild('newsletter', NS)!.attrs.subscribe === 'true'
   return status(db.setNewsletter(jid, wanted)!)
+})
+
+// <language code='es|en|'/>: the language the user chose in the app ('' = the computer's),
+// so it follows them to other computers (and, later, emails go out in it).
+const LANGUAGES = ['', 'es', 'en']
+xmpp.iqCallee.set(NS, 'language', (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  const code = ctx.stanza.getChild('language', NS)!.attrs.code ?? ''
+  if (!LANGUAGES.includes(code)) return stanzaError('bad-request', 'unknown language')
+  return status(db.setLanguage(jid, code)!)
 })
 
 // <lookup address='…'/>: who has this address (adding a contact). Knowing someone's email
@@ -210,7 +235,13 @@ xmpp.iqCallee.get(NS, 'invites', (ctx) => {
 
 // Picks the new account's JID, asks Prosody for an invite that can only create it, and
 // emails it. `inviter`: bare JID, null for the admin's.
-async function invite(email: string, inviter: string | null, inviterName: string): Promise<void> {
+async function invite(
+  email: string,
+  inviter: string | null,
+  inviterName: string,
+  lang: Language
+): Promise<void> {
+  const _ = translator(lang)
   const local = newLocalpart()
   const res = await prosodyIq(
     xml('account', {
@@ -221,30 +252,41 @@ async function invite(email: string, inviter: string | null, inviterName: string
   )
   const token = res.getChild('account', INVITES)!.attrs.token as string
   const optout = db.addInvite({ token, email, jid: `${local}@${USER_DOMAIN}`, inviter })
-  const who = inviterName || 'Alguien'
+  const who = inviterName || _('Alguien')
   await send({
     to: email,
+    lang,
     subject: inviter
-      ? `${who} quiere agregarte en Palique`
-      : '¡Tienes una invitación para Palique!',
+      ? _('{name} quiere agregarte en Palique', { name: who })
+      : _('¡Tienes una invitación para Palique!'),
     sender: inviter ? who : undefined,
     paragraphs: [
       inviter
-        ? '¡Ey! Quiero tenerte en mi lista de contactos de Palique 🙂'
-        : '¡Ey! Te hemos guardado un sitio 🙂❤️',
-      '¿Te acuerdas de llegar a casa, encender el ordenador y mirar quién estaba conectado? Palique va de eso: tu lista de contactos, zumbidos, guiños y el sonidito cuando alguien se conecta.',
-      'Abre Palique, pulsa «¿Tienes una invitación? Crea tu cuenta» y pega este código:'
+        ? _('¡Ey! Quiero tenerte en mi lista de contactos de Palique 🙂')
+        : _('¡Ey! Te hemos guardado un sitio 🙂❤️'),
+      _(
+        '¿Te acuerdas de llegar a casa, encender el ordenador y mirar quién estaba conectado? Palique va de eso: tu lista de contactos, zumbidos, guiños y el sonidito cuando alguien se conecta.'
+      ),
+      _('Abre Palique, pulsa «¿Tienes una invitación? Crea tu cuenta» y pega este código:')
     ],
     code: token,
     link: {
       href: `palique://signup?t=${encodeURIComponent(token)}`,
-      label: 'Abrir Palique y crear mi cuenta'
+      label: _('Abrir Palique y crear mi cuenta')
     },
-    note: `Entrarás con esta dirección (${email}). La invitación caduca en una semana, así que no lo dejes para luego.${inviter ? ` Cuando entres, ${who} ya estará en tu lista.` : ''}`,
-    footer: '¿Prefieres que no te invitemos más?',
+    note: inviter
+      ? _(
+          'Entrarás con esta dirección ({email}). La invitación caduca en una semana, así que no lo dejes para luego. Cuando entres, {name} ya estará en tu lista.',
+          { email, name: who }
+        )
+      : _(
+          'Entrarás con esta dirección ({email}). La invitación caduca en una semana, así que no lo dejes para luego.',
+          { email }
+        ),
+    footer: _('¿Prefieres que no te invitemos más?'),
     footerLink: {
-      href: `${PUBLIC_URL}/no-invites?t=${optout}`,
-      label: 'No quiero más invitaciones'
+      href: `${PUBLIC_URL}/no-invites?t=${optout}&l=${lang}`,
+      label: _('No quiero más invitaciones')
     }
   })
 }
@@ -273,7 +315,8 @@ xmpp.iqCallee.set(NS, 'invite-email', async (ctx) => {
       String(request.attrs.name ?? '')
         .replace(PLUS_CODES, '')
         .trim()
-        .slice(0, 64)
+        .slice(0, 64),
+      language(request.attrs.lang)
     )
   }
   return inviteStatus(jid)
@@ -335,7 +378,8 @@ function allowReset(email: string, ip: string): boolean {
   return true
 }
 
-async function sendReset(email: string): Promise<void> {
+async function sendReset(email: string, lang: Language): Promise<void> {
+  const _ = translator(lang)
   const account = db.accountByEmail(email)
   if (!account) return
   const username = account.jid.split('@')[0]
@@ -343,18 +387,19 @@ async function sendReset(email: string): Promise<void> {
   const token = res.getChild('reset', INVITES)!.attrs.token
   await send({
     to: email,
-    subject: '¿Se te ha olvidado la contraseña de Palique?',
+    lang,
+    subject: _('¿Se te ha olvidado la contraseña de Palique?'),
     paragraphs: [
-      'Tranqui, nos ha pasado a todos 😉',
-      'Abre Palique, pulsa «¿Olvidaste tu contraseña?», luego «Ya tengo un código» y pega este:'
+      _('Tranqui, nos ha pasado a todos 😉'),
+      _('Abre Palique, pulsa «¿Olvidaste tu contraseña?», luego «Ya tengo un código» y pega este:')
     ],
     code: token,
     link: {
       href: `palique://reset?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
-      label: 'Abrir Palique y elegir contraseña'
+      label: _('Abrir Palique y elegir contraseña')
     },
-    note: 'El código caduca en una hora y solo vale una vez.',
-    footer: 'Si no lo has pedido tú, pasa de este correo: tu contraseña sigue igual.'
+    note: _('El código caduca en una hora y solo vale una vez.'),
+    footer: _('Si no lo has pedido tú, pasa de este correo: tu contraseña sigue igual.')
   })
 }
 
@@ -368,8 +413,8 @@ const pushStatus = (account: Account): void => {
 }
 
 // Same look as the emails: a conversation window with the butterfly colors on top.
-function page(title: string, message: string): string {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${escape(title)} · Palique</title>
+function page(title: string, message: string, lang: Language): string {
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${escape(title)} · Palique</title>
 <style>
 :root{--bg:#f7f7f6;--card:#fff;--line:#e7e7e5;--fg:#18181b;--muted:#71717a;--acc:#2563eb;--tint:#eef3ff;--tint-line:#c9d8fd}
 @media (prefers-color-scheme:dark){:root{--bg:#0c0c0d;--card:#18181b;--line:#2a2a2e;--fg:#f4f4f5;--muted:#a1a1aa;--acc:#6b9bff;--tint:#1b2540;--tint-line:#2f3b5c}}
@@ -419,47 +464,54 @@ createServer(async (req, res) => {
     return json(200, { email: invite.email, username: invite.jid.split('@')[0] })
   }
   if (req.method === 'POST' && url.pathname === '/recover') {
-    const email = cleanEmail((await readJson(req)).email)
+    const body = await readJson(req)
+    const email = cleanEmail(body.email)
     if (validEmail(email) && allowReset(email, clientIp(req))) {
-      sendReset(email).catch((e) => console.error('reset', e.message))
+      sendReset(email, language(body.lang)).catch((e) => console.error('reset', e.message))
     }
     return json(202, { ok: true })
   }
   // The admin's invites (src/invite.ts), only from inside the container.
   if (req.method === 'POST' && url.pathname === '/admin/invite' && isLoopback(req)) {
-    const email = cleanEmail((await readJson(req)).email)
+    const body = await readJson(req)
+    const email = cleanEmail(body.email)
     if (!validEmail(email)) return json(400, { error: 'invalid' })
     if (db.taken(email)) return json(409, { error: 'taken' })
     try {
-      await invite(email, null, '')
+      await invite(email, null, '', language(body.lang))
       return json(200, { ok: true })
     } catch (e) {
       return json(500, { error: (e as Error).message })
     }
   }
 
+  // Pages: the language in the link, else the browser's.
+  const lang = language(url.searchParams.get('l') ?? req.headers['accept-language'])
+  const _ = translator(lang)
   const reply = (code: number, title: string, message: string): void => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
-    res.end(page(title, message))
+    res.end(page(title, message, lang))
   }
   if (req.method === 'GET' && url.pathname === '/verify') {
     const account = db.verify(url.searchParams.get('t') ?? '')
-    if (!account) return reply(404, 'Enlace no válido', 'Este enlace ya se ha usado o no existe.')
+    if (!account) {
+      return reply(404, _('Enlace no válido'), _('Este enlace ya se ha usado o no existe.'))
+    }
     // Let the app know right away (it also asks on every sign-in).
     pushStatus(account)
     return reply(
       200,
-      'Correo cambiado',
-      `¡Hecho! A partir de ahora entrarás en Palique con ${account.email}.`
+      _('Correo cambiado'),
+      _('¡Hecho! A partir de ahora entrarás en Palique con {email}.', { email: account.email })
     )
   }
   if (req.method === 'GET' && url.pathname === '/no-invites') {
     if (!db.optOut(url.searchParams.get('t') ?? '')) {
-      return reply(404, 'Enlace no válido', 'Este enlace no existe.')
+      return reply(404, _('Enlace no válido'), _('Este enlace no existe.'))
     }
-    return reply(200, 'Listo', 'Vale, no te invitaremos más a Palique en esta dirección.')
+    return reply(200, _('Listo'), _('Vale, no te invitaremos más a Palique en esta dirección.'))
   }
-  reply(404, 'Página no encontrada', 'Por aquí no hay nada.')
+  reply(404, _('Página no encontrada'), _('Por aquí no hay nada.'))
 }).listen(Number(env('HTTP_PORT', '8080')), () => console.log('http ready'))
 
 // Prosody may not be up yet (or restarting): keep trying instead of crashing. Later

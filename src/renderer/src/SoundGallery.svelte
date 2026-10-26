@@ -1,6 +1,7 @@
 <script lang="ts">
   import { events, packs as all, playEffect, type Pack, type SoundEvent } from './sounds'
   import type { SoundPack } from '../../main/settings'
+  import { _ } from './i18n'
 
   // Development view (#sounds in the dev app's address): every sound collection side by
   // side, to tune them. Not linked from the app.
@@ -21,26 +22,28 @@
   }
 </script>
 
-<svelte:head><title>Sonidos</title></svelte:head>
+<svelte:head><title>{_('Sonidos')}</title></svelte:head>
 
 <main>
-  <label>Volumen <input type="range" min="0" max="1" step="0.05" bind:value={volume} /></label>
+  <label
+    >{_('Volumen')} <input type="range" min="0" max="1" step="0.05" bind:value={volume} /></label
+  >
 
   <ul>
     {#each packs as p (p.id)}
       <li>
-        <h2>{p.name}</h2>
-        <small>{p.note}</small>
+        <h2>{_(p.name)}</h2>
+        <small>{_(p.note)}</small>
         <div class="buttons">
           {#each events as e (e.id)}
-            <button onclick={() => play(p, e.id)}>▶ {e.label}</button>
+            <button onclick={() => play(p, e.id)}>▶ {_(e.label)}</button>
           {/each}
         </div>
         {#each events as e (e.id)}
           {@const clip = p[e.id]}
           {#if typeof clip === 'object' && p.id === 'classic'}
             <label class="cut">
-              {e.label}
+              {_(e.label)}
               <input type="range" min="0.1" max="0.8" step="0.05" bind:value={clip.length} />
               {clip.length.toFixed(2)} s
             </label>
@@ -51,18 +54,18 @@
   </ul>
 
   <section>
-    <h2>Tu combinación</h2>
-    <small>Elige cada sonido de una colección distinta.</small>
+    <h2>{_('Tu combinación')}</h2>
+    <small>{_('Elige cada sonido de una colección distinta.')}</small>
     {#each events as e (e.id)}
       <label>
-        {e.label}
+        {_(e.label)}
         <select bind:value={mix[e.id]}>
-          {#each packs as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+          {#each packs as p (p.id)}<option value={p.id}>{_(p.name)}</option>{/each}
         </select>
         <button onclick={() => play(pack(mix[e.id]), e.id)}>▶</button>
       </label>
     {/each}
-    <button onclick={playMix}>▶ Probar los tres</button>
+    <button onclick={playMix}>▶ {_('Probar los tres')}</button>
   </section>
 </main>
 

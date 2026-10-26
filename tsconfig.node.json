@@ -1,7 +1,8 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/renderer/src/emoticons.ts", "src/renderer/src/wink-labels.ts", "src/renderer/src/version.ts", "src/renderer/src/password.ts"],
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/renderer/src/emoticons.ts", "src/renderer/src/wink-labels.ts", "src/renderer/src/version.ts", "src/renderer/src/password.ts", "src/renderer/src/i18n.ts", "src/renderer/src/locales/*.json"],
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "composite": true,
     "types": ["electron-vite/node"]
   }

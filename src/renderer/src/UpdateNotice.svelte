@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { UpdateStatus } from '../../main/updates'
+  import { _ } from './i18n'
   import { versionLabel } from './version'
 
   // A new release (see main/updates.ts): macOS downloads it by hand, Windows and Linux
@@ -17,17 +18,19 @@
 
 {#if update?.state === 'available'}
   <p class="update" role="status">
-    Hay una versión nueva de Palique: {versionLabel(update.version)}.
+    {_('Hay una versión nueva de Palique: {version}.', { version: versionLabel(update.version) })}
     <a
       href="https://github.com/pauferr/palique/releases/tag/v{update.version}"
       target="_blank"
-      rel="noreferrer">Descargar</a
+      rel="noreferrer">{_('Descargar')}</a
     >
   </p>
 {:else if update?.state === 'ready'}
   <p class="update" role="status">
-    Palique se ha actualizado a la {versionLabel(update.version)}. Se aplicará al cerrarlo.
-    <button onclick={() => window.api.installUpdate()}>Reiniciar ahora</button>
+    {_('Palique se ha actualizado a la {version}. Se aplicará al cerrarlo.', {
+      version: versionLabel(update.version)
+    })}
+    <button onclick={() => window.api.installUpdate()}>{_('Reiniciar ahora')}</button>
   </p>
 {/if}
 

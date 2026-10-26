@@ -1,5 +1,5 @@
 // Every wink, one file each. The id travels over the network and is saved in histories:
-// never reuse or rename one (a retired id keeps its label in wink-labels.ts).
+// never reuse or rename one.
 import type { Wink } from './kit'
 import { wink as angry } from './angry'
 import { wink as bubble } from './bubble'

@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
+import { _, lang } from '../renderer/src/i18n.ts'
 
 // Which server: fixed at build time for releases (MAIN_VITE_* variables, see the release
 // workflow), overridable with PALIQUE_* at run time, localhost in development.
@@ -31,25 +32,6 @@ export const NICK_MAX = 128 // room for Messenger Plus! codes
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)
-
-// Wink ids were Spanish up to 0.4; old history (and old apps) still have those.
-const LEGACY_WINKS: Record<string, string> = {
-  burbuja: 'bubble',
-  ola: 'wave',
-  ovni: 'ufo',
-  rebote: 'bounce',
-  globo: 'water-balloon',
-  cerdo: 'pig',
-  burla: 'tease',
-  beso: 'kiss',
-  carcajada: 'laugh',
-  enamorado: 'in-love',
-  enfadado: 'angry',
-  llorando: 'crying',
-  chulo: 'cool'
-}
-export const winkId = (id: string): string =>
-  Object.hasOwn(LEGACY_WINKS, id) ? LEGACY_WINKS[id] : id
 
 export type AuthError =
   | 'conflict' // the invite's account already exists
@@ -122,7 +104,7 @@ let typingListener: (contact: string, typing: boolean) => void = () => {}
 let emailListener: (email: EmailStatus) => void = () => {}
 
 // JIDs are random ids: never show them. Other XMPP clients may not send a name.
-const nameOf = (bare: string): string => nicks.get(bare) || 'Sin nombre'
+const nameOf = (bare: string): string => nicks.get(bare) || _('Sin nombre')
 
 // Best presence across the contact's connected devices.
 const RANK: Record<Show, number> = { online: 0, dnd: 1, away: 2 }
@@ -295,7 +277,7 @@ function handleMessage(stanza: Element): void {
 
   const buzz = Boolean(message.getChild('attention', ATTENTION))
   const received = message.getChild('wink', WINK)?.attrs.id
-  const wink = isWinkId(received) ? winkId(received) : ''
+  const wink = isWinkId(received) ? received : ''
   // A wink's body is only the fallback text for other XMPP clients.
   const body = wink ? '' : (message.getChildText('body') ?? '')
   // Our own typing on other devices doesn't matter. Any other chat state, or the
@@ -629,7 +611,7 @@ export function sendWink(to: string, wink: string): Promise<ChatMessage> {
   const stanza = xml(
     'message',
     { type: 'chat' },
-    xml('body', {}, `😉 Te he enviado un guiño (${wink}). Para verlo, usa Palique.`),
+    xml('body', {}, _('😉 Te he enviado un guiño ({wink}). Para verlo, usa Palique.', { wink })),
     xml('wink', { xmlns: WINK, id: wink }),
     xml('active', { xmlns: CHATSTATES })
   )
@@ -749,7 +731,7 @@ export async function inviteByEmail(address: string): Promise<InviteStatus> {
   try {
     const res = await accountsIq(
       'set',
-      xml('invite-email', { xmlns: ACCOUNTS, address, name: nicks.get(me) ?? '' })
+      xml('invite-email', { xmlns: ACCOUNTS, address, name: nicks.get(me) ?? '', lang })
     )
     return parseInvites(res.getChild('invites', ACCOUNTS))
   } catch (e) {
@@ -782,13 +764,20 @@ export async function lookupContact(address: string): Promise<string> {
 }
 
 // `pending`: a new address waiting to be confirmed from its inbox ('' if none).
-export type EmailStatus = { address: string; pending: string; newsletter: boolean }
+// `language`: the one chosen in Options, kept with the account ('' = the computer's).
+export type EmailStatus = {
+  address: string
+  pending: string
+  newsletter: boolean
+  language: string
+}
 
 function parseEmail(el: Element): EmailStatus {
   return {
     address: el.attrs.address ?? '',
     pending: el.attrs.pending ?? '',
-    newsletter: el.attrs.newsletter === 'true'
+    newsletter: el.attrs.newsletter === 'true',
+    language: el.attrs.language ?? ''
   }
 }
 
@@ -800,7 +789,7 @@ export async function emailStatus(): Promise<EmailStatus> {
 // Asks to change the address: a link goes to the new one. Rejects with 'invalid'.
 export async function changeEmail(address: string): Promise<EmailStatus> {
   try {
-    const res = await accountsIq('set', xml('email', { xmlns: ACCOUNTS, address }))
+    const res = await accountsIq('set', xml('email', { xmlns: ACCOUNTS, address, lang }))
     return parseEmail(res.getChild('email', ACCOUNTS)!)
   } catch (e) {
     throw new Error(condition(e) === 'bad-request' ? 'invalid' : unexpected('email change', e))
@@ -810,7 +799,7 @@ export async function changeEmail(address: string): Promise<EmailStatus> {
 // Another link for the pending address; rejects with 'wait' within a minute of the last.
 export async function resendVerification(): Promise<void> {
   try {
-    await accountsIq('set', xml('resend', { xmlns: ACCOUNTS }))
+    await accountsIq('set', xml('resend', { xmlns: ACCOUNTS, lang }))
   } catch (e) {
     throw new Error(condition(e) === 'resource-constraint' ? 'wait' : unexpected('resend', e))
   }
@@ -821,6 +810,11 @@ export async function setNewsletter(subscribe: boolean): Promise<EmailStatus> {
     'set',
     xml('newsletter', { xmlns: ACCOUNTS, subscribe: String(subscribe) })
   )
+  return parseEmail(res.getChild('email', ACCOUNTS)!)
+}
+
+export async function setAccountLanguage(code: string): Promise<EmailStatus> {
+  const res = await accountsIq('set', xml('language', { xmlns: ACCOUNTS, code }))
   return parseEmail(res.getChild('email', ACCOUNTS)!)
 }
 
@@ -864,7 +858,8 @@ export function inviteInfo(token: string): Promise<{ email: string; username: st
   return accountsPost('/signup', { token })
 }
 
-// The service answers the same whether or not the address has an account.
+// The service answers the same whether or not the address has an account. The email
+// goes out in the language the app is in.
 export async function requestPasswordReset(email: string): Promise<void> {
-  await accountsPost('/recover', { email })
+  await accountsPost('/recover', { email, lang })
 }

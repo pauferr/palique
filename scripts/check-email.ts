@@ -28,14 +28,20 @@ await A.logout()
 const a = await register(aName, pass)
 
 // Every account starts with the invited address (verified: the invite reached it).
-assert.deepEqual(await A.emailStatus(), { address: email, pending: '', newsletter: false })
+assert.deepEqual(await A.emailStatus(), {
+  address: email,
+  pending: '',
+  newsletter: false,
+  language: ''
+})
 await assert.rejects(A.changeEmail('no-es-un-correo'), /invalid/)
 
 // Changing it sends a link to the new address; until then, the old one still signs in.
 assert.deepEqual(await A.changeEmail(` ${newEmail.toUpperCase()} `), {
   address: email,
   pending: newEmail,
-  newsletter: false
+  newsletter: false,
+  language: ''
 })
 const mail = await lastMail(newEmail)
 assert.equal(mail.subject, 'Confirma tu nuevo correo de Palique')
@@ -52,7 +58,8 @@ const before = await mailCount(`${bName}@correo.test`)
 assert.deepEqual(await A.changeEmail(`${bName}@correo.test`), {
   address: email,
   pending: newEmail,
-  newsletter: false
+  newsletter: false,
+  language: ''
 })
 await new Promise((r) => setTimeout(r, 1000))
 assert.equal(await mailCount(`${bName}@correo.test`), before)
@@ -84,7 +91,7 @@ assert.equal(page.status, 200)
 assert.match(await page.text(), /Correo cambiado/)
 const deadline = Date.now() + 5000
 while (!pushes.length && Date.now() < deadline) await sleep(50)
-assert.deepEqual(pushes, [{ address: newEmail, pending: '', newsletter: false }])
+assert.deepEqual(pushes, [{ address: newEmail, pending: '', newsletter: false, language: '' }])
 assert.equal((await fetch(link)).status, 404, 'links work once')
 
 // Same account (same JID, contacts and history), new address to sign in with; the old

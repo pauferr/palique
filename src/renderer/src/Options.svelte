@@ -6,24 +6,25 @@
   import { Bell, KeyRound, MessageCircle, Monitor, User } from '@lucide/svelte'
   import { avatarPng } from './picture'
   import { events, packs, playSound } from './sounds'
+  import { _, _p } from './i18n'
 
   // Laid out like Windows Live Messenger's Options: sections on the left, one at a time on
   // the right. Every change applies at once; there's only "Cerrar". The name and personal
   // message are edited from the contact list.
   const sections = [
-    { id: 'personal', icon: User, label: 'Personal' },
-    { id: 'general', icon: Monitor, label: 'General' },
-    { id: 'messages', icon: MessageCircle, label: 'Mensajes' },
-    { id: 'alerts', icon: Bell, label: 'Alertas' },
-    { id: 'account', icon: KeyRound, label: 'Cuenta' }
+    { id: 'personal', icon: User, label: _('Personal') },
+    { id: 'general', icon: Monitor, label: _('General') },
+    { id: 'messages', icon: MessageCircle, label: _('Mensajes') },
+    { id: 'alerts', icon: Bell, label: _('Alertas') },
+    { id: 'account', icon: KeyRound, label: _('Cuenta') }
   ] as const
   let section: (typeof sections)[number]['id'] = $state('personal')
 
   const themes: { id: Theme; label: string; font: string }[] = [
-    { id: 'classic', label: 'Clásico', font: 'Noto Sans' },
-    { id: 'retro', label: 'Retro', font: 'IBM Plex Sans' },
-    { id: 'glass', label: 'Cristal', font: 'Hind' },
-    { id: 'night', label: 'Noche', font: 'Noto Sans' }
+    { id: 'classic', label: _('Clásico'), font: 'Noto Sans' },
+    { id: 'retro', label: _('Retro'), font: 'IBM Plex Sans' },
+    { id: 'glass', label: _p('tema', 'Cristal'), font: 'Hind' },
+    { id: 'night', label: _('Noche'), font: 'Noto Sans' }
   ]
 
   const fonts: { id: Font; label: string }[] = [
@@ -39,7 +40,7 @@
   ]
 
   let settings: Settings | undefined = $state()
-  let themeFont = $derived(themes.find((t) => t.id === settings?.theme)?.font ?? 'La del tema')
+  let themeFont = $derived(themes.find((t) => t.id === settings?.theme)?.font ?? _('La del tema'))
   let me: Snapshot | undefined = $state()
   let email: EmailStatus | undefined = $state()
   let invites: InviteStatus | undefined = $state()
@@ -93,15 +94,15 @@
     try {
       await window.api.setAvatar(await avatarPng(file))
     } catch {
-      note = 'No se ha podido usar esa imagen.'
+      note = _('No se ha podido usar esa imagen.')
     }
   }
 
   // Messages: a copy of the history, format picked in the save dialog.
   const exportResults = {
-    saved: 'Copia guardada.',
+    saved: _('Copia guardada.'),
     canceled: '',
-    empty: 'Todavía no hay conversaciones que guardar.'
+    empty: _('Todavía no hay conversaciones que guardar.')
   }
   let exportNote = $state('')
   let exporting = $state(false)
@@ -112,7 +113,7 @@
     try {
       exportNote = exportResults[await window.api.exportHistory()]
     } catch {
-      exportNote = 'No se ha podido guardar el archivo.'
+      exportNote = _('No se ha podido guardar el archivo.')
     }
     exporting = false
   }
@@ -131,16 +132,16 @@
       newEmail = ''
       changing = false
     } catch {
-      emailNote = 'Esa dirección no parece válida.'
+      emailNote = _('Esa dirección no parece válida.')
     }
   }
 
   async function resend(): Promise<void> {
     try {
       await window.api.resendVerification()
-      emailNote = 'Enlace reenviado.'
+      emailNote = _('Enlace reenviado.')
     } catch {
-      emailNote = 'Espera un minuto antes de pedir otro enlace.'
+      emailNote = _('Espera un minuto antes de pedir otro enlace.')
     }
   }
 
@@ -152,17 +153,17 @@
       email = await window.api.setNewsletter(box.checked)
     } catch {
       box.checked = !box.checked
-      note = 'No se ha podido guardar. Inténtalo de nuevo.'
+      note = _('No se ha podido guardar. Inténtalo de nuevo.')
     }
   }
 
   const left = $derived(invites ? Math.max(0, invites.max - invites.used) : 0)
 </script>
 
-<svelte:head><title>Opciones</title></svelte:head>
+<svelte:head><title>{_('Opciones')}</title></svelte:head>
 
 <div class="options">
-  <nav aria-label="Secciones">
+  <nav aria-label={_('Secciones')}>
     {#each sections as item (item.id)}
       <button
         aria-current={section === item.id ? 'page' : undefined}
@@ -176,13 +177,14 @@
 
   <main>
     {#if section === 'personal'}
-      <h1>Personal</h1>
+      <h1>{_('Personal')}</h1>
       <p class="hint">
-        Tu nombre y tu mensaje personal se cambian haciendo clic sobre ellos en la lista de
-        contactos.
+        {_(
+          'Tu nombre y tu mensaje personal se cambian haciendo clic sobre ellos en la lista de contactos.'
+        )}
       </p>
       <section>
-        <h2>Tu imagen para mostrar</h2>
+        <h2>{_('Tu imagen para mostrar')}</h2>
         <div class="row">
           {#if me}
             <Avatar
@@ -193,7 +195,7 @@
               size={56}
             />
           {/if}
-          <button onclick={() => picker?.click()}>Cambiar imagen…</button>
+          <button onclick={() => picker?.click()}>{_('Cambiar imagen…')}</button>
           <input
             bind:this={picker}
             type="file"
@@ -204,7 +206,7 @@
         </div>
       </section>
       <section>
-        <h2>Tu estado</h2>
+        <h2>{_('Tu estado')}</h2>
         <label>
           <input
             type="checkbox"
@@ -212,25 +214,25 @@
             onchange={(e) => set({ away: e.currentTarget.checked ? 10 : 0 })}
           />
           <span>
-            Mostrarme como Ausente si no uso el ordenador durante
+            {_('Mostrarme como Ausente si no uso el ordenador durante')}
             <select
               value={settings?.away || 10}
               disabled={!settings?.away}
               onchange={(e) => set({ away: Number(e.currentTarget.value) })}
-              aria-label="Minutos"
+              aria-label={_('Minutos')}
             >
               {#each [5, 10, 15, 30] as minutes (minutes)}<option value={minutes}>{minutes}</option
                 >{/each}
             </select>
-            minutos
+            {_('minutos')}
           </span>
         </label>
-        <p class="hint">Cuando vuelvas, pasarás a Disponible otra vez.</p>
+        <p class="hint">{_('Cuando vuelvas, pasarás a Disponible otra vez.')}</p>
       </section>
     {:else if section === 'general'}
-      <h1>General</h1>
+      <h1>{_('General')}</h1>
       <section>
-        <h2>Inicio</h2>
+        <h2>{_('Inicio')}</h2>
         {#if startupAvailable}
           <label>
             <input
@@ -238,7 +240,7 @@
               checked={settings?.startup}
               onchange={(e) => set({ startup: e.currentTarget.checked })}
             />
-            Abrir Palique al encender el ordenador
+            {_('Abrir Palique al encender el ordenador')}
           </label>
         {/if}
         <label>
@@ -248,17 +250,17 @@
             disabled={!remembered.available}
             onchange={(e) => set({ autoLogin: e.currentTarget.checked })}
           />
-          Iniciar sesión automáticamente
+          {_('Iniciar sesión automáticamente')}
         </label>
         {#if !remembered.available}
-          <p class="hint">Este ordenador no puede guardar la contraseña de forma segura.</p>
+          <p class="hint">{_('Este ordenador no puede guardar la contraseña de forma segura.')}</p>
         {:else if settings?.autoLogin && !remembered.saved}
-          <p class="hint">Se activará la próxima vez que inicies sesión.</p>
+          <p class="hint">{_('Se activará la próxima vez que inicies sesión.')}</p>
         {/if}
       </section>
       <section>
-        <h2>Tema</h2>
-        <div class="themes" role="radiogroup" aria-label="Tema">
+        <h2>{_('Tema')}</h2>
+        <div class="themes" role="radiogroup" aria-label={_('Tema')}>
           {#each themes as item (item.id)}
             <button
               class="theme"
@@ -273,31 +275,46 @@
         </div>
       </section>
       <section>
-        <h2>Fuente</h2>
+        <h2>{_('Fuente')}</h2>
         <label>
           <select
             value={settings?.font}
             onchange={(e) => set({ font: e.currentTarget.value as Font })}
-            aria-label="Fuente"
+            aria-label={_('Fuente')}
           >
             {#each fonts as item (item.id)}<option value={item.id}
-                >{item.label || `${themeFont} (predeterminada)`}</option
+                >{item.label || _('{font} (predeterminada)', { font: themeFont })}</option
               >{/each}
           </select>
         </label>
-        <p class="hint">Vista previa: ¡Hola! ¿Hablamos luego? 😎</p>
+        <p class="hint">{_('Vista previa: ¡Hola! ¿Hablamos luego? 😎')}</p>
+      </section>
+      <section>
+        <h2>{_('Idioma')}</h2>
+        <label>
+          <select
+            value={settings?.language}
+            onchange={(e) => set({ language: e.currentTarget.value as Settings['language'] })}
+            aria-label={_('Idioma')}
+          >
+            <option value="auto">{_('La del sistema')}</option>
+            <!-- Each language named in itself. -->
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </select>
+        </label>
       </section>
     {:else if section === 'messages'}
-      <h1>Mensajes</h1>
+      <h1>{_('Mensajes')}</h1>
       <section>
-        <h2>Al chatear</h2>
+        <h2>{_('Al chatear')}</h2>
         <label>
           <input
             type="checkbox"
             checked={settings?.emoticons}
             onchange={(e) => set({ emoticons: e.currentTarget.checked })}
           />
-          Mostrar emoticonos
+          {_('Mostrar emoticonos')}
         </label>
         <label>
           <input
@@ -305,7 +322,7 @@
             checked={settings?.winks}
             onchange={(e) => set({ winks: e.currentTarget.checked })}
           />
-          Mostrar los guiños a pantalla completa
+          {_('Mostrar los guiños a pantalla completa')}
         </label>
         <label>
           <input
@@ -313,7 +330,7 @@
             checked={settings?.shake}
             onchange={(e) => set({ shake: e.currentTarget.checked })}
           />
-          Dejar que los zumbidos hagan temblar la ventana
+          {_('Dejar que los zumbidos hagan temblar la ventana')}
         </label>
         <label>
           <input
@@ -321,31 +338,32 @@
             checked={settings?.typing}
             onchange={(e) => set({ typing: e.currentTarget.checked })}
           />
-          Mostrar cuando alguien está escribiendo
+          {_('Mostrar cuando alguien está escribiendo')}
         </label>
       </section>
       <section>
-        <h2>Historial de conversaciones</h2>
+        <h2>{_('Historial de conversaciones')}</h2>
         <p>
-          Tus conversaciones se guardan solo en este ordenador. Si lo cambias o lo formateas, se
-          pierden.
+          {_(
+            'Tus conversaciones se guardan solo en este ordenador. Si lo cambias o lo formateas, se pierden.'
+          )}
         </p>
         <div class="row">
-          <button onclick={exportHistory} disabled={exporting}>Guardar una copia…</button>
+          <button onclick={exportHistory} disabled={exporting}>{_('Guardar una copia…')}</button>
           {#if exportNote}<span class="hint" role="status">{exportNote}</span>{/if}
         </div>
       </section>
     {:else if section === 'alerts'}
-      <h1>Alertas</h1>
+      <h1>{_('Alertas')}</h1>
       <section>
-        <h2>Mostrar alertas cuando</h2>
+        <h2>{_('Mostrar alertas cuando')}</h2>
         <label>
           <input
             type="checkbox"
             checked={settings?.alertOnline}
             onchange={(e) => set({ alertOnline: e.currentTarget.checked })}
           />
-          Un contacto se conecte
+          {_('Un contacto se conecte')}
         </label>
         <label>
           <input
@@ -353,53 +371,59 @@
             checked={settings?.alertMessages}
             onchange={(e) => set({ alertMessages: e.currentTarget.checked })}
           />
-          Me llegue un mensaje
+          {_('Me llegue un mensaje')}
         </label>
       </section>
       <section>
-        <h2>Sonidos</h2>
+        <h2>{_('Sonidos')}</h2>
         <label>
           <input
             type="checkbox"
             checked={settings?.sounds}
             onchange={(e) => set({ sounds: e.currentTarget.checked })}
           />
-          Reproducir sonidos
+          {_('Reproducir sonidos')}
         </label>
         <label>
-          Colección
+          {_('Colección')}
           <select
             value={settings?.soundPack}
             onchange={(e) => set({ soundPack: e.currentTarget.value as SoundPack })}
           >
-            {#each packs as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+            {#each packs as p (p.id)}<option value={p.id}>{_(p.name)}</option>{/each}
           </select>
         </label>
         <table class="sounds">
           <tbody>
             {#each events as e (e.id)}
               <tr
-                ><td>{e.label}</td><td
+                ><td>{_(e.label)}</td><td
                   ><button onclick={() => settings && playSound(settings.soundPack, e.id)}
-                    >▶ Probar</button
+                    >▶ {_('Probar')}</button
                   ></td
                 ></tr
               >
             {/each}
           </tbody>
         </table>
-        <p class="hint">Con el estado No molestar no hay alertas ni sonidos.</p>
+        <p class="hint">{_('Con el estado No molestar no hay alertas ni sonidos.')}</p>
       </section>
     {:else}
-      <h1>Cuenta</h1>
+      <h1>{_('Cuenta')}</h1>
       <section>
-        <h2>Tu correo</h2>
-        <p>Entras en Palique con <strong>{email?.address}</strong>. Tus contactos no lo ven.</p>
+        <h2>{_('Tu correo')}</h2>
+        <p>
+          {_('Entras en Palique con')} <strong>{email?.address}</strong>. {_(
+            'Tus contactos no lo ven.'
+          )}
+        </p>
         {#if email?.pending}
           <p class="hint" role="status">
-            Te hemos enviado un enlace a {email.pending} para confirmarlo. Hasta entonces sigues entrando
-            con el de siempre.
-            <button class="link" onclick={resend}>Reenviar</button>
+            {_(
+              'Te hemos enviado un enlace a {address} para confirmarlo. Hasta entonces sigues entrando con el de siempre.',
+              { address: email.pending }
+            )}
+            <button class="link" onclick={resend}>{_('Reenviar')}</button>
           </p>
         {/if}
         {#if changing}
@@ -410,26 +434,34 @@
               bind:value={newEmail}
               required
               maxlength="254"
-              placeholder="Nuevo correo"
-              aria-label="Nuevo correo"
+              placeholder={_('Nuevo correo')}
+              aria-label={_('Nuevo correo')}
             />
-            <button type="submit">Enviar enlace</button>
+            <button type="submit">{_('Enviar enlace')}</button>
           </form>
         {:else}
-          <div class="row"><button onclick={() => (changing = true)}>Cambiar correo…</button></div>
+          <div class="row">
+            <button onclick={() => (changing = true)}>{_('Cambiar correo…')}</button>
+          </div>
         {/if}
         {#if emailNote}<p class="hint" role="alert">{emailNote}</p>{/if}
       </section>
       <section>
-        <h2>Invitaciones</h2>
+        <h2>{_('Invitaciones')}</h2>
         <p>
-          {#if invites}Te quedan <strong>{left}</strong> de {invites.max}.{/if}
-          Las que caducan sin usarse se te devuelven. Para invitar a alguien, ve a
-          <em>Contactos → Añadir o invitar a un contacto</em> en tu lista.
+          <!-- Whole sentences to translate; the bold and italic parts go where {left} and
+          {menu} are. -->
+          {#if invites}{#each _( 'Te quedan {left} de {max}.', { max: invites.max } ).split('{left}') as part, i (i)}{#if i}<strong
+                  >{left}</strong
+                >{/if}{part}{/each}{/if}
+          {_('Las que caducan sin usarse se te devuelven.')}
+          {#each _('Para invitar a alguien, ve a {menu} en tu lista.').split('{menu}') as part, i (i)}{#if i}<em
+                >{_('Contactos')} → {_('Añadir o invitar a un contacto')}</em
+              >{/if}{part}{/each}
         </p>
       </section>
       <section>
-        <h2>Novedades</h2>
+        <h2>{_('Novedades')}</h2>
         <label>
           <input
             type="checkbox"
@@ -437,7 +469,7 @@
             disabled={!email}
             onchange={toggleNewsletter}
           />
-          Quiero recibir novedades de Palique por correo
+          {_('Quiero recibir novedades de Palique por correo')}
         </label>
       </section>
     {/if}
@@ -446,7 +478,7 @@
 
   <footer>
     <small>Palique {version}</small>
-    <button onclick={() => window.close()}>Cerrar</button>
+    <button onclick={() => window.close()}>{_('Cerrar')}</button>
   </footer>
 </div>
 

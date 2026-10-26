@@ -1,6 +1,7 @@
 <script lang="ts">
   import WinkPlayer from './WinkPlayer.svelte'
   import { winkLabel, winks } from './winks'
+  import { _ } from './i18n'
 
   // Development view (#winks in the dev app's address): every wink, to polish them.
   // Not linked from the app.
@@ -8,12 +9,12 @@
   let sound = $state(true)
 </script>
 
-<svelte:head><title>Guiños</title></svelte:head>
+<svelte:head><title>{_('Guiños')}</title></svelte:head>
 
 <main>
-  <label><input type="checkbox" bind:checked={sound} /> Sonido</label>
+  <label><input type="checkbox" bind:checked={sound} /> {_('Sonido')}</label>
   <ul>
-    {#each winks as { id, dur } (id)}
+    {#each winks() as { id, dur } (id)}
       <li>
         <button onclick={() => (playing = playing === id ? '' : id)}>
           {playing === id ? '■' : '▶'}

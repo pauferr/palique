@@ -4,6 +4,7 @@
   import type { MenuLabel } from '../../preload'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
+  import { _, _n, lang } from './i18n'
   import { emojify } from './emoticons'
   import { avatarPng } from './picture'
   import { stripPlus } from './plus'
@@ -14,10 +15,10 @@
   let { jid, onlogout }: { jid: string; onlogout: () => void } = $props()
 
   const labels: Record<Contact['show'], string> = {
-    online: 'Disponible',
-    away: 'Ausente',
-    dnd: 'No molestar',
-    offline: 'Sin conexión'
+    online: _('Disponible'),
+    away: _('Ausente'),
+    dnd: _('No molestar'),
+    offline: _('Sin conexión')
   }
 
   let roster: Snapshot = $state({
@@ -44,7 +45,8 @@
   // Two groups like MSN, alphabetical inside each (by the name as read, without its codes).
   let sorted = $derived(
     [...roster.contacts].sort(
-      (a, b) => stripPlus(a.name).localeCompare(stripPlus(b.name)) || a.jid.localeCompare(b.jid)
+      (a, b) =>
+        stripPlus(a.name).localeCompare(stripPlus(b.name), lang) || a.jid.localeCompare(b.jid)
     )
   )
   // The search box filters by name, ignoring case and accents.
@@ -53,8 +55,8 @@
     emojify(stripPlus(text)).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   let found = $derived(sorted.filter((c) => fold(c.name).includes(fold(query.trim()))))
   let groups = $derived([
-    { label: 'En línea', contacts: found.filter((c) => c.show !== 'offline') },
-    { label: 'Sin conexión', contacts: found.filter((c) => c.show === 'offline') }
+    { label: _('En línea'), contacts: found.filter((c) => c.show !== 'offline') },
+    { label: _('Sin conexión'), contacts: found.filter((c) => c.show === 'offline') }
   ])
 
   // Messages waiting in conversations that aren't open (contact → count), like MSN.
@@ -92,14 +94,14 @@
     try {
       await window.api.setPresence(show, status)
     } catch {
-      presenceError = 'No se ha podido cambiar el estado.'
+      presenceError = _('No se ha podido cambiar el estado.')
     }
   }
 
   // Menus like MSN's, each action in one place: the bar on top (Archivo, Contactos,
   // Herramientas, Ayuda), your status under your name, and a right click on a contact.
   // Native, so they can go past the window.
-  const ownLabels: Record<OwnShow, string> = { ...labels, invisible: 'Invisible' }
+  const ownLabels: Record<OwnShow, string> = { ...labels, invisible: _('Invisible') }
   type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
 
   // Under the button clicked, or where the right click was.
@@ -117,23 +119,23 @@
 
   const fileMenu = (e: MouseEvent): Promise<void> =>
     popup(e, [
-      { label: 'Cambiar mi nombre…', run: window.api.openNick },
-      { label: 'Cambiar mi mensaje personal…', run: () => (editing = true) },
+      { label: _('Cambiar mi nombre…'), run: window.api.openNick },
+      { label: _('Cambiar mi mensaje personal…'), run: () => (editing = true) },
       '-',
-      { label: 'Cerrar sesión', run: onlogout },
-      { label: 'Salir de Palique', run: window.api.quit }
+      { label: _('Cerrar sesión'), run: onlogout },
+      { label: _('Salir de Palique'), run: window.api.quit }
     ])
 
   const contactsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [{ label: 'Añadir o invitar a un contacto…', run: openAdd }])
+    popup(e, [{ label: _('Añadir o invitar a un contacto…'), run: openAdd }])
 
   const toolsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [{ label: 'Opciones…', run: window.api.openOptions }])
+    popup(e, [{ label: _('Opciones…'), run: window.api.openOptions }])
 
   const helpMenu = (e: MouseEvent): Promise<void> =>
     popup(e, [
-      { label: 'Registro de errores…', run: window.api.openLogs },
-      { label: 'Acerca de Palique', run: window.api.openAbout }
+      { label: _('Registro de errores…'), run: window.api.openLogs },
+      { label: _('Acerca de Palique'), run: window.api.openAbout }
     ])
 
   const meMenu = (e: MouseEvent): Promise<void> =>
@@ -149,12 +151,12 @@
   function contactMenu(e: MouseEvent, contact: Contact): Promise<void> {
     e.preventDefault()
     return popup(e, [
-      { label: 'Enviar un mensaje', run: () => window.api.openChat(contact.jid) },
+      { label: _('Enviar un mensaje'), run: () => window.api.openChat(contact.jid) },
       ...(contact.email
-        ? [{ label: 'Copiar correo', run: () => navigator.clipboard.writeText(contact.email) }]
+        ? [{ label: _('Copiar correo'), run: () => navigator.clipboard.writeText(contact.email) }]
         : []),
       '-',
-      { label: 'Eliminar contacto…', run: () => remove(contact) }
+      { label: _('Eliminar contacto…'), run: () => remove(contact) }
     ])
   }
 
@@ -166,7 +168,7 @@
     try {
       await window.api.setAvatar(await avatarPng(file))
     } catch {
-      avatarError = 'No se ha podido usar esa imagen.'
+      avatarError = _('No se ha podido usar esa imagen.')
     }
   }
 
@@ -194,41 +196,58 @@
     try {
       const result = await window.api.addContact(value)
       if (result === 'added') {
-        addNote = `Le hemos pedido a ${value} que te acepte. Aparecerá en tu lista cuando lo haga.`
+        addNote = _(
+          'Le hemos pedido a {email} que te acepte. Aparecerá en tu lista cuando lo haga.',
+          {
+            email: value
+          }
+        )
         address = ''
-      } else if (result === 'self') addNote = 'Ese es tu propio correo.'
+      } else if (result === 'self') addNote = _('Ese es tu propio correo.')
       else notFound = value
     } catch (e) {
       addNote = String(e).includes('offline')
-        ? 'Sin conexión con el servidor. Inténtalo cuando vuelvas a estar conectado.'
+        ? _('Sin conexión con el servidor. Inténtalo cuando vuelvas a estar conectado.')
         : String(e).includes('wait')
-          ? 'Has buscado demasiados correos. Espera un rato.'
+          ? _('Has buscado demasiados correos. Espera un rato.')
           : String(e).includes('invalid')
-            ? 'Esa dirección no parece válida.'
-            : 'No se ha podido añadir.'
+            ? _('Esa dirección no parece válida.')
+            : _('No se ha podido añadir.')
     }
   }
 
   async function sendInvite(value: string): Promise<void> {
     try {
       invites = await window.api.inviteByEmail(value)
-      addNote = `Invitación enviada a ${value}. Cuando cree su cuenta, aparecerá directamente en tu lista.`
+      addNote = _(
+        'Invitación enviada a {email}. Cuando cree su cuenta, aparecerá directamente en tu lista.',
+        { email: value }
+      )
       address = ''
     } catch (e) {
       const reason = String(e)
       addNote = reason.includes('limit')
-        ? 'Ya no te quedan invitaciones.'
+        ? _('Ya no te quedan invitaciones.')
         : reason.includes('registered')
-          ? 'Esa persona ya está en Palique: añádela con su correo.'
+          ? _('Esa persona ya está en Palique: añádela con su correo.')
           : reason.includes('invalid')
-            ? 'Esa dirección no parece válida.'
-            : 'No se ha podido enviar la invitación.'
+            ? _('Esa dirección no parece válida.')
+            : _('No se ha podido enviar la invitación.')
     }
     notFound = ''
   }
 
+  // A sentence with markup inside (a bold name): translated whole, then split around its
+  // placeholder, so each language keeps its own word order.
+  const around = (text: string, key = '{name}'): string[] => {
+    const [before, after = ''] = text.split(key)
+    return [before, after]
+  }
+
   function remove(contact: Contact): void {
-    if (confirm(`¿Eliminar a ${emojify(stripPlus(contact.name))} de tus contactos?`)) {
+    if (
+      confirm(_('¿Eliminar a {name} de tus contactos?', { name: emojify(stripPlus(contact.name)) }))
+    ) {
       window.api.removeContact(contact.jid)
     }
   }
@@ -236,14 +255,14 @@
 
 <section class="roster">
   <div class="menubar" role="menubar">
-    <button role="menuitem" aria-haspopup="menu" onclick={fileMenu}>Archivo</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={contactsMenu}>Contactos</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={toolsMenu}>Herramientas</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={helpMenu}>Ayuda</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={fileMenu}>{_('Archivo')}</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={contactsMenu}>{_('Contactos')}</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={toolsMenu}>{_('Herramientas')}</button>
+    <button role="menuitem" aria-haspopup="menu" onclick={helpMenu}>{_('Ayuda')}</button>
   </div>
 
   <header>
-    <button class="me" onclick={() => picker.click()} title="Cambiar tu imagen">
+    <button class="me" onclick={() => picker.click()} title={_('Cambiar tu imagen')}>
       <Avatar
         {jid}
         name={roster.name}
@@ -262,7 +281,7 @@
     <div class="identity">
       <div class="line">
         <!-- The name opens its own window, with the Messenger Plus! formatting tools. -->
-        <button class="nick" onclick={() => window.api.openNick()} title="Cambiar tu nombre"
+        <button class="nick" onclick={() => window.api.openNick()} title={_('Cambiar tu nombre')}
           ><Emoticons text={roster.name} plus /></button
         >
         <button class="show" aria-haspopup="menu" onclick={meMenu}
@@ -278,16 +297,18 @@
           onkeydown={commitOnEnter}
           use:focus
           maxlength="140"
-          placeholder="Escribe un mensaje personal"
-          aria-label="Mensaje personal"
+          placeholder={_('Escribe un mensaje personal')}
+          aria-label={_('Mensaje personal')}
         />
       {:else}
         <button
           class="personal"
           class:empty={!status}
           onclick={() => (editing = true)}
-          title="Cambiar tu mensaje personal"
-          >{#if status}<Emoticons text={status} />{:else}Escribe un mensaje personal{/if}</button
+          title={_('Cambiar tu mensaje personal')}
+          >{#if status}<Emoticons text={status} />{:else}{_(
+              'Escribe un mensaje personal'
+            )}{/if}</button
         >
       {/if}
     </div>
@@ -297,18 +318,24 @@
   {#if avatarError}<p class="notice error" role="alert">{avatarError}</p>{/if}
   {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
   {#if roster.show === 'invisible'}
-    <p class="notice">Estás invisible: tus contactos te ven sin conexión, pero puedes chatear.</p>
+    <p class="notice">
+      {_('Estás invisible: tus contactos te ven sin conexión, pero puedes chatear.')}
+    </p>
   {/if}
   {#if !roster.connected}
-    <p class="notice warning" role="status">Reconectando…</p>
+    <p class="notice warning" role="status">{_('Reconectando…')}</p>
   {/if}
 
   <div class="list">
     {#each roster.requests as request (request.jid)}
       <div class="request">
-        <span><strong><Emoticons text={request.name} plus /></strong> quiere añadirte</span>
-        <button onclick={() => window.api.acceptRequest(request.jid)}>Aceptar</button>
-        <button onclick={() => window.api.rejectRequest(request.jid)}>Rechazar</button>
+        <span
+          >{around(_('{name} quiere añadirte'))[0]}<strong
+            ><Emoticons text={request.name} plus /></strong
+          >{around(_('{name} quiere añadirte'))[1]}</span
+        >
+        <button onclick={() => window.api.acceptRequest(request.jid)}>{_('Aceptar')}</button>
+        <button onclick={() => window.api.rejectRequest(request.jid)}>{_('Rechazar')}</button>
       </div>
     {/each}
 
@@ -317,10 +344,10 @@
         class="search"
         type="search"
         bind:value={query}
-        placeholder="Buscar contactos"
-        aria-label="Buscar contactos"
+        placeholder={_('Buscar contactos')}
+        aria-label={_('Buscar contactos')}
       />
-      {#if !found.length}<p class="no-match">Nadie se llama así.</p>{/if}
+      {#if !found.length}<p class="no-match">{_('Nadie se llama así.')}</p>{/if}
       <!-- While searching, only the groups with someone in them. -->
       {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
         <details open>
@@ -347,13 +374,13 @@
                   <button class="name" onclick={() => window.api.openChat(contact.jid)}>
                     <span><Emoticons text={contact.name} plus /></span>
                     {#if contact.pending}
-                      <small>Esperando a que te acepte</small>
+                      <small>{_('Esperando a que te acepte')}</small>
                     {:else if contact.status}
                       <small><Emoticons text={contact.status} /></small>
                     {/if}
                   </button>
                   {#if unread[contact.jid]}
-                    <span class="badge" title="Mensajes sin leer"
+                    <span class="badge" title={_('Mensajes sin leer')}
                       >{unread[contact.jid] > 9 ? '9+' : unread[contact.jid]}</span
                     >
                   {/if}
@@ -366,21 +393,24 @@
     {:else}
       <div class="no-contacts">
         <p>
-          Aún no tienes contactos.<br />Añade a alguien con su correo; si no está en Palique, podrás
-          invitarle.
+          {_('Aún no tienes contactos.')}<br />{_(
+            'Añade a alguien con su correo; si no está en Palique, podrás invitarle.'
+          )}
         </p>
-        <button class="add-link" onclick={openAdd}><b>+</b><span>Añadir un contacto</span></button>
+        <button class="add-link" onclick={openAdd}
+          ><b>+</b><span>{_('Añadir un contacto')}</span></button
+        >
       </div>
     {/if}
   </div>
 
   {#if addOpen}
-    <div class="sheet" role="dialog" aria-label="Añadir un contacto">
+    <div class="sheet" role="dialog" aria-label={_('Añadir un contacto')}>
       <h3>
-        Añadir un contacto
-        <button class="close" onclick={() => (addOpen = false)} aria-label="Cerrar">×</button>
+        {_('Añadir un contacto')}
+        <button class="close" onclick={() => (addOpen = false)} aria-label={_('Cerrar')}>×</button>
       </h3>
-      <p class="hint">Escribe su correo. Si aún no está en Palique, podrás invitarle.</p>
+      <p class="hint">{_('Escribe su correo. Si aún no está en Palique, podrás invitarle.')}</p>
       <form onsubmit={add}>
         <!-- svelte-ignore a11y_autofocus -->
         <input
@@ -389,23 +419,26 @@
           bind:value={address}
           required
           maxlength="254"
-          placeholder="Su correo"
-          aria-label="Correo del contacto"
+          placeholder={_('Su correo')}
+          aria-label={_('Correo del contacto')}
           autofocus
         />
-        <button type="submit">Añadir</button>
+        <button type="submit">{_('Añadir')}</button>
       </form>
       {#if notFound}
         <div class="result" role="status">
-          <p><strong>{notFound}</strong> aún no está en Palique.</p>
+          <p>
+            {around(_('{email} aún no está en Palique.'), '{email}')[0]}<strong>{notFound}</strong
+            >{around(_('{email} aún no está en Palique.'), '{email}')[1]}
+          </p>
           <div class="row">
             <button onclick={() => sendInvite(notFound)} disabled={!left}
-              >Enviarle una invitación</button
+              >{_('Enviarle una invitación')}</button
             >
             <span class="hint">
-              {left === 1 ? 'Te queda 1' : `Te quedan ${left}`}{invites
-                ? ` de ${invites.max}`
-                : ''}.
+              {invites
+                ? _n('Te queda 1 de {max}.', 'Te quedan {n} de {max}.', left, { max: invites.max })
+                : _n('Te queda 1.', 'Te quedan {n}.', left)}
             </span>
           </div>
         </div>

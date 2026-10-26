@@ -9,6 +9,7 @@ export type Account = {
   email: string
   pending: string // new address waiting for its verification link, '' if none
   newsletter: boolean
+  language: string // the app's language, '' = the computer's
 }
 
 export type Invite = { token: string; email: string; jid: string; inviter: string | null }
@@ -21,6 +22,7 @@ type AccountRow = {
   email: string
   pending_email: string | null
   newsletter: number
+  language: string
   token_sent_at: number | null
 }
 
@@ -34,6 +36,7 @@ export function openDb(file: string) {
       email TEXT NOT NULL UNIQUE,  -- verified: the invite reached it
       newsletter INTEGER NOT NULL DEFAULT 0,
       newsletter_at INTEGER,       -- when the choice was made (proof of consent)
+      language TEXT NOT NULL DEFAULT '', -- 'es', 'en'; '' = the computer's
       pending_email TEXT,          -- changing the address: waits for its link
       token TEXT UNIQUE,           -- that link
       token_sent_at INTEGER
@@ -55,11 +58,20 @@ export function openDb(file: string) {
     CREATE TABLE IF NOT EXISTS invite_optout (email TEXT PRIMARY KEY);
   `)
 
+  // Databases from before the language was kept get its column.
+  // ponytail: one-off; a schema version table if more columns come.
+  try {
+    db.exec("ALTER TABLE accounts ADD COLUMN language TEXT NOT NULL DEFAULT ''")
+  } catch {
+    // Already there.
+  }
+
   const toAccount = (row: AccountRow): Account => ({
     jid: row.jid,
     email: row.email,
     pending: row.pending_email ?? '',
-    newsletter: row.newsletter === 1
+    newsletter: row.newsletter === 1,
+    language: row.language
   })
   const get = (jid: string): AccountRow | undefined =>
     db.prepare('SELECT * FROM accounts WHERE jid = ?').get(jid) as AccountRow | undefined
@@ -208,6 +220,14 @@ export function openDb(file: string) {
         Date.now(),
         jid
       )
+      return toAccount(get(jid)!)
+    },
+
+    // --- language ---
+
+    setLanguage(jid: string, language: string): Account | undefined {
+      if (!get(jid)) return undefined
+      db.prepare('UPDATE accounts SET language = ? WHERE jid = ?').run(language, jid)
       return toAccount(get(jid)!)
     }
   }

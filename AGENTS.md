@@ -37,6 +37,7 @@ deploy/            production: compose, Prosody config, Caddyfile, setup.sh, cer
 build/             packaging: icon.svg and tray.svg are the icon sources; build/icons.sh makes the PNG/ICNS files
 scripts/           check-*.ts: runnable checks (see Checks), invite.ts, mailpit.ts helpers
 docs/              palique.md (plan and decisions), deployment.md (deployment guide)
+agents/skills/     step-by-step guides for agents, referenced from the section they apply to
 compose.yaml       local server stack
 ```
 
@@ -74,7 +75,7 @@ compose.yaml       local server stack
 
 - **XMPP:** connects to Prosody as a component (XEP-0114) at `accounts.<domain>`. Signed-in users talk to it over XMPP, so Prosody vouches for who's asking. Namespace `urn:palique:accounts:0`:
   - `email` get/set: status, or change the address
-  - `resend`, `newsletter`
+  - `resend`, `newsletter`, `language` (the app's language, '' = the computer's)
   - `lookup`
   - `contacts`: the emails of your mutual contacts
   - `invites` get, `invite-email` set
@@ -126,7 +127,7 @@ npm run dev                    # app with hot reload (renderer only; restart for
 
 - Docker: any engine works (OrbStack on macOS).
 - **Logs and reset:** `docker compose logs -f` follows the server logs. `docker compose down -v` deletes every account.
-- **First accounts:** `docker compose exec accounts node src/invite.ts tere@correo.test`. Open the email in Mailpit (http://localhost:8025) and paste its code into "¿Tienes una invitación? Crea tu cuenta". Any address works; nothing is really sent.
+- **First accounts:** `docker compose exec accounts node src/invite.ts tere@correo.test` (add `en` for the email in English). Open the email in Mailpit (http://localhost:8025) and paste its code into "¿Tienes una invitación? Crea tu cuenta". Any address works; nothing is really sent.
 - **Second instance** to chat with yourself (the dev server must be running):
 
   ```bash
@@ -146,6 +147,20 @@ npm run build:mac    # package .dmg
 npm run build:linux  # AppImage (use CI from macOS)
 ```
 
+## Translations
+
+Gettext style, no library: the Spanish text is the key (`src/renderer/src/i18n.ts`, shared by main and renderer).
+
+- Write UI text in Spanish inside `_()`: `_('Opciones')`, `_('{name} se ha conectado', { name })`. Plurals: `_n('Un contacto', '{n} contactos', n)`. Whole sentences in one call, never glued pieces.
+- Same Spanish with another meaning, or a lone word a translator can't place: `_p('tema', 'Cristal')` (stored as `"tema::Cristal"`; the context is never shown).
+- Text in module-level lists or constants is marked with `N_()` and translated where it's shown (`_(pack.name)`): the language is set after modules load, so `_()` never runs at module top level.
+- Catalogs: `src/renderer/src/locales/<lang>.json`, flat `{ "Spanish": "Translation" }`, plurals as `"one|other"`. A missing or empty translation shows the Spanish.
+- After adding or changing texts: `npm run check:i18n -- --write` adds them to every catalog as `""`, drops unused ones and lists each string left with where it's used; translate them from there, never from the key alone. **Before translating, read and follow [agents/skills/translate/SKILL.md](agents/skills/translate/SKILL.md).**
+- A new language: its JSON in `locales/`, imported in `i18n.ts` and added to `LANGUAGES`, plus its name in Options.
+- The language is the «Idioma» setting (`auto` follows the computer; languages Palique doesn't have get English). It's kept with the account (account service, `language`), so it follows the user to any computer and is applied on sign-in; `settings.json` keeps the last one for the sign-in screen. Changing it reloads every window (signed-in windows stay signed in). Dates use `lang`.
+- The account service's emails and the pages their links open are translated the same way, with their own `server/accounts/src/i18n.ts` (a copy: the service is built on its own) and catalog `server/accounts/src/locales/`; `check:i18n` covers both. A function makes the translator per email, `const _ = translator(lang)`, as each one has its own language.
+- An email goes out in the language of the app that asked for it (`lang` in the iq or the `/recover` body; an invite, in the inviter's). Its links carry it (`&l=en`) for the page they open. The admin's invites take it as an argument (`src/invite.ts correo [es|en]`, Spanish by default).
+
 ## Winks
 
 Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/renderer/src/winks/`, so they're sharp at any size (thumbnail, conversation, full screen) and weigh a few KB.
@@ -154,7 +169,7 @@ Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/ren
 - One file per wink (`<id>.ts`), listed in `catalog.ts`; shared characters in `face.ts` (emotes) and `kid.ts`.
 - `WinkPlayer.svelte` plays one, scaled to its box at the screen's pixel density. Sound follows "Reproducir sonidos".
 - To see them all: `npm run dev`, then open the dev app at `#winks` (e.g. `ELECTRON_RENDERER_URL=http://localhost:5173 npx electron .` and change the hash, or load `http://localhost:5173/#winks` in its DevTools).
-- A new wink: its file, an entry in `catalog.ts` and a label in `src/renderer/src/wink-labels.ts`. Ids travel over the network and live in histories: never rename or reuse one. A retired id keeps its label so old conversations still name it.
+- A new wink: its file, an entry in `catalog.ts` and a label in `src/renderer/src/wink-labels.ts`. Ids travel over the network and live in histories: never rename or reuse one.
 
 **Sounds** (message, contact online, buzz) come in collections chosen in Options (`soundPack` setting): `src/renderer/src/sounds.ts`, synthesized with the winks' `makeSound` except the classic message (a recording, cut shorter). `#sounds` shows them all side by side. A new collection: its entry in `packs` and its id in `SOUND_PACKS` (`src/main/settings.ts`).
 
@@ -170,12 +185,13 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `avatar` | publish and fetch avatars |
 | `invites` | invites by email, 3-per-user limit, inviter becomes a contact, opt-out |
 | `email` | changing the email, uniqueness, old address works until confirmed |
-| `reset` | password recovery by email |
-| `newsletter` | newsletter choice |
+| `reset` | password recovery by email, in the app's language |
+| `newsletter` | newsletter choice, language kept with the account |
 | `invisible` | invisible status (needs the server module) |
 | `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `log` | error log: format, size limit, nothing personal written |
 | `version` | next release version from the commits |
+| `i18n` | every translated string is in the catalogs, none left over, placeholders match |
 
 Add or update the matching check with any change to that logic. Before committing, run `npm run typecheck`, `npm run lint` and the affected checks.
 
@@ -183,7 +199,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
 
 ## Conventions
 
-- **Language:** UI text and user-facing emails are in **Spanish** (Spain). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, taken from mock accounts (`@palique.com` addresses).
+- **Language:** UI text and user-facing emails are written in **Spanish** (Spain) and translated (see Translations). Code, comments, commit messages and this file are in **English**. `docs/` is Spanish, and so is README.md while the app is Spanish-only. Its screenshots are in `docs/images/`, taken from mock accounts (`@palique.com` addresses).
 - **Commits:**
   - Conventional Commits in English, as in [CONTRIBUTING.md](CONTRIBUTING.md).
   - Small commits straight to `main`, pushed as you go; no PRs.

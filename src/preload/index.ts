@@ -62,6 +62,7 @@ const api = {
     ipcRenderer.invoke('invites:email', address),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   getRoster: (): Promise<Snapshot> => ipcRenderer.invoke('roster:snapshot'),
+  currentAccount: (): Promise<string> => ipcRenderer.invoke('auth:current'),
   // Returns an unsubscribe function. Callbacks must not return a value: whatever they
   // return crosses back over the bridge, and a Svelte $state proxy (what `(v) => (x = v)`
   // returns) can't, which throws "An object could not be cloned".
@@ -145,6 +146,7 @@ const api = {
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),
   version: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  language: (): Promise<string> => ipcRenderer.invoke('app:language'),
   // Shows palique.log in the file manager.
   openLogs: (): Promise<void> => ipcRenderer.invoke('logs:open'),
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),

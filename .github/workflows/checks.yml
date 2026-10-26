@@ -30,7 +30,7 @@ jobs:
 
       - name: Local checks
         run: |
-          for c in history export settings presence emoticons plus cooldown log version; do
+          for c in history export settings presence emoticons plus cooldown log version i18n; do
             npm run --silent check:$c
           done
 

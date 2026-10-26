@@ -1,5 +1,6 @@
 // Outgoing email over SMTP (Mailpit in development, any SMTP server in production).
 import nodemailer from 'nodemailer'
+import { translator, type Language } from './i18n.ts'
 
 export const escape = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
@@ -9,6 +10,7 @@ export const escape = (text: string): string =>
 // under it and a footer.
 export type Mail = {
   to: string
+  lang: Language // the texts come translated; this is for the parts every email shares
   subject: string
   // Who "says" the first paragraph, as in the app's "Tere dice:". Palique by default.
   sender?: string
@@ -32,6 +34,7 @@ const TINT_BORDER = '#c9d8fd'
 const BRAND = `<span style="color:#22c55e">&#9679;</span>&nbsp;<span class="acc" style="color:${ACCENT}">palique</span>`
 
 function html(mail: Mail): string {
+  const _ = translator(mail.lang)
   const p = (text: string, style = 'color:#18181b', kind = 'fg'): string =>
     `<p class="${kind}" style="margin:0 0 16px;${style}">${escape(text)}</p>`
   const [first = '', ...rest] = mail.paragraphs
@@ -39,7 +42,7 @@ function html(mail: Mail): string {
     (color, i) =>
       `<td height="5" style="background:${color};${i === 0 ? 'border-radius:10px 0 0 0' : i === 3 ? 'border-radius:0 10px 0 0' : ''}"></td>`
   ).join('')
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="${mail.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
 <title>${escape(mail.subject)}</title>
@@ -60,15 +63,15 @@ function html(mail: Mail): string {
 <table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f6"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e7e5;border-radius:10px;font-family:${FONT};font-size:15px;line-height:1.6;color:#18181b">
 <tr><td style="padding:0;font-size:0;line-height:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${stripe}</tr></table></td></tr>
-<tr><td class="tint line" style="padding:10px 20px;background:${TINT};border-bottom:1px solid ${TINT_BORDER};font-size:13px;color:#71717a"><span class="muted" style="color:#71717a">Para:</span> <b class="fg" style="color:#18181b">tú</b> <span style="float:right;font-weight:700">${BRAND}</span></td></tr>
+<tr><td class="tint line" style="padding:10px 20px;background:${TINT};border-bottom:1px solid ${TINT_BORDER};font-size:13px;color:#71717a"><span class="muted" style="color:#71717a">${_('Para:')}</span> <b class="fg" style="color:#18181b">${_('tú')}</b> <span style="float:right;font-weight:700">${BRAND}</span></td></tr>
 <tr><td class="fg" style="padding:12px 28px 8px;color:#18181b">
-<p class="muted" style="margin:12px 0 6px;font-size:13px;color:#71717a"><b class="acc" style="color:${ACCENT}">${escape(mail.sender ?? 'Palique')}</b> dice:</p>
+<p class="muted" style="margin:12px 0 6px;font-size:13px;color:#71717a">${_('{name} dice:', { name: `<b class="acc" style="color:${ACCENT}">${escape(mail.sender ?? 'Palique')}</b>` })}</p>
 <div class="tint fg" style="margin:0 0 18px;padding:12px 16px;background:${TINT};border:1px solid ${TINT_BORDER};border-radius:14px 14px 14px 4px;color:#18181b;display:inline-block">${escape(first)}</div>
 ${rest.map((text) => p(text)).join('\n')}
 ${
   mail.code
     ? `<div class="tint" style="margin:0 0 6px;padding:16px 12px;background:${TINT};border:1px solid ${TINT_BORDER};border-radius:8px;text-align:center;font-family:${MONO};font-size:22px;font-weight:600;letter-spacing:0.12em;color:#18181b;word-break:break-all;-webkit-user-select:all;user-select:all">${escape(mail.code)}</div>
-<p class="muted" style="margin:0 0 20px;text-align:center;font-size:12px;color:#71717a">Un clic y lo tienes seleccionado entero.</p>`
+<p class="muted" style="margin:0 0 20px;text-align:center;font-size:12px;color:#71717a">${_('Un clic y lo tienes seleccionado entero.')}</p>`
     : ''
 }
 ${mail.link ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr><td class="btn" align="center" style="background:${ACCENT};border-radius:8px"><a class="btn" href="${escape(mail.link.href)}" style="display:block;padding:13px 22px;background:${ACCENT};color:#ffffff;border-radius:8px;font-weight:600;text-align:center;text-decoration:none">${escape(mail.link.label)}</a></td></tr></table>` : ''}
@@ -98,10 +101,11 @@ export function mailer(options: {
   })
 
   return (mail: Mail): Promise<unknown> => {
+    const _ = translator(mail.lang)
     // The code gets a paragraph of its own, so it's easy to copy from the plain text too.
     // With no bubble here, the sender is named in front of what they say.
     const text = [
-      ...(mail.sender ? [`${mail.sender} dice:`] : []),
+      ...(mail.sender ? [_('{name} dice:', { name: mail.sender })] : []),
       ...mail.paragraphs,
       ...(mail.code ? [mail.code] : []),
       ...(mail.link ? [`${mail.link.label}: ${mail.link.href}`] : []),

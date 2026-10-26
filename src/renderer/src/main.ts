@@ -7,6 +7,7 @@ import './themes/night.css'
 import './themes/fonts.css'
 import './themes/base.css'
 
+import { lang, setLanguage } from './i18n'
 import App from './App.svelte'
 import Chat from './Chat.svelte'
 import Options from './Options.svelte'
@@ -23,6 +24,10 @@ const applyTheme = ({ theme, font }: { theme: string; font: string }): void => {
 }
 window.api.getSettings().then(applyTheme)
 window.api.onSettings(applyTheme)
+
+// Texts are translated as each view is drawn, so the language goes first.
+setLanguage(await window.api.language())
+document.documentElement.lang = lang
 
 const target = document.getElementById('app')!
 const params = new URLSearchParams(location.hash.slice(1))

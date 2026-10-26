@@ -1,6 +1,7 @@
 import messageOgg from './assets/sounds/message.ogg'
 import type { SoundPack } from '../../main/settings'
 import { makeSound, type Sound } from './winks/kit'
+import { N_ } from './i18n.ts'
 
 // The sound collections, chosen in Options (all of them side by side at #sounds). They're
 // synthesized live with the winks' synthesizer, so each weighs nothing; only the classic
@@ -13,9 +14,9 @@ type Effect = Clip | ((s: Sound) => void)
 export type Pack = { id: SoundPack; name: string; note: string } & Record<SoundEvent, Effect>
 
 export const events: { id: SoundEvent; label: string }[] = [
-  { id: 'message', label: 'Mensaje nuevo' },
-  { id: 'online', label: 'Un contacto se conecta' },
-  { id: 'buzz', label: 'Zumbido' }
+  { id: 'message', label: N_('Mensaje nuevo') },
+  { id: 'online', label: N_('Un contacto se conecta') },
+  { id: 'buzz', label: N_('Zumbido') }
 ]
 
 // Semitones from A4 (440 Hz): 3 = C5, 7 = E5, 10 = G5, 15 = C6.
@@ -41,8 +42,8 @@ function marimba(s: Sound, f: number, t: number, dur: number, gain: number): voi
 export const packs: Pack[] = [
   {
     id: 'classic',
-    name: 'Clásico',
-    note: 'El mensaje de siempre, con conectado y zumbido de marimba.',
+    name: N_('Clásico'),
+    note: N_('El mensaje de siempre, con conectado y zumbido de marimba.'),
     message: { src: messageOgg, length: 0.25 },
     online(s) {
       ;[3, 7, 10].forEach((n, i) => marimba(s, hz(n), i * 0.07, i === 2 ? 0.3 : 0.12, 0.18))
@@ -55,8 +56,8 @@ export const packs: Pack[] = [
   },
   {
     id: 'velvet',
-    name: 'Terciopelo',
-    note: 'Senos suaves con un poco de cuerpo. Lo más discreto.',
+    name: N_('Terciopelo'),
+    note: N_('Senos suaves con un poco de cuerpo. Lo más discreto.'),
     message(s) {
       s.tone(hz(7), 0, 0.45, { gain: 0.16, attack: 0.015 })
       s.tone(hz(12), 0.11, 0.75, { gain: 0.16, attack: 0.015 })
@@ -73,8 +74,8 @@ export const packs: Pack[] = [
   },
   {
     id: 'crystal',
-    name: 'Cristal',
-    note: 'Campanitas limpias con cola larga. Muy de los 2000.',
+    name: N_('Cristal'),
+    note: N_('Campanitas limpias con cola larga. Muy de los 2000.'),
     message(s) {
       bell(s, hz(15), 0, 1.2, 0.12)
       bell(s, hz(10), 0.12, 1.4, 0.1)
@@ -91,8 +92,8 @@ export const packs: Pack[] = [
   },
   {
     id: 'bubble',
-    name: 'Burbuja',
-    note: 'Gotas que hacen «blop». Juguetón pero blando.',
+    name: N_('Burbuja'),
+    note: N_('Gotas que hacen «blop». Juguetón pero blando.'),
     message(s) {
       pop(s, 500, 0, 0.25)
       pop(s, 700, 0.09, 0.22)

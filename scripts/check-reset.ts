@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import * as A from '../src/main/xmpp.ts'
+import { setLanguage } from '../src/renderer/src/i18n.ts'
 import { register } from './invite.ts'
 import { lastMail, mailCount } from './mailpit.ts'
 
@@ -69,6 +70,21 @@ assert.deepEqual(await A.login(a, 'Third-pass1', { invite: code }), {
   ok: false,
   error: 'invalid-invite'
 })
+
+// The email goes out in the language the app is in.
+const english = `rstb${id}@correo.test`
+await register(`rstb${id}`, 'Old-pass1')
+await A.logout()
+setLanguage('en')
+await A.requestPasswordReset(english)
+setLanguage('es')
+while ((await mailCount(english)) < 2) {
+  assert.ok(Date.now() < deadline + 10_000, 'English recovery email arrives')
+  await sleep(100)
+}
+const inEnglish = await lastMail(english)
+assert.equal(inEnglish.subject, 'Forgot your Palique password?')
+assert.match(inEnglish.text, /Open Palique and choose a password: palique:\/\/reset/)
 
 console.log('reset check passed')
 process.exit(0)

@@ -9,6 +9,7 @@ const dir = mkdtempSync(join(tmpdir(), 'palique-'))
 const file = join(dir, 'settings.json')
 
 const defaults = {
+  language: 'auto',
   theme: 'classic',
   font: 'theme',
   winks: true,
@@ -47,8 +48,16 @@ assert.deepEqual(
 
 // The Options window can only change known keys, with valid values.
 assert.deepEqual(
-  validPatch({ sounds: false, theme: 'glass', font: 'comic', away: 15, soundPack: 'bubble' }),
+  validPatch({
+    sounds: false,
+    theme: 'glass',
+    font: 'comic',
+    away: 15,
+    soundPack: 'bubble',
+    language: 'en'
+  }),
   {
+    language: 'en',
     font: 'comic',
     sounds: false,
     soundPack: 'bubble',
@@ -60,6 +69,7 @@ assert.deepEqual(
   validPatch({
     sounds: 'no',
     soundPack: 'neon',
+    language: 'fr',
     font: 'wingdings',
     theme: 'neon',
     away: 7,

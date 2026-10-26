@@ -1,6 +1,7 @@
 // App preferences for this computer, as a small JSON file.
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { OwnShow } from './xmpp'
+import { LANGUAGES, type Language } from '../renderer/src/i18n.ts'
 
 export const THEMES = ['classic', 'retro', 'glass', 'night'] as const
 export type Theme = (typeof THEMES)[number]
@@ -23,6 +24,7 @@ export const SOUND_PACKS = ['classic', 'velvet', 'crystal', 'bubble'] as const
 export type SoundPack = (typeof SOUND_PACKS)[number]
 
 export type Settings = {
+  language: 'auto' | Language // 'auto' = the computer's language
   theme: Theme
   font: Font
   winks: boolean // play winks full screen (else inside the conversation)
@@ -44,6 +46,7 @@ export type Settings = {
 export const AWAY_MINUTES = [0, 5, 10, 15, 30]
 
 const DEFAULTS: Settings = {
+  language: 'auto',
   theme: 'classic',
   font: 'theme',
   winks: true,
@@ -79,6 +82,8 @@ export function validPatch(patch: unknown): Partial<Settings> {
   const given = (patch ?? {}) as Record<string, unknown>
   const valid: Partial<Settings> = {}
   for (const key of SWITCHES) if (typeof given[key] === 'boolean') valid[key] = given[key]
+  if (given.language === 'auto' || LANGUAGES.includes(given.language as Language))
+    valid.language = given.language as Settings['language']
   if (THEMES.includes(given.theme as Theme)) valid.theme = given.theme as Theme
   if (FONTS.includes(given.font as Font)) valid.font = given.font as Font
   if (SOUND_PACKS.includes(given.soundPack as SoundPack))

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import Emoticons from './Emoticons.svelte'
   import { stripPlus, tag, tidyPlus } from './plus'
+  import { _, _p } from './i18n'
 
   // Changing our display name, with Messenger Plus! codes. The tools write the codes around
   // the selection (or the whole name); contacts see nothing until "Aplicar".
@@ -19,11 +20,11 @@
 
   // Ready-made gradients, one click away.
   const presets = [
-    { label: 'Chicle', from: '#ff4fa3', to: '#7a5cff' },
-    { label: 'Fuego', from: '#ffb300', to: '#ff0040' },
-    { label: 'Océano', from: '#00a2ff', to: '#00c060' },
-    { label: 'Noche', from: '#1d2fb8', to: '#c02cc0' },
-    { label: 'Lima', from: '#7ed400', to: '#00a8a8' }
+    { label: _('Chicle'), from: '#ff4fa3', to: '#7a5cff' },
+    { label: _('Fuego'), from: '#ffb300', to: '#ff0040' },
+    { label: _('Océano'), from: '#00a2ff', to: '#00c060' },
+    { label: _('Noche'), from: '#1d2fb8', to: '#c02cc0' },
+    { label: _('Lima'), from: '#7ed400', to: '#00a8a8' }
   ]
 
   onMount(() => {
@@ -51,7 +52,7 @@
     const before = name.slice(0, a)
     const next = tidyPlus(before + text + name.slice(b))
     if (next.length > MAX) {
-      error = 'No caben más códigos: el nombre puede tener hasta 128 caracteres.'
+      error = _('No caben más códigos: el nombre puede tener hasta {max} caracteres.', { max: MAX })
       return
     }
     error = ''
@@ -80,7 +81,7 @@
 
   async function apply(): Promise<void> {
     if (!stripPlus(name).trim()) {
-      error = 'Tu nombre no puede quedar vacío.'
+      error = _('Tu nombre no puede quedar vacío.')
       return
     }
     busy = true
@@ -88,58 +89,69 @@
       if (name !== saved) await window.api.setNick(name)
       window.close()
     } catch {
-      error = 'No se ha podido cambiar tu nombre.'
+      error = _('No se ha podido cambiar tu nombre.')
       busy = false
     }
   }
 
   const examples = [
-    ['[b]negrita[/b]', 'También [i]cursiva[/i], [u]subrayado[/u] y [s]tachado[/s].'],
-    ['[c=#e8344e]rojo[/c]', 'Un color, en hexadecimal.'],
-    ['[c=#ff4fa3]degradado[/c=#7a5cff]', 'El color de inicio va en [c=…] y el de final en [/c=…].'],
-    ['[a=#fff3a0]fondo[/a]', 'Color de fondo.'],
-    ['[b][c=#00a2ff]Tere[/c=#00c060][/b] (L)', 'Se pueden combinar, con emoticonos.']
+    [_('[b]negrita[/b]'), _('También [i]cursiva[/i], [u]subrayado[/u] y [s]tachado[/s].')],
+    [_('[c=#e8344e]rojo[/c]'), _('Un color, en hexadecimal.')],
+    [
+      _('[c=#ff4fa3]degradado[/c=#7a5cff]'),
+      _('El color de inicio va en [c=…] y el de final en [/c=…].')
+    ],
+    [_('[a=#fff3a0]fondo[/a]'), _('Color de fondo.')],
+    ['[b][c=#00a2ff]Tere[/c=#00c060][/b] (L)', _('Se pueden combinar, con emoticonos.')]
   ]
 </script>
 
-<svelte:head><title>Cambiar tu nombre</title></svelte:head>
+<svelte:head><title>{_('Cambiar tu nombre')}</title></svelte:head>
 
 <main>
   <div class="preview-block">
-    <h2>Así te verán</h2>
-    <p class="preview" aria-label="Así te verán tus contactos">
+    <h2>{_('Así te verán')}</h2>
+    <p class="preview" aria-label={_('Así te verán tus contactos')}>
       {#if name.trim()}<Emoticons text={name} plus />{:else}&nbsp;{/if}
     </p>
   </div>
 
   <div class="tools">
-    <div class="bar" role="toolbar" aria-label="Formato">
+    <div class="bar" role="toolbar" aria-label={_('Formato')}>
       <span class="group">
-        <button onclick={() => wrap('[b]', '[/b]')} title="Negrita"><b>N</b></button>
-        <button onclick={() => wrap('[i]', '[/i]')} title="Cursiva"><i>K</i></button>
-        <button onclick={() => wrap('[u]', '[/u]')} title="Subrayado"><u>S</u></button>
-        <button onclick={() => wrap('[s]', '[/s]')} title="Tachado"><s>T</s></button>
+        <button onclick={() => wrap('[b]', '[/b]')} title={_('Negrita')}
+          ><b>{_p('botón de negrita', 'N')}</b></button
+        >
+        <button onclick={() => wrap('[i]', '[/i]')} title={_('Cursiva')}
+          ><i>{_p('botón de cursiva', 'K')}</i></button
+        >
+        <button onclick={() => wrap('[u]', '[/u]')} title={_('Subrayado')}
+          ><u>{_p('botón de subrayado', 'S')}</u></button
+        >
+        <button onclick={() => wrap('[s]', '[/s]')} title={_('Tachado')}
+          ><s>{_p('botón de tachado', 'T')}</s></button
+        >
       </span>
       <span class="group">
         <span class="pick">
-          <input type="color" bind:value={color} aria-label="Elegir color del texto" />
-          <button onclick={() => wrap(`[c=${color}]`, '[/c]')}>Color</button>
+          <input type="color" bind:value={color} aria-label={_('Elegir color del texto')} />
+          <button onclick={() => wrap(`[c=${color}]`, '[/c]')}>{_('Color')}</button>
         </span>
         <span class="pick">
-          <input type="color" bind:value={background} aria-label="Elegir color de fondo" />
-          <button onclick={() => wrap(`[a=${background}]`, '[/a]')}>Fondo</button>
+          <input type="color" bind:value={background} aria-label={_('Elegir color de fondo')} />
+          <button onclick={() => wrap(`[a=${background}]`, '[/a]')}>{_('Fondo')}</button>
         </span>
         <span class="pick">
-          <input type="color" bind:value={from} aria-label="Color de inicio del degradado" />
-          <input type="color" bind:value={to} aria-label="Color de final del degradado" />
-          <button onclick={() => wrap(`[c=${from}]`, `[/c=${to}]`)}>Degradado</button>
+          <input type="color" bind:value={from} aria-label={_('Color de inicio del degradado')} />
+          <input type="color" bind:value={to} aria-label={_('Color de final del degradado')} />
+          <button onclick={() => wrap(`[c=${from}]`, `[/c=${to}]`)}>{_('Degradado')}</button>
         </span>
       </span>
     </div>
   </div>
 
   <div class="field">
-    <label for="nick">Tu nombre</label>
+    <label for="nick">{_('Tu nombre')}</label>
     <!-- A name is one line, but codes make it long: a box that shows all of it. -->
     <textarea
       id="nick"
@@ -157,10 +169,10 @@
       spellcheck="false"
     ></textarea>
     <p class="hint">
-      Selecciona una parte del nombre para darle estilo; sin selección, se aplica a todo.
+      {_('Selecciona una parte del nombre para darle estilo; sin selección, se aplica a todo.')}
       <span class="count"
-        ><button class="link" onclick={clear} title="Quitar los colores y el formato"
-          >Quitar formato</button
+        ><button class="link" onclick={clear} title={_('Quitar los colores y el formato')}
+          >{_('Quitar formato')}</button
         >
         · {name.length}/{MAX}</span
       >
@@ -168,13 +180,13 @@
   </div>
 
   <div class="presets">
-    <h2>Estilos rápidos</h2>
+    <h2>{_('Estilos rápidos')}</h2>
     <div class="chips">
       {#each presets as p (p.label)}
         <button
           class="chip"
           onclick={() => restyle(`[c=${p.from}]`, `[/c=${p.to}]`)}
-          title="Degradado {p.from} → {p.to}"
+          title={_('Degradado {from} → {to}', { from: p.from, to: p.to })}
           ><span class="sample" style:background="linear-gradient(90deg, {p.from}, {p.to})"
           ></span>{p.label}</button
         >
@@ -183,7 +195,7 @@
   </div>
 
   <details>
-    <summary>Chuleta de códigos</summary>
+    <summary>{_('Chuleta de códigos')}</summary>
     <table>
       <tbody>
         {#each examples as [code, note] (code)}
@@ -200,8 +212,8 @@
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 
   <footer>
-    <button onclick={() => window.close()}>Cancelar</button>
-    <button class="apply" onclick={apply} disabled={busy}>Aplicar</button>
+    <button onclick={() => window.close()}>{_('Cancelar')}</button>
+    <button class="apply" onclick={apply} disabled={busy}>{_('Aplicar')}</button>
   </footer>
 </main>
 

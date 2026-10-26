@@ -32,18 +32,12 @@ export function openHistory(file: string): History {
       mine INTEGER NOT NULL,
       body TEXT NOT NULL,
       buzz INTEGER NOT NULL,
+      wink TEXT NOT NULL DEFAULT '',
       at INTEGER NOT NULL,
       PRIMARY KEY (account, contact, id)
     );
     CREATE INDEX IF NOT EXISTS messages_by_time ON messages (account, contact, at);
   `)
-  // Columns added after the first release.
-  const columns = (db.prepare('PRAGMA table_info(messages)').all() as { name: string }[]).map(
-    (c) => c.name
-  )
-  if (!columns.includes('wink')) {
-    db.exec("ALTER TABLE messages ADD COLUMN wink TEXT NOT NULL DEFAULT ''")
-  }
   const insert = db.prepare(
     'INSERT OR IGNORE INTO messages (account, contact, id, mine, body, buzz, wink, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   )
