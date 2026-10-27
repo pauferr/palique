@@ -227,9 +227,9 @@ GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) 
 - **Linux:** `.AppImage`
 - **Windows:** unsigned `.exe`
 
-The installers go up with the update files the installed apps read (`latest*.yml`; no blockmaps, so updates are full downloads).
+The installers' names carry no version (`palique-mac-arm64.dmg`, `palique-mac-x64.dmg`, `palique-windows-x64.exe`, `palique-linux-x86_64.AppImage`), so `https://github.com/pauferr/palique/releases/latest/download/<name>` always gets the latest beta or stable one: palique.io's downloads page links there. The installers go up with the update files the installed apps read (`latest*.yml`; no blockmaps, so updates are full downloads).
 
-**Updates** ([src/main/updates.ts](src/main/updates.ts), `electron-updater`, packaged builds only): every few hours the app looks for a newer published release (drafts don't count; pre-releases do while the version has a stage).
+**Updates** ([src/main/updates.ts](src/main/updates.ts), `electron-updater`, packaged builds only): every few hours the app looks for a newer published release (drafts don't count; pre-releases do while the version has a stage, and an alpha moves up to the beta).
 
 - **Windows and Linux** download it in the background and install it on quit. The contact list and sign-in screen offer «Reiniciar ahora».
 - **macOS** can't install it (ad-hoc signature, no Developer ID): the same places show a notice with a link to download it.
@@ -245,7 +245,7 @@ The installers go up with the update files the installed apps read (`latest*.yml
 | anything else | patch |
 | nothing | no release (the run fails) |
 
-- The first release is `0.3.0`. The **stage** in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable) goes on as a suffix (`v0.3.0-alpha`) and makes the release a pre-release.
+- The first release is `0.3.0`. The **stage** in `package.json` (`"stage": "alpha"`, then `"beta"`, then `""` when stable) goes on as a suffix (`v0.3.0-alpha`). Only alpha releases are pre-releases: beta and stable ones are GitHub's latest release.
 - Versions are never committed: `package.json` keeps `"version": "0.0.0-dev"`, and the app shows it as `v0.3.0 (alpha)` (`v1.0.0` when stable), in development the next one (sign-in screen, Options and About). Don't use `npm version`.
 - `node scripts/next-version.ts` prints what the next release would be. `npm run check:version` checks the rules.
 - To force a version (e.g. `1.0.0`), fill the workflow's **version** input.

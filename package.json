@@ -1,7 +1,7 @@
 {
   "name": "palique",
   "version": "0.0.0-dev",
-  "stage": "alpha",
+  "stage": "beta",
   "private": true,
   "description": "Desktop instant messenger inspired by MSN Messenger and AIM",
   "license": "AGPL-3.0-or-later",

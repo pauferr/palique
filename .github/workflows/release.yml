@@ -4,8 +4,9 @@
 #  - "publish" on: one GitHub Release with every OS's files.
 # Versions are semver, worked out from the commits since the last release
 # (scripts/next-version.ts) and never committed: v0.3.0-alpha, v0.3.1-alpha, v0.4.0-alpha…
-# package.json only holds the stage ("alpha", "beta", or "" when stable); with one, the
-# release is a pre-release.
+# package.json only holds the stage ("alpha", "beta", or "" when stable). Alpha releases
+# are pre-releases; beta and stable ones are GitHub's "latest", so the website's fixed
+# download links (releases/latest/download/palique-mac-arm64.dmg…) point at them.
 # Builds don't publish themselves: in parallel they raced and made one release each.
 # See AGENTS.md, "Releases".
 name: Release
@@ -128,14 +129,14 @@ jobs:
           merge-multiple: true
 
       # The tag goes up first, on the commit that was built: a draft release doesn't create
-      # it, and the next run counts from it. Versions with a suffix (alpha…) are pre-releases.
+      # it, and the next run counts from it. Only alpha versions are pre-releases.
       - name: Release with every platform's files
         run: |
           version="${{ needs.version.outputs.version }}"
           git tag "v$version" "$GITHUB_SHA"
           git push origin "v$version"
           prerelease=""
-          case "$version" in *-*) prerelease="--prerelease" ;; esac
+          case "$version" in *-alpha*) prerelease="--prerelease" ;; esac
           gh release create "v$version" dist/* --verify-tag --generate-notes \
             --title "Palique $version" $prerelease \
             ${{ inputs.draft && '--draft' || '' }} --repo "$GITHUB_REPOSITORY"

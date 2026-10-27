@@ -30,7 +30,8 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-  artifactName: ${name}-${version}-mac-${arch}.${ext}
+  # No version in the file names: palique.io links to releases/latest/download/<name>.
+  artifactName: ${name}-mac-${arch}.${ext}
 
 linux:
   maintainer: Paulo Ferreira <203633342+pauferr@users.noreply.github.com>
@@ -38,14 +39,14 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
-  artifactName: ${name}-${version}-linux-${arch}.${ext}
+  artifactName: ${name}-linux-${arch}.${ext}
 
 # Unsigned for now: Windows shows a SmartScreen warning ("More info" > "Run anyway").
 win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: ${name}-${version}-windows-${arch}.${ext}
+  artifactName: ${name}-windows-${arch}.${ext}
 # Update files (latest*.yml) for src/main/updates.ts: Windows and Linux update themselves,
 # macOS only checks (latest-mac.yml). Full downloads, no blockmaps for now.
 nsis:

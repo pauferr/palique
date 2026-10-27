@@ -14,7 +14,7 @@ export function startUpdates(onStatus: (status: UpdateStatus) => void): void {
   if (!app.isPackaged) return
   const manual = process.platform === 'darwin'
   autoUpdater.autoDownload = !manual
-  // While releases are pre-releases (v0.8.0-alpha), they are the updates.
+  // With a stage (v0.15.0-beta), pre-releases count too: an alpha moves up to the beta.
   autoUpdater.allowPrerelease = app.getVersion().includes('-')
   // Problems go to palique.log (see index.ts); routine progress stays out.
   autoUpdater.logger = { info: () => {}, debug: () => {}, warn: console.warn, error: () => {} }
