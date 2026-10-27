@@ -8,7 +8,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const ROOT = path.join(__dirname, '../..')
-const OUT = path.join(ROOT, 'docs/images')
+// The website's (palique-web/public) with OUT=… ONLY=web; the README's otherwise.
+const OUT = process.env.OUT || path.join(ROOT, 'docs/images')
 
 // The transcript, scrolled to the end once everything (emoji included) has its size.
 const BOTTOM =
@@ -29,8 +30,23 @@ const SHOTS = {
   'tema-calido': { hash: '', w: 360, h: 640, theme: 'warm' },
   'tema-oscuro': { hash: '', w: 360, h: 640, theme: 'dark' },
   'opciones-general': { hash: 'options', w: 600, h: 500, section: 'General' },
-  'opciones-sonidos': { hash: 'options', w: 600, h: 500, section: 'Alertas' }
+  'opciones-sonidos': { hash: 'options', w: 600, h: 500, section: 'Alertas' },
+  // palique.io's contact list, in each language and theme (saved without the web- prefix).
+  // The website draws a macOS window around them.
+  'web-contacts': { hash: '', w: 360, h: 820 },
+  'web-contacts-dark': { hash: '', w: 360, h: 820, theme: 'dark' },
+  'web-contacts-en': { hash: '', w: 360, h: 820, args: ['--app-lang=en'] },
+  'web-contacts-en-dark': {
+    hash: '',
+    w: 360,
+    h: 820,
+    theme: 'dark',
+    args: ['--app-lang=en']
+  }
 }
+// ONLY=web takes just the website's; by default, everything but those.
+const wanted = (name) =>
+  process.env.ONLY ? name.startsWith(`${process.env.ONLY}-`) : !name.startsWith('web-')
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2')
 
@@ -62,8 +78,9 @@ async function shoot(name) {
   await new Promise((r) => setTimeout(r, 3500))
   if (shot.run === BOTTOM) await win.webContents.executeJavaScript(shot.run)
   const image = await win.webContents.capturePage()
-  fs.writeFileSync(path.join(OUT, `${name}.png`), image.toPNG())
-  console.log('saved', `docs/images/${name}.png`)
+  const file = path.join(OUT, `${name.replace(/^web-/, '')}.png`)
+  fs.writeFileSync(file, image.toPNG())
+  console.log('saved', path.relative(process.cwd(), file))
 }
 
 app.whenReady().then(async () => {
@@ -72,7 +89,7 @@ app.whenReady().then(async () => {
     return app.exit(0)
   }
   // One process per screenshot: a second off-screen window in the same process fails to load.
-  for (const name of Object.keys(SHOTS)) {
+  for (const name of Object.keys(SHOTS).filter(wanted)) {
     spawnSync(process.execPath, [__filename], {
       env: { ...process.env, SHOT: name },
       stdio: 'inherit'

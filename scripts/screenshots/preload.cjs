@@ -6,6 +6,9 @@ const { contextBridge } = require('electron')
 const arg = (name) =>
   (process.argv.find((a) => a.startsWith(`--${name}=`)) || '').split('=').slice(1).join('=')
 const theme = arg('theme') || 'light'
+// The app's language (--app-lang=en; --lang is Chromium's own), and the friends' names and messages in it too.
+const lang = arg('app-lang') || 'es'
+const say = (es, en) => (lang === 'en' ? en : es)
 const account = 'andrea@localhost'
 
 // A picture avatar: an emoji on a gradient, as an SVG data URL.
@@ -31,33 +34,49 @@ const contacts = [
     'iker',
     '[b][c=#00a2ff]Iker[/c=#00c060][/b] (H)',
     'online',
-    '¿Partidita al Counter a las 10? ¡¡que no falte nadie!!',
+    say(
+      '¿Partidita al Counter a las 10? ¡¡que no falte nadie!!',
+      'Counter-Strike at 10? everybody in!!'
+    ),
     picture('🎮', '#4c7fe8', '#00c2a8')
   ),
   friend(
     'nerea',
     '[a=#fff3a0][c=#e8344e]Nerea[/c][/a] (F)',
     'online',
-    'Pasando las fotos de la cámara nueva :D',
+    say('Pasando las fotos de la cámara nueva :D', 'Uploading the pics from my new camera :D'),
     picture('📸', '#ff8fb8', '#ffd27a')
   ),
-  friend('ruben', '[c=#ffb300]Rubén[/c=#ff0040] (8)', 'away', 'Escuchando: Estopa – Como Camarón'),
+  friend(
+    'ruben',
+    '[c=#ffb300]Rubén[/c=#ff0040] (8)',
+    'away',
+    say('Escuchando: Estopa – Como Camarón', 'Listening to: Oasis – Wonderwall')
+  ),
   friend(
     'lucia',
     '[i][c=#c02cc0]Lucía[/c=#1d2fb8][/i] (L)',
     'dnd',
-    'De exámenes… no molestar (que me conozco) :P'
+    say('De exámenes… no molestar (que me conozco) :P', 'Exams… do not disturb (I know myself) :P')
   ),
   friend(
     'marta',
     '[c=#7ed400]Marta[/c=#00a8a8] (*)',
     'online',
-    'El sábado, fiesta en mi casa (^) ¡traed patatas!',
+    say(
+      'El sábado, fiesta en mi casa (^) ¡traed patatas!',
+      'Party at mine on Saturday (^) bring crisps!'
+    ),
     picture('🌻', '#7ed400', '#00a8a8')
   ),
-  friend('dani', '[b]Dani[/b] (Y)', 'online', 'Mañana en el parque a las 6'),
-  friend('abuela', 'Abuela Carmen (K)', 'offline', ''),
-  friend('pablo', '[s]El de mates[/s] Pablo :S', 'offline', '')
+  friend(
+    'dani',
+    '[b]Dani[/b] (Y)',
+    'online',
+    say('Mañana en el parque a las 6', 'Park tomorrow at 6')
+  ),
+  friend('abuela', say('Abuela Carmen (K)', 'Grandma Carmen (K)'), 'offline', ''),
+  friend('pablo', say('[s]El de mates[/s] Pablo :S', '[s]Maths guy[/s] Pablo :S'), 'offline', '')
 ]
 
 const snapshot = {
@@ -66,7 +85,10 @@ const snapshot = {
   name: '[b][c=#ff4fa3]Andrea[/c=#7a5cff][/b] (L)',
   avatar: picture('🎧', '#ff4fa3', '#7a5cff'),
   show: 'online',
-  status: "~*~ Contando los días pa' el viaje de fin de curso ~*~",
+  status: say(
+    "~*~ Contando los días pa' el viaje de fin de curso ~*~",
+    '~*~ Counting the days till the school trip ~*~'
+  ),
   requests: [{ jid: 'sara@localhost', name: '[c=#ff4fa3]Sara[/c=#ffb300] (F)' }],
   contacts
 }
@@ -107,7 +129,7 @@ const values = {
   getUnread: { 'nerea@localhost': 2 },
   getChatHistory: history,
   version: 'v0.15.0 (beta)',
-  language: 'es',
+  language: lang,
   getSettings: {
     language: 'auto',
     theme,
