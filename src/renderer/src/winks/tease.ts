@@ -125,7 +125,7 @@ export const wink: Wink = {
     // ¡Nananá! with each letter bouncing in turn, and a cheeky :P
     const word = '¡Nananá!'
     const show = seg(t, SNAP + 0.15, SNAP + 0.35) * (1 - seg(t, DONE, DONE + 0.25))
-    c.font = '900 30px "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif'
+    c.font = '900 30px "Comic Relief", system-ui, sans-serif'
     let x = 40
     for (let i = 0; i < word.length; i++) {
       const w = c.measureText(word[i]).width

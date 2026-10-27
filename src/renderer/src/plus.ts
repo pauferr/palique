@@ -1,4 +1,4 @@
-// Messenger Plus!-style codes in display names: [b] [i] [u] [s],
+// Formatting codes in display names: [b] [i] [u] [s],
 // [c=#e8344e]color[/c], [c=#ff0000]gradient[/c=#0000ff] and [a=#fff3a0]background[/a]. Parsed here
 // into styled runs and drawn by Emoticons.svelte; never HTML. Colors are checked and end
 // up as CSS values only. Other XMPP clients see the codes as typed.

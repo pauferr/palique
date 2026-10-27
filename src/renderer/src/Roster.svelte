@@ -44,7 +44,7 @@
     if (event.key === 'Enter') (event.currentTarget as HTMLInputElement).blur()
   }
 
-  // Two groups like MSN, alphabetical inside each (by the name as read, without its codes).
+  // Two groups, alphabetical inside each (by the name as read, without its codes).
   let sorted = $derived(
     [...roster.contacts].sort(
       (a, b) =>
@@ -61,7 +61,7 @@
     { label: _('Sin conexión'), contacts: found.filter((c) => c.show === 'offline') }
   ])
 
-  // Messages waiting in conversations that aren't open (contact → count), like MSN.
+  // Messages waiting in conversations that aren't open (contact → count).
   let unread: Record<string, number> = $state({})
 
   onMount(() => {
@@ -102,7 +102,7 @@
 
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: _('Invisible') }
 
-  // The bar on top, like MSN's. The app's own menu is named after it, as on a Mac.
+  // The bar on top. The app's own menu is named after it, as on a Mac.
   const menus = [
     {
       label: 'Palique',
@@ -269,7 +269,7 @@
     />
     <div class="identity">
       <div class="line">
-        <!-- The name opens its own window, with the Messenger Plus! formatting tools. -->
+        <!-- The name opens its own window, with the formatting tools. -->
         <button class="nick" onclick={() => window.api.openNick()} title={_('Cambiar tu nombre')}
           ><Emoticons text={roster.name} plus /></button
         >
@@ -496,7 +496,7 @@
     font-weight: 800;
   }
 
-  /* Reads as text until you click it, like MSN's personal message. */
+  /* Reads as text until you click it. */
   .personal {
     text-align: left;
     border-color: transparent;
@@ -734,7 +734,7 @@
     font-size: inherit;
   }
 
-  /* No contacts yet: with no bar at the bottom, say how to add someone, MSN's green link. */
+  /* No contacts yet: with no bar at the bottom, say how to add someone, a green link. */
   .no-contacts {
     display: grid;
     gap: 10px;
@@ -779,7 +779,7 @@
     text-decoration: underline;
   }
 
-  /* The menu bar on top, like MSN Messenger's. */
+  /* The menu bar on top. */
   /* Panels that rise from the bottom of the list: adding someone, About. */
   .sheet {
     display: grid;

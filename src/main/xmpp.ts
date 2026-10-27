@@ -27,7 +27,7 @@ const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
 const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 export const AVATAR_MAX_BYTES = 100_000
 const NICK = 'http://jabber.org/protocol/nick' // display names (XEP-0172): PEP and presence
-export const NICK_MAX = 128 // room for Messenger Plus! codes
+export const NICK_MAX = 128 // room for formatting codes
 
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
@@ -226,7 +226,7 @@ function handlePresence(stanza: Element): void {
       entry?.resources.delete(from.getResource())
       break
     case 'subscribe':
-      // Someone we already added is adding us back: accept, like MSN's mutual lists.
+      // Someone we already added is adding us back: accept: lists are mutual.
       if (entry && (entry.pending || entry.subscription === 'to')) {
         send(xml('presence', { to: bare, type: 'subscribed' }))
         return

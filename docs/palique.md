@@ -1,6 +1,6 @@
 # Palique
 
-Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Messenger (AIM). El objetivo es recuperar la emoción de recibir un mensaje a principios de los 2000: sonidos, zumbidos, animaciones y una estética que despierte nostalgia de los 90 y los 00, con un diseño minimalista pero entrañable.
+Cliente de mensajería de escritorio inspirado en los chats de escritorio de principios de los 2000. El objetivo es recuperar la emoción de recibir un mensaje a principios de los 2000: sonidos, zumbidos, animaciones y una estética que despierte nostalgia de los 90 y los 00, con un diseño minimalista pero entrañable.
 
 > Estado: fase de ideas y planificación. Este documento se trasladará a skills / agent cuando el proyecto esté definido.
 
@@ -65,7 +65,7 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 **Seguridad**
 
 - TLS obligatorio cliente-servidor y servidor-servidor.
-- Cifrado de extremo a extremo opcional mediante OMEMO (XEP-0384, basado en el Double Ratchet de Signal).
+- Cifrado de extremo a extremo opcional mediante OMEMO (XEP-0384, basado en el algoritmo Double Ratchet).
 - Limitaciones: metadatos visibles para el servidor; las extensiones propias van sin cifrar salvo que se encapsulen en el contenido OMEMO.
 
 **Costes**
@@ -77,26 +77,26 @@ Cliente de mensajería de escritorio inspirado en MSN Messenger y AOL Instant Me
 
 - Servidor propio con WebSockets: mismo coste económico, mucho más trabajo (auth, presencia, cola offline, persistencia, cifrado).
 - Matrix: más pesado de lo necesario.
-- MTProto (Telegram): servidor cerrado, no se puede autoalojar; sin E2EE por defecto.
+- MTProto: protocolo de un servicio comercial con servidor cerrado, no se puede autoalojar; sin E2EE por defecto.
 
 ## 3. Funcionalidades clave
 
 ### Notificaciones con sonido
 - Sonidos propios para mensaje entrante, contacto conectado, zumbido, etc.
-- **Origen: provisionales libres para el prototipo y el MVP** (CC0 de Freesound o generados con sfxr/sintetizador). Los definitivos se encargan o se crean más adelante. Los sonidos originales de MSN/AIM no se pueden usar (son de Microsoft/AOL).
+- **Origen: provisionales libres para el prototipo y el MVP** (CC0 de Freesound o generados con sfxr/sintetizador). Los definitivos se encargan o se crean más adelante. No se usan sonidos de otras apps: tienen dueño.
 
 ### Zumbidos
 - Sonido + sacudida del contenido **dentro** de la ventana (funciona en cualquier entorno).
 - Refuerzo con `flashFrame` de Electron: parpadeo en la barra de tareas (Linux) y rebote del icono en el dock (macOS).
 - Límite por contacto (ver "Antispam"): un zumbido cada 10 segundos, al enviar y al recibir.
-- Opcional a futuro: en X11, mover la ventana real como en el MSN original.
+- Opcional a futuro: en X11, mover la ventana real, como hacían los chats de antes.
 - Decisión: no se considera un problema que en Wayland la ventana no se desplace.
 
 ### Animaciones a pantalla completa
 - Ventana transparente, siempre encima y que deje pasar los clics (`transparent`, `alwaysOnTop`, `setIgnoreMouseEvents`).
 - macOS y X11: sin complicaciones.
 - Wayland: los clientes Wayland nativos no pueden ponerse siempre encima en todos los compositores (GNOME no lo permite). Primero se forzó XWayland (`--ozone-platform=x11`), pero dejaba la app sin ventana donde no hay XWayland (niri) y tampoco se veía en KDE (issues #1 y #2). Decisión: Wayland nativo, y en Wayland el guiño se reproduce dentro de la ventana de la conversación en vez de a pantalla completa.
-- Nombre en la app: "guiños" (como en MSN).
+- Nombre en la app: "guiños".
 - **Transmisión: catálogo predefinido.** Las animaciones vienen incluidas en la app; el mensaje solo lleva un identificador (p. ej. `tarta-cumple`). Mensaje ligero, reproducción instantánea y contenido controlado.
 - **Formato: dibujados en directo** (canvas y sonido sintetizado con Web Audio, `src/renderer/src/winks/`). Primero se usó vídeo WebM con canal alfa, pero a pantalla completa se veía borroso y pesaba megas; dibujados en el momento se ven nítidos a cualquier tamaño, pesan unos KB y el sonido respeta las opciones. Si algún día se trabaja con animadores, se puede volver a admitir vídeo junto a estos.
 - Diseño extensible: el formato del mensaje debe permitir añadir packs descargables en el futuro sin cambios.
@@ -133,11 +133,11 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Prosody no trae invisibilidad de serie (y `mod_privacy_lists` está obsoleto), así que Palique incluye un módulo propio: `server/modules/mod_palique_invisible.lua`, una versión mínima de XEP-0186 (Invisible Command).
 - Invisible, la sesión sigue disponible para el servidor (recibes mensajes y ves a tus contactos), pero ninguna presencia "disponible" tuya llega a nadie: ni anuncios ni respuestas cuando alguien pregunta. Al pasar a invisible, tus contactos te ven desconectarte.
 - La app recuerda tu último estado e inicia sesión con él, así que entrando invisible nunca apareces conectado ni un instante.
-- Limitación: mientras eres invisible no se envía tampoco presencia dirigida. Y si escribes a alguien, sabrá que estás ahí (igual que en MSN).
+- Limitación: mientras eres invisible no se envía tampoco presencia dirigida. Y si escribes a alguien, sabrá que estás ahí.
 - Un servidor XMPP sin este módulo rechaza el estado: la app avisa y no cambia de estado.
 
 ### Emoticonos
-- Atajos clásicos de MSN (`:)`, `:D`, `;)`, `:P`, `:(`, `(L)`, `(Y)`, `(H)`, `(F)`…), sin distinguir mayúsculas, mostrados como emoji en mensajes y mensajes personales.
+- Atajos clásicos de los chats de antes (`:)`, `:D`, `;)`, `:P`, `:(`, `(L)`, `(Y)`, `(H)`, `(F)`…), sin distinguir mayúsculas, mostrados como emoji en mensajes y mensajes personales.
 - Solo cambia cómo se pinta: el texto enviado no se modifica, así que otros clientes XMPP siguen viendo `:)`.
 - Selector en la ventana de chat que inserta el atajo donde está el cursor.
 - Provisional: emoji del sistema. Cada tema podrá sustituirlos por sus propias imágenes.
@@ -146,14 +146,14 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - XEP-0084: la imagen se publica en el PEP del usuario (solo la ven sus contactos). Al cambiarla se reenvía la presencia, y Prosody (`mod_vcard_legacy`) añade el hash para que los contactos la descarguen al momento.
 - Se elige pulsando tu avatar en la lista de contactos; la app la recorta al centro y la reduce a 96×96 PNG.
 - Solo se aceptan PNG, JPEG, GIF o WebP de hasta 100 KB (vienen de la red).
-- El marco del avatar muestra el estado (verde, amarillo, rojo, gris), como en MSN.
+- El marco del avatar muestra el estado (verde, amarillo, rojo, gris).
 - Avatar por defecto provisional: inicial sobre un color sacado del nombre. Los personajes del elenco lo sustituirán cuando estén ilustrados.
 
 ### Registro y autenticación
 
 **Decidido: la cuenta es el correo electrónico. Registro solo con invitación por correo.**
 
-- Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) que es lo que ve todo el mundo. El correo solo lo ven los contactos mutuos (los dos os habéis agregado), como en MSN, para saber quién es quién aunque cambie de nombre; quien no te tiene agregado nunca lo ve.
+- Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) que es lo que ve todo el mundo. El correo solo lo ven los contactos mutuos (los dos os habéis agregado), para saber quién es quién aunque cambie de nombre; quien no te tiene agregado nunca lo ve.
 - Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID, y solo se lo da a los contactos mutuos: pregunta a Prosody quiénes son (el roster está allí) antes de responder. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie más. El JID no se muestra nunca.
 - El nombre visible es XEP-0172: se publica en PEP (lo leen los contactos, como el avatar) y viaja en cada presencia y en las solicitudes de amistad, para que se vea antes de aceptar.
 - Iniciar sesión: la app pregunta al servicio de cuentas (HTTP) qué JID corresponde al correo y entra con él (SASL normal). A un correo sin cuenta le responde un JID inventado y siempre el mismo, así que falla igual que una contraseña mal escrita y no se sabe si la cuenta existe. Limitado por IP.
@@ -237,7 +237,7 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - Historial sincronizado entre dispositivos (XEP-0313).
 - Packs de guiños descargables.
 - Temas adicionales ("sabores") y sus packs de sonidos.
-- Inicio de sesión con Google u otros proveedores (opcional, sin compromiso). Requiere un pequeño servicio de autenticación intermedio entre el proveedor y Prosody.
+- Inicio de sesión con proveedores externos, por OpenID Connect (opcional, sin compromiso). Requiere un pequeño servicio de autenticación intermedio entre el proveedor y Prosody.
 - Soporte para Windows.
 
 **Más adelante**
@@ -272,17 +272,17 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - [x] **Sonidos** → provisionales libres (CC0 / generados) hasta tener los definitivos (ver sección 3).
 - [x] **Alcance del MVP** → ver sección 4.
 - [x] **Historial de chat** → solo local, con aviso y exportación (ver sección 3).
-- [x] **Registro y autenticación** → usuario y contraseña desde la app (XEP-0077); Google y otros proveedores en la hoja de ruta (ver sección 3).
+- [x] **Registro y autenticación** → usuario y contraseña desde la app (XEP-0077); proveedores externos en la hoja de ruta (ver sección 3).
 - [~] **Nombre "Palique"** → búsqueda web (oct. 2026) sin coincidencias de apps o proyectos de mensajería con ese nombre. Pendiente: consulta formal en EUIPO y OEPM (clases 9 y 38) y disponibilidad de dominio/usuario en GitHub. Posible debilidad: "palique" significa "charla" en español, lo que podría considerarse descriptivo para una app de chat a efectos de registro de marca.
 
 ## 8. Diseño y sensaciones (por desarrollar)
 
-- Referencias: MSN Messenger, AIM, interfaces de Windows 98/XP.
+- Referencias: los chats de escritorio y las interfaces de principios de los 2000.
 - Principio: minimalista pero entrañable. Nostalgia sin caer en copia literal.
-- **Diseño "Cielo"** (elegido en octubre de 2026 entre tres propuestas: Cielo, Libreta y Nítido): el Messenger de 2005 hecho hoy. Cabeceras de cielo azul con nubes, botones redondos con brillo tipo «aqua», campos redondeados, verde césped para "conectado" y tipografía redonda (Nunito). La acción principal de cada ventana es el botón azul brillante (`button.primary`).
+- **Diseño "Cielo"** (elegido en octubre de 2026 entre tres propuestas: Cielo, Libreta y Nítido): un chat de 2005 hecho hoy. Cabeceras de cielo azul con nubes, botones redondos con brillo tipo «aqua», campos redondeados, verde césped para "conectado" y tipografía redonda (Nunito). La acción principal de cada ventana es el botón azul brillante (`button.primary`).
 - **Tres temas, variantes del mismo cielo:** Claro (por defecto), Cálido (atardecer) y Oscuro (noche). `src/renderer/src/themes/light.css`, `warm.css` y `dark.css`. Sustituyen a los cuatro anteriores (Clásico, Retro, Cristal y Noche): así cualquier tema sigue pareciendo Palique.
-- Tipografías libres (OFL) incluidas en la app (alfabeto latino): Nunito (la de los temas). Las fuentes de Windows (Tahoma, Segoe UI, MS Sans Serif) son de Microsoft y no se pueden distribuir.
-- Fuente elegible en Opciones, por encima de la del tema: Comic Relief (en lugar de Comic Sans, que es de Microsoft: misma métrica y trazo parecido; siempre la libre para que todos vean lo mismo), Noto Sans, Fira Sans, Patrick Hand, Atkinson Hyperlegible, Gelasio y Courier Prime. Todas OFL. `src/renderer/src/themes/fonts.css`. Cada fuente se escala con `font-size-adjust` para que sus minúsculas midan lo mismo que las de la fuente del tema (cada tema declara su `--x-height`); si no, unas parecen pequeñas o finas.
+- Tipografías libres (OFL) incluidas en la app (alfabeto latino): Nunito (la de los temas). Solo fuentes libres: las del sistema operativo tienen dueño y no se pueden distribuir.
+- Fuente elegible en Opciones, por encima de la del tema: Comic Relief (una de cómic, libre, para que todos vean lo mismo), Noto Sans, Fira Sans, Patrick Hand, Atkinson Hyperlegible, Gelasio y Courier Prime. Todas OFL. `src/renderer/src/themes/fonts.css`. Cada fuente se escala con `font-size-adjust` para que sus minúsculas midan lo mismo que las de la fuente del tema (cada tema declara su `--x-height`); si no, unas parecen pequeñas o finas.
 - Estructura: `themes/base.css` define el aspecto común solo con variables; cada tema da valores a esas variables (`:root[data-theme="…"]`). El tema se elige en Opciones, se guarda en las preferencias y se aplica al momento en todas las ventanas.
 - Los temas se llaman por lo que son ("Claro", "Cálido", "Oscuro"), sin marcas reales.
 - Avatares por defecto: inicial sobre una paleta fija de 8 colores vivos definida por el tema; cada usuario siempre tiene el mismo color. Un borde blanco separa la imagen del marco de estado.

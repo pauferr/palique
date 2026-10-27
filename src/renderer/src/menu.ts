@@ -1,7 +1,7 @@
 import type { MenuLabel } from '../../preload'
 import { _ } from './i18n'
 
-// Menus like MSN's, each action in one place: the bar on top, your picture, and a right
+// Menus with each action in one place: the bar on top, your picture, and a right
 // click on a contact. Native, so they can go past the window.
 export type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
 

@@ -1,4 +1,4 @@
-// Messenger Plus! code parsing check (no server needed). Run: npm run check:plus
+// Display name formatting codes check (no server needed). Run: npm run check:plus
 import assert from 'node:assert/strict'
 import { parsePlus, stripPlus, tidyPlus } from '../src/renderer/src/plus.ts'
 

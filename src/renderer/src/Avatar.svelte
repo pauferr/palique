@@ -29,7 +29,7 @@
 </span>
 
 <style>
-  /* The frame shows the status, like MSN: a glossy rounded square in the status color,
+  /* The frame shows the status: a glossy rounded square in the status color,
      the picture inset with a gap in the list's color so the frame reads on any picture. */
   .avatar {
     display: inline-grid;

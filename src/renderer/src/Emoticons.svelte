@@ -3,7 +3,7 @@
   import { parsePlus, type Run } from './plus'
   import { prefs } from './prefs.svelte'
 
-  // `plus`: also draw Messenger Plus! codes (display names).
+  // `plus`: also draw formatting codes (display names).
   let { text, plus = false }: { text: string; plus?: boolean } = $props()
 
   // With emoticons off in Options, the codes stay as typed.

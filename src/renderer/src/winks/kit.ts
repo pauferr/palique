@@ -113,7 +113,7 @@ export function text(
   c.globalAlpha *= alpha
   c.translate(x, y)
   c.rotate(rot)
-  c.font = `900 ${size}px "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif`
+  c.font = `900 ${size}px "Comic Relief", system-ui, sans-serif`
   c.textAlign = 'center'
   c.textBaseline = 'middle'
   c.lineJoin = 'round'

@@ -148,7 +148,7 @@ function createWindow(): void {
   // If rendering fails (e.g. the GPU process keeps crashing) 'ready-to-show' may never
   // come: show the window anyway rather than run with nothing on screen.
   setTimeout(() => mainWindow?.isVisible() || mainWindow?.show(), 3000)
-  // Closing the contact list keeps Palique running (tray, notifications), like MSN.
+  // Closing the contact list keeps Palique running (tray, notifications).
   mainWindow.on('close', (event) => {
     if (quitting) return
     event.preventDefault()
@@ -239,7 +239,7 @@ function notify(title: string, body: string, onClick: () => void): void {
 }
 
 // Native titles can't hold images or colors: emoticon codes become plain emoji, and
-// Messenger Plus! codes go.
+// formatting codes go.
 const contactName = (jid: string): string => {
   const name =
     stripPlus(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '') || _('Sin nombre')
@@ -292,7 +292,7 @@ function announceArrivals(state: Snapshot): void {
   previous = state
 }
 
-// One window per conversation, like MSN.
+// One window per conversation.
 const chats = new Map<string, BrowserWindow>()
 const pending = new Map<string, [ChatMessage, boolean][]>()
 let history: History
@@ -373,7 +373,7 @@ function openOptions(): void {
   loadRenderer(options, 'options')
 }
 
-// Changing our display name, with its Messenger Plus! colors: a small window of its own.
+// Changing our display name, with its formatting codes: a small window of its own.
 let nickWindow: BrowserWindow | null = null
 
 function openNick(): void {
@@ -465,7 +465,7 @@ function forgetPassword(): void {
   rm(passwordFile(), { force: true }).catch(() => {})
 }
 
-// Away after a while without using the computer, like MSN, and back when you return.
+// Away after a while without using the computer, and back when you return.
 // Only from Conectado: Ocupado or Invisible were chosen on purpose.
 let autoAway = false
 
@@ -483,7 +483,7 @@ function checkIdle(): void {
   }
 }
 
-// Unread messages per contact, MSN style: the contact blinks in the list with a count
+// Unread messages per contact: the contact blinks in the list with a count
 // (and the dock icon shows the total) until its conversation is opened.
 const unread = new Map<string, number>()
 // Winks that came live while their conversation was closed: they play when it opens.

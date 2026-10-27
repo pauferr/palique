@@ -4,7 +4,7 @@
   import { stripPlus, tag, tidyPlus } from './plus'
   import { _, _p } from './i18n'
 
-  // Changing our display name, with Messenger Plus! codes. The tools write the codes around
+  // Changing our display name, with formatting codes. The tools write the codes around
   // the selection (or the whole name); contacts see nothing until "Aplicar".
   const MAX = 128
 

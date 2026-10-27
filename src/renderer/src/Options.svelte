@@ -8,7 +8,7 @@
   import { events, packs, playSound } from './sounds'
   import { _, _p } from './i18n'
 
-  // Laid out like Windows Live Messenger's Options: sections on the left, one at a time on
+  // Laid out like a classic desktop options window: sections on the left, one at a time on
   // the right. Every change applies at once; there's only "Cerrar". The name and personal
   // message are edited from the contact list.
   const sections = [
@@ -488,7 +488,7 @@
 </div>
 
 <style>
-  /* Windows Live Messenger's layout, in the current theme's colors. */
+  /* A classic options window, in the current theme's colors. */
   .options {
     display: grid;
     grid-template-columns: 168px 1fr;

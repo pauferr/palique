@@ -49,7 +49,7 @@ export const packs: Pack[] = [
       ;[3, 7, 10].forEach((n, i) => marimba(s, hz(n), i * 0.07, i === 2 ? 0.3 : 0.12, 0.18))
     },
     buzz(s) {
-      // A quick trill between two notes that lands lower, like Messenger's nudge.
+      // A quick trill between two notes that lands lower.
       for (let i = 0; i < 10; i++) marimba(s, hz(i % 2 ? 3 : 7), i * 0.045, 0.12, 0.18)
       marimba(s, hz(-2), 0.47, 0.4, 0.2)
     }

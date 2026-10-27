@@ -34,12 +34,12 @@ key alone.
 
 ## How it should read
 
-- The tone of the Spanish: friendly, casual, a bit nostalgic (MSN Messenger, early 2000s).
+- The tone of the Spanish: friendly, casual, a bit nostalgic (the desktop chat apps of the early 2000s).
   The Spanish uses «tú»; in English use plain everyday words ("Sign in", "Quit", "Buzz").
-- Use the terms MSN used where they exist: "wink", "buzz", "display picture", "personal
+- Use the classic chat app terms where they exist: "wink", "buzz", "display picture", "personal
   message", "Do not disturb".
 - Same Spanish term → same translation across the app, unless the context says otherwise.
-- Keep `{placeholders}` exactly, Messenger Plus! codes (`[b]`, `[c=#hex]`, `[/c=#hex]`) as
+- Keep `{placeholders}` exactly, formatting codes (`[b]`, `[c=#hex]`, `[/c=#hex]`) as
   they are (translate only the words inside), and emoji. Spanish quotes «» become the
   language's own (“” in English); keep the `…` character.
 - Plurals (`"one|other"` keys): translate both forms, keeping the `|`.

@@ -193,7 +193,7 @@ xmpp.iqCallee.set(NS, 'language', (ctx) => {
 })
 
 // <lookup address='…'/>: who has this address (adding a contact). Knowing someone's email
-// tells you whether they're on Palique, like other messengers; limited per user.
+// tells you whether they're on Palique, like other chat apps; limited per user.
 const LOOKUP_WINDOW = 60 * 60_000
 const LOOKUP_MAX = 30
 const lookups = new Map<string, { since: number; count: number }>()
@@ -316,7 +316,7 @@ async function invite(
   })
 }
 
-// Messenger Plus! codes a display name may carry ([b], [c=#hex]…): plain text in emails.
+// Formatting codes a display name may carry ([b], [c=#hex]…): plain text in emails.
 // Same pattern as `tag` in src/renderer/src/plus.ts.
 const PLUS_CODES = /\[\/?(?:b|i|u|s|c|a)(?:=(?:#[0-9a-f]{6}|#[0-9a-f]{3}))?\]/gi
 

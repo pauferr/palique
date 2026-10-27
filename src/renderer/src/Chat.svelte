@@ -315,7 +315,7 @@
           <Star size={16} />
           {_('Guiño')}</summary
         >
-        <!-- Thumbnails like MSN: a still frame, the animation (muted) on hover or focus. -->
+        <!-- Thumbnails: a still frame, the animation (muted) on hover or focus. -->
         <div class="popup">
           <h2>{_('Enviar un guiño')}</h2>
           <ul class="winks">

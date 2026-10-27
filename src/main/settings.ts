@@ -28,7 +28,7 @@ export type Settings = {
   theme: Theme
   font: Font
   winks: boolean // play winks full screen (else inside the conversation)
-  show: OwnShow // last status, used at the next sign-in (like MSN)
+  show: OwnShow // last status, used at the next sign-in
   status: string // last personal message, likewise
   email: string // last account signed in, pre-filled on the sign-in screen
   away: number // minutes without using the computer before showing as Away; 0 = never

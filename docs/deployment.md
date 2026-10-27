@@ -51,7 +51,7 @@ Debe devolver la IP de tu máquina. Ese nombre será el dominio de las cuentas: 
 
 Necesitas una cuenta SMTP: servidor, puerto, usuario y contraseña. El remitente (`MAIL_FROM`) debe ser una dirección desde la que ese servidor pueda enviar, en un dominio con SPF y DKIM configurados.
 
-> No uses como remitente una dirección gratuita (Gmail, Outlook…) a través de otro servidor: sus proveedores no la reconocen y los correos acaban en spam o no llegan.
+> No uses como remitente una dirección de un correo gratuito a través de otro servidor: sus proveedores no la reconocen y los correos acaban en spam o no llegan.
 
 ## 6. Descargar Palique en el servidor
 

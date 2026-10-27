@@ -1,4 +1,4 @@
-/* Theme "Claro" (default): a 2005 messenger made today. Sky-blue headers with clouds,
+/* Theme "Claro" (default): a 2005 chat app made today. Sky-blue headers with clouds,
    glossy pill buttons, rounded fields and grass-green for "online". Every other theme
    sets these same variables. Plain :root so it also applies before a theme is picked. */
 @import '@fontsource/nunito/latin-400.css';

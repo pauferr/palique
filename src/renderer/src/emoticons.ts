@@ -1,6 +1,6 @@
 import { N_ } from './i18n.ts'
 
-// Classic MSN shortcuts, shown as emoji. The text sent stays as typed, so other XMPP
+// Classic emoticon shortcuts, shown as emoji. The text sent stays as typed, so other XMPP
 // clients still see ":)". ponytail: system emoji for now; themes can swap in images later.
 export const EMOTICONS: { codes: string[]; emoji: string; name: string }[] = [
   { codes: [':)', ':-)'], emoji: '🙂', name: N_('Sonrisa') },
@@ -29,7 +29,7 @@ export const EMOTICONS: { codes: string[]; emoji: string; name: string }[] = [
 const byCode = new Map(
   EMOTICONS.flatMap(({ codes, emoji }) => codes.map((code) => [code.toUpperCase(), emoji]))
 )
-// Longest first, so ":-)" wins over ":)"-like prefixes. Case-insensitive like MSN.
+// Longest first, so ":-)" wins over ":)"-like prefixes. Case-insensitive.
 const pattern = new RegExp(
   [...byCode.keys()]
     .sort((a, b) => b.length - a.length)

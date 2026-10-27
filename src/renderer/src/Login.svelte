@@ -50,7 +50,7 @@
   let error = $state('')
   let busy = $state(false)
   let version = $state('')
-  // "Iniciar sesión automáticamente", like MSN. Only offered with system encryption.
+  // "Iniciar sesión automáticamente". Only offered with system encryption.
   let remember = $state(false)
   let canRemember = $state(false)
 

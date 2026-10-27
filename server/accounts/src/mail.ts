@@ -31,7 +31,7 @@ export type Mail = {
 }
 
 // A Palique conversation window, in the app's "Cielo" colors. Inline styles and tables,
-// because that's what Gmail and Outlook render; the <style> only adds dark mode where
+// because that's what web and desktop email clients render; the <style> only adds dark mode where
 // supported. No images: most inboxes hide them until asked.
 const FONT =
   "Nunito,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
