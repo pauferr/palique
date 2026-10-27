@@ -145,8 +145,8 @@
     <span class="cloud c2" aria-hidden="true"></span>
     <span class="cloud c3" aria-hidden="true"></span>
     <span class="cloud c4" aria-hidden="true"></span>
-    <!-- Placeholder frame until the cast illustrations exist; shows the initial as you type. -->
-    <div class="frame">
+    <!-- Placeholder until the cast illustrations exist; shows the initial as you type. -->
+    <div class="picture">
       <Avatar
         jid={(mode === 'register' ? nick : email).trim() || 'palique'}
         show="online"
@@ -348,21 +348,11 @@
     opacity: 0.8;
   }
 
-  /* The picture in a glossy green frame: you, online. */
-  .frame {
+  /* The avatar's own green ring is the frame (you, online); this only lifts it off the sky. */
+  .picture {
     position: relative;
     display: grid;
-    padding: 8px;
-    border-radius: var(--radius-large);
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 40%), transparent 60%), var(--status-online);
-    box-shadow:
-      0 6px 18px rgb(19 41 75 / 25%),
-      inset 0 2px 0 rgb(255 255 255 / 60%);
-  }
-
-  .tall .frame {
-    border-radius: 26px;
+    filter: drop-shadow(0 6px 12px rgb(19 41 75 / 25%));
   }
 
   h1 {
