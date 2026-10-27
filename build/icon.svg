@@ -1,57 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Palique's icon: a palique among three friends, in the status colours, on the app's
-       glossy blue. Disponible (green, in (H) shades) tells the bombshell, Ausente (amber) is floored and
-       No molestar (red) is in stitches. Glossy and round, like the 2005 messengers.
+  <!-- Palique's icon: an orange speech bubble (the colour of a contact who just wrote to you)
+       laughing and shaking with a buzz, on the app's sky, with the online green dot.
        Regenerate the PNG/ICNS files with build/icons.sh after changing it. -->
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#5db2ff"/>
-      <stop offset="1" stop-color="#1a63b3"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f86e0"/>
+      <stop offset="1" stop-color="#9fd2ff"/>
     </linearGradient>
-    <clipPath id="clip"><rect x="4" y="4" width="92" height="92" rx="22"/></clipPath>
-    <!-- Each friend: a highlight top left fading into its colour -->
-    <radialGradient id="green-head" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#9ee68a"/><stop offset="1" stop-color="#2f9a3c"/></radialGradient>
-    <linearGradient id="green-body"><stop offset="0" stop-color="#9ee68a"/><stop offset="0.55" stop-color="#2f9a3c"/></linearGradient>
-    <radialGradient id="amber-head" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffd27a"/><stop offset="1" stop-color="#e8920f"/></radialGradient>
-    <linearGradient id="amber-body"><stop offset="0" stop-color="#ffd27a"/><stop offset="0.55" stop-color="#e8920f"/></linearGradient>
-    <radialGradient id="red-head" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ff9a8f"/><stop offset="1" stop-color="#cf3a32"/></radialGradient>
-    <linearGradient id="red-body"><stop offset="0" stop-color="#ff9a8f"/><stop offset="0.55" stop-color="#cf3a32"/></linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc061"/>
+      <stop offset="1" stop-color="#ef8a14"/>
+    </linearGradient>
+    <radialGradient id="green" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#a6f08f"/>
+      <stop offset="1" stop-color="#2f9a3c"/>
+    </radialGradient>
   </defs>
-
-  <rect x="4" y="4" width="92" height="92" rx="22" fill="url(#tile)"/>
-  <path d="M4 26 Q4 4 26 4 H74 Q96 4 96 26 V38 Q50 28 4 44 Z" fill="#fff" opacity="0.16"/>
-
-  <g clip-path="url(#clip)">
-    <!-- Ausente, leaning in, floored -->
-    <g transform="rotate(6 26 106)">
-      <rect x="13" y="68.5" width="26" height="70" rx="13" fill="url(#amber-body)"/>
-      <circle cx="26" cy="56" r="11" fill="url(#amber-head)"/>
-      <ellipse cx="23.3" cy="50" rx="5" ry="2.4" fill="#fff" opacity="0.55"/>
-      <circle cx="22" cy="55.5" r="3" fill="#fff"/><circle cx="23.4" cy="55.8" r="1.4" fill="#13294b"/>
-      <circle cx="30" cy="55.5" r="3" fill="#fff"/><circle cx="31.3" cy="55.8" r="1.4" fill="#13294b"/>
-      <path d="M19.4 50.5 q2.4 -2.6 4.8 0 M27.8 50.5 q2.4 -2.6 4.8 0" fill="none" stroke="#13294b" stroke-width="1.2" stroke-linecap="round"/>
-      <ellipse cx="26" cy="61.5" rx="1.7" ry="2.3" fill="#13294b"/>
-    </g>
-    <!-- No molestar, in stitches -->
-    <g transform="rotate(-6 74 106)">
-      <rect x="61" y="68.5" width="26" height="70" rx="13" fill="url(#red-body)"/>
-      <circle cx="74" cy="56" r="11" fill="url(#red-head)"/>
-      <ellipse cx="71.3" cy="50" rx="5" ry="2.4" fill="#fff" opacity="0.55"/>
-      <path d="M67.6 55.8 q2.1 -3.1 4.2 0 M76.2 55.8 q2.1 -3.1 4.2 0" fill="none" stroke="#13294b" stroke-width="1.3" stroke-linecap="round"/>
-      <path d="M68.3 58 Q74 68.1 79.7 58 Z" fill="#13294b"/>
-      <ellipse cx="74" cy="62.8" rx="2.4" ry="1.3" fill="#ff7aa2"/>
-      <path d="M63.9 54.7 q-2 3.1 0 4.4 q2 -1.3 0 -4.4 Z M84.1 54.7 q-2 3.1 0 4.4 q2 -1.3 0 -4.4 Z" fill="#cdeeff"/>
-    </g>
-    <!-- Disponible, telling it, in (H) shades -->
-    <rect x="35" y="59.5" width="30" height="70" rx="15" fill="url(#green-body)"/>
-    <circle cx="50" cy="45" r="13" fill="url(#green-head)"/>
-    <ellipse cx="46.8" cy="37.9" rx="5.9" ry="2.9" fill="#fff" opacity="0.55"/>
-    <rect x="41.0" y="42.7" width="8.1" height="5.5" rx="2.5" fill="#16161e"/><path d="M42.6 44.3 l2.0 0" stroke="#fff" stroke-width="1.04" stroke-linecap="round" opacity="0.8"/><rect x="50.9" y="42.7" width="8.1" height="5.5" rx="2.5" fill="#16161e"/><path d="M52.5 44.3 l2.0 0" stroke="#fff" stroke-width="1.04" stroke-linecap="round" opacity="0.8"/><path d="M48.7 44.3 h2.6 M37.3 43.8 h3.9 M58.8 43.8 h3.9" stroke="#16161e" stroke-width="1.30" stroke-linecap="round"/>
-    <path d="M45.6 49.4 Q50 57 54.4 49.4 Z" fill="#13294b"/>
-    <!-- The bombshell -->
-    <rect x="60" y="9" width="30" height="21" rx="10.5" fill="#fff"/>
-    <path d="M63 28 L58 35 L70 29 Z" fill="#fff"/>
-    <path d="M71 14 v8 M79 14 v8" stroke="#1f6fc4" stroke-width="3.4" stroke-linecap="round"/>
-    <circle cx="71" cy="26" r="1.9" fill="#1f6fc4"/><circle cx="79" cy="26" r="1.9" fill="#1f6fc4"/>
+  <rect x="4" y="4" width="92" height="92" rx="22" fill="url(#sky)"/>
+  <path d="M16 39 Q11 49 16 59 M84 39 Q89 49 84 59 M11 34 Q4.5 49 11 64 M89 34 Q95.5 49 89 64"
+    fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+  <g transform="rotate(-8 50 50)">
+    <rect x="20" y="26" width="60" height="46" rx="23" fill="url(#orange)"/>
+    <path d="M32 66 L25 82 L46 70 Z" fill="#ef8a14"/>
+    <ellipse cx="50" cy="33" rx="20" ry="5" fill="#ffffff" opacity="0.5"/>
+    <path d="M34 46 q4.5 -7 9 0 M55 46 q4.5 -7 9 0" fill="none" stroke="#1b2b44" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M36 54 Q49.5 68 63 54 Z" fill="#1b2b44"/>
   </g>
+  <circle cx="82" cy="17" r="7.5" fill="url(#green)" stroke="#ffffff" stroke-width="1"/>
 </svg>
