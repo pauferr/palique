@@ -15,9 +15,9 @@ export async function adminInvite(email: string): Promise<string> {
   return inviteCode((await lastMail(email)).text)
 }
 
-// The code in an invite email.
+// The code in an invite email (its "Create my account" link carries it).
 export function inviteCode(text: string): string {
-  const token = text.match(/palique:\/\/signup\?t=([\w-]+)/)?.[1]
+  const token = text.match(/\/join\?t=([\w-]+)/)?.[1]
   if (!token) throw new Error(`no invite in: ${text}`)
   return token
 }

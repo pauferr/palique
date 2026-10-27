@@ -21,8 +21,8 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 const a = await register(name, 'Old-pass1')
 await A.logout()
 
-// The request always "works"; only the account's address gets an email, with an app link
-// (carrying the address) and the code.
+// The request always "works"; only the account's address gets an email, with a link to
+// the page that opens the app (carrying the address) and the code.
 await A.requestPasswordReset(email)
 await A.requestPasswordReset(`nadie${id}@correo.test`)
 // It's sent after answering (so timing reveals nothing): wait for it.
@@ -32,14 +32,19 @@ while ((await mailCount(email)) < 2) {
   await sleep(100)
 }
 const recovery = await lastMail(email)
-assert.equal(recovery.subject, '¿Se te ha olvidado la contraseña de Palique?')
-const link = recovery.text.match(/palique:\/\/reset\?e=([^&\s]+)&t=(\S+)/)
-assert.ok(link, 'palique:// link in the email')
+assert.equal(recovery.subject, 'Cambia tu contraseña de Palique')
+const link = recovery.text.match(/http:\/\/localhost:8080\/reset\?e=([^&\s]+)&t=([^&\s]+)/)
+assert.ok(link, 'link in the email')
 assert.equal(decodeURIComponent(link[1]), email)
 const code = decodeURIComponent(link[2])
 assert.ok(
   recovery.text.replace(/\r/g, '').includes(`\n\n${code}\n\n`),
   'the code is also written out'
+)
+const resetPage = await (await fetch(link[0])).text()
+assert.ok(
+  resetPage.includes(`palique://reset?e=${link[1]}&#38;t=${link[2]}`),
+  'the page opens the app'
 )
 await sleep(500)
 assert.equal(await mailCount(`nadie${id}@correo.test`), 0)
@@ -83,8 +88,8 @@ while ((await mailCount(english)) < 2) {
   await sleep(100)
 }
 const inEnglish = await lastMail(english)
-assert.equal(inEnglish.subject, 'Forgot your Palique password?')
-assert.match(inEnglish.text, /Open Palique and choose a password: palique:\/\/reset/)
+assert.equal(inEnglish.subject, 'Change your Palique password')
+assert.match(inEnglish.text, /Choose a new password: http:\/\/localhost:8080\/reset\?e=.*&l=en/)
 
 // Apps from before translations don't say which language: Spanish, as they were.
 const older = `rstc${id}@correo.test`
@@ -99,7 +104,7 @@ while ((await mailCount(older)) < 2) {
   assert.ok(Date.now() < deadline + 20_000, 'recovery email for an older app arrives')
   await sleep(100)
 }
-assert.equal((await lastMail(older)).subject, '¿Se te ha olvidado la contraseña de Palique?')
+assert.equal((await lastMail(older)).subject, 'Cambia tu contraseña de Palique')
 
 console.log('reset check passed')
 process.exit(0)

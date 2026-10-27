@@ -5,84 +5,132 @@ import { translator, type Language } from './i18n.ts'
 export const escape = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
-// Every email has the same shape: a first line said by someone (like a chat message),
-// more text, an optional code to paste into the app, an optional button, a smaller note
-// under it and a footer.
+export type Link = { href: string; label: string }
+
+// Every email has the same shape, top to bottom: someone says something (like a chat
+// message), a heading and a line on what it's about, then what to do: numbered steps with
+// a button each, or one button. A code to paste is the fallback when the button can't open
+// the app. A small note and a footer close it.
 export type Mail = {
   to: string
   lang: Language // the texts come translated; this is for the parts every email shares
   subject: string
-  // Who "says" the first paragraph, as in the app's "Tere dice:". Palique by default.
+  preheader: string // shown after the subject in the inbox
+  window: string // the window's title, as in the app
+  // Who says `bubble`, as in the app's "Tere dice:". Palique by default.
   sender?: string
-  paragraphs: string[]
-  code?: string
-  link?: { href: string; label: string }
+  bubble: string
+  heading: string
+  intro: string
+  features?: string[]
+  steps?: { title: string; text: string; link: Link }[]
+  link?: Link
+  code?: { label: string; value: string }
   note?: string
-  footer?: string
-  footerLink?: { href: string; label: string }
+  footer: string
+  footerLink?: Link
 }
 
-// Looks like a conversation window, with MSN's butterfly colors on top. Inline styles and
-// tables, because that's what Gmail and Outlook render; the <style> only adds dark mode
-// where supported.
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
+// A Palique conversation window, in the app's "Cielo" colors. Inline styles and tables,
+// because that's what Gmail and Outlook render; the <style> only adds dark mode where
+// supported. No images: most inboxes hide them until asked.
+const FONT =
+  "Nunito,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
 const MONO = "ui-monospace,'SF Mono',Menlo,Consolas,monospace"
-export const BUTTERFLY = ['#2563eb', '#22c55e', '#f59e0b', '#ef4444']
-const ACCENT = '#2563eb'
-const TINT = '#eef3ff'
-const TINT_BORDER = '#c9d8fd'
-const BRAND = `<span style="color:#22c55e">&#9679;</span>&nbsp;<span class="acc" style="color:${ACCENT}">palique</span>`
+const TEXT = '#13294b'
+const MUTED = '#4d6584'
+const STRONG = '#1f6fc4'
+const LINE = '#cfe3f7'
+const SOFT = '#eef6ff'
+const SOFT_LINE = '#bfe3ff'
+const BUTTON = `background:#1f6fc4;background-image:linear-gradient(180deg,#5db2ff 0%,#1f6fc4 52%,#1a63b3 100%);border:1px solid #1a5fa8;border-radius:999px;color:#ffffff;font-weight:800;text-decoration:none`
+
+const button = (link: Link, block: boolean): string =>
+  `<a class="btn" href="${escape(link.href)}" style="display:${block ? 'block' : 'inline-block'};padding:${block ? '13px 20px' : '10px 20px'};text-align:center;${BUTTON}">${escape(link.label)}</a>`
 
 function html(mail: Mail): string {
   const _ = translator(mail.lang)
-  const p = (text: string, style = 'color:#18181b', kind = 'fg'): string =>
-    `<p class="${kind}" style="margin:0 0 16px;${style}">${escape(text)}</p>`
-  const [first = '', ...rest] = mail.paragraphs
-  const stripe = BUTTERFLY.map(
-    (color, i) =>
-      `<td height="5" style="background:${color};${i === 0 ? 'border-radius:10px 0 0 0' : i === 3 ? 'border-radius:0 10px 0 0' : ''}"></td>`
-  ).join('')
+  const sender = mail.sender ?? 'Palique'
+  // People get a pink picture, Palique its sky blue; the green frame is "online".
+  const picture = `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding:3px;border-radius:12px;background:#2f9a3c"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td class="ring" width="34" height="34" align="center" style="width:34px;height:34px;border:2px solid #ffffff;border-radius:9px;background:${mail.sender ? '#e8569a' : '#2f86e0'};color:#ffffff;font-weight:800;font-size:17px">${escape(sender.slice(0, 1).toUpperCase())}</td></tr></table></td></tr></table>`
+  const check = `<span style="color:#2f9a3c;font-weight:900">&#10003;</span>`
+  const features = (mail.features ?? [])
+    .map(
+      (text) =>
+        `<tr><td width="24" valign="top" style="padding:2px 0">${check}</td><td class="fg" style="padding:2px 0;color:${TEXT}">${escape(text)}</td></tr>`
+    )
+    .join('')
+  const steps = (mail.steps ?? [])
+    .map(
+      (
+        step,
+        i
+      ) => `<tr><td style="padding:0 0 12px"><table role="presentation" class="soft" width="100%" cellpadding="0" cellspacing="0" style="background:${SOFT};border:1px solid ${SOFT_LINE};border-radius:14px"><tr>
+<td width="44" valign="top" style="padding:14px 0 14px 16px"><div class="num" style="width:28px;height:28px;line-height:28px;border-radius:999px;background:${STRONG};color:#ffffff;text-align:center;font-weight:900;font-size:14px">${i + 1}</div></td>
+<td style="padding:14px 16px 14px 0"><p class="fg" style="margin:0 0 2px;font-weight:800;font-size:16px;color:${TEXT}">${escape(step.title)}</p><p class="muted" style="margin:0 0 10px;font-size:14px;color:${MUTED}">${escape(step.text)}</p>${button(step.link, false)}</td>
+</tr></table></td></tr>`
+    )
+    .join('')
   return `<!doctype html><html lang="${mail.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
 <title>${escape(mail.subject)}</title>
 <style>
 @media (prefers-color-scheme: dark) {
-  .bg { background:#0c0c0d !important }
-  .card { background:#18181b !important; border-color:#2a2a2e !important }
-  .fg { color:#f4f4f5 !important }
-  .muted { color:#a1a1aa !important }
-  .acc { color:#6b9bff !important }
-  .tint { background:#1b2540 !important; border-color:#2f3b5c !important; color:#f4f4f5 !important }
-  .btn { background:#6b9bff !important; color:#0c0c0d !important }
-  .line { border-color:#2a2a2e !important }
+  .bg { background:#0b1633 !important }
+  .card { background:#111a30 !important; border-color:#25365e !important }
+  .bar { background:#172a52 !important; border-color:#25365e !important }
+  .fg { color:#e6eeff !important }
+  .muted { color:#a3b4d3 !important }
+  .acc { color:#8cc2ff !important }
+  .soft { background:#1b2a4f !important; border-color:#2f4677 !important; color:#e6eeff !important }
+  .num { background:#8cc2ff !important; color:#111a30 !important }
+  .ring { border-color:#111a30 !important }
+  .line { border-color:#25365e !important }
 }
 </style></head>
-<body class="bg" style="margin:0;padding:0;background:#f7f7f6">
-<div style="display:none;max-height:0;overflow:hidden">${escape(first)}</div>
-<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f6"><tr><td align="center" style="padding:32px 16px">
-<table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #e7e7e5;border-radius:10px;font-family:${FONT};font-size:15px;line-height:1.6;color:#18181b">
-<tr><td style="padding:0;font-size:0;line-height:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${stripe}</tr></table></td></tr>
-<tr><td class="tint line" style="padding:10px 20px;background:${TINT};border-bottom:1px solid ${TINT_BORDER};font-size:13px;color:#71717a"><span class="muted" style="color:#71717a">${_('Para:')}</span> <b class="fg" style="color:#18181b">${_('tú')}</b> <span style="float:right;font-weight:700">${BRAND}</span></td></tr>
-<tr><td class="fg" style="padding:12px 28px 8px;color:#18181b">
-<p class="muted" style="margin:12px 0 6px;font-size:13px;color:#71717a">${_('{name} dice:', { name: `<b class="acc" style="color:${ACCENT}">${escape(mail.sender ?? 'Palique')}</b>` })}</p>
-<div class="tint fg" style="margin:0 0 18px;padding:12px 16px;background:${TINT};border:1px solid ${TINT_BORDER};border-radius:14px 14px 14px 4px;color:#18181b;display:inline-block">${escape(first)}</div>
-${rest.map((text) => p(text)).join('\n')}
+<body class="bg" style="margin:0;padding:0;background:#eaf4ff">
+<div style="display:none;max-height:0;overflow:hidden">${escape(mail.preheader)}</div>
+<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" style="background:#eaf4ff"><tr><td align="center" style="padding:28px 16px">
+<table role="presentation" class="card" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#ffffff;border:1px solid ${LINE};border-radius:16px;font-family:${FONT};font-size:15px;line-height:1.55;color:${TEXT}">
+<tr><td class="bar" style="padding:12px 18px;background:#e6f4ff;border-bottom:1px solid ${LINE};border-radius:16px 16px 0 0;font-size:13px"><b class="fg" style="font-size:16px;color:${TEXT}"><span style="color:#2f9a3c">&#9679;</span>&nbsp;Palique</b><span class="muted" style="float:right;padding-top:2px;color:${MUTED}">${escape(mail.window)}</span></td></tr>
+<tr><td style="padding:24px 30px 6px">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px"><tr><td>${picture}</td><td class="muted" style="padding-left:12px;font-size:14px;color:${MUTED}">${_('{name} dice:', { name: `<b class="acc" style="color:${STRONG}">${escape(sender)}</b>` })}</td></tr></table>
+<div class="soft fg" style="display:inline-block;margin:0 0 22px;padding:12px 16px;background:${SOFT};border:1px solid ${SOFT_LINE};border-radius:18px 18px 18px 6px;font-size:16px;font-weight:700;color:${TEXT}">${escape(mail.bubble)}</div>
+<h1 class="fg" style="margin:0 0 6px;font-size:21px;font-weight:900;line-height:1.25;color:${TEXT}">${escape(mail.heading)}</h1>
+<p class="muted" style="margin:0 0 14px;color:${MUTED}">${escape(mail.intro)}</p>
+${features ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px">${features}</table>` : ''}
+${steps ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px">${steps}</table>` : ''}
+${mail.link ? `<div style="margin:4px 0 18px">${button(mail.link, true)}</div>` : ''}
 ${
   mail.code
-    ? `<div class="tint" style="margin:0 0 6px;padding:16px 12px;background:${TINT};border:1px solid ${TINT_BORDER};border-radius:8px;text-align:center;font-family:${MONO};font-size:22px;font-weight:600;letter-spacing:0.12em;color:#18181b;word-break:break-all;-webkit-user-select:all;user-select:all">${escape(mail.code)}</div>
-<p class="muted" style="margin:0 0 20px;text-align:center;font-size:12px;color:#71717a">${_('Un clic y lo tienes seleccionado entero.')}</p>`
+    ? `<table role="presentation" class="line" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;border:1px dashed ${SOFT_LINE};border-radius:12px"><tr><td style="padding:10px 14px"><p class="muted" style="margin:0 0 4px;font-size:13px;color:${MUTED}">${escape(mail.code.label)}</p><div class="fg" style="font-family:${MONO};font-size:16px;font-weight:700;letter-spacing:0.06em;color:${TEXT};word-break:break-all;-webkit-user-select:all;user-select:all">${escape(mail.code.value)}</div></td></tr></table>`
     : ''
 }
-${mail.link ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr><td class="btn" align="center" style="background:${ACCENT};border-radius:8px"><a class="btn" href="${escape(mail.link.href)}" style="display:block;padding:13px 22px;background:${ACCENT};color:#ffffff;border-radius:8px;font-weight:600;text-align:center;text-decoration:none">${escape(mail.link.label)}</a></td></tr></table>` : ''}
-${mail.note ? p(mail.note, 'font-size:14px;color:#71717a', 'muted') : ''}
+${mail.note ? `<p class="muted" style="margin:0 0 18px;font-size:13px;color:${MUTED}">${escape(mail.note)}</p>` : ''}
 </td></tr>
-${
-  mail.footer
-    ? `<tr><td class="muted line" style="padding:16px 28px 22px;border-top:1px solid #eeeeec;font-size:12px;line-height:1.5;color:#71717a">${escape(mail.footer)}${mail.footerLink ? ` <a class="acc" href="${escape(mail.footerLink.href)}" style="color:${ACCENT}">${escape(mail.footerLink.label)}</a>` : ''}</td></tr>`
-    : ''
-}
+<tr><td class="muted line" style="padding:14px 30px 20px;border-top:1px solid ${LINE};font-size:12px;line-height:1.5;color:${MUTED}">${escape(mail.footer)}${mail.footerLink ? ` <a class="acc" href="${escape(mail.footerLink.href)}" style="color:${STRONG}">${escape(mail.footerLink.label)}</a>` : ''}</td></tr>
 </table></td></tr></table></body></html>`
+}
+
+// The same email as plain text, for clients that don't show HTML. The code gets a
+// paragraph of its own, so it's easy to copy.
+function text(mail: Mail): string {
+  const _ = translator(mail.lang)
+  return [
+    `${_('{name} dice:', { name: mail.sender ?? 'Palique' })} ${mail.bubble}`,
+    mail.heading,
+    mail.intro,
+    ...(mail.features?.length ? [mail.features.map((f) => `- ${f}`).join('\n')] : []),
+    ...(mail.steps ?? []).map(
+      (step, i) => `${i + 1}. ${step.title}: ${step.text}\n${step.link.label}: ${step.link.href}`
+    ),
+    ...(mail.link ? [`${mail.link.label}: ${mail.link.href}`] : []),
+    ...(mail.code ? [mail.code.label, mail.code.value] : []),
+    ...(mail.note ? [mail.note] : []),
+    '--',
+    mail.footerLink ? `${mail.footer} ${mail.footerLink.href}` : mail.footer
+  ].join('\n\n')
 }
 
 export function mailer(options: {
@@ -100,29 +148,13 @@ export function mailer(options: {
     auth: options.user ? { user: options.user, pass: options.pass } : undefined
   })
 
-  return (mail: Mail): Promise<unknown> => {
-    const _ = translator(mail.lang)
-    // The code gets a paragraph of its own, so it's easy to copy from the plain text too.
-    // With no bubble here, the sender is named in front of what they say.
-    const text = [
-      ...(mail.sender ? [_('{name} dice:', { name: mail.sender })] : []),
-      ...mail.paragraphs,
-      ...(mail.code ? [mail.code] : []),
-      ...(mail.link ? [`${mail.link.label}: ${mail.link.href}`] : []),
-      ...(mail.note ? [mail.note] : []),
-      ...(mail.footer
-        ? ['--', mail.footerLink ? `${mail.footer} ${mail.footerLink.href}` : mail.footer]
-        : [])
-    ].join('\n\n')
-    return transport.sendMail({
+  return (mail: Mail): Promise<unknown> =>
+    transport.sendMail({
       from: options.from,
       replyTo: options.replyTo,
       to: mail.to,
       subject: mail.subject,
-      text,
+      text: text(mail),
       html: html(mail)
     })
-  }
 }
-
-export type SendMail = ReturnType<typeof mailer>

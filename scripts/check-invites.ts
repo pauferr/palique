@@ -68,10 +68,20 @@ assert.deepEqual(await A.inviteStatus(), { max: 3, used: 0 })
 // New address: an invite email with a working code, costing one invite.
 assert.deepEqual(await A.inviteByEmail(` ${mail(newbieName).toUpperCase()} `), { max: 3, used: 1 })
 const invite = await lastMail(mail(newbieName))
-assert.equal(invite.subject, `${aName} quiere agregarte en Palique`)
+assert.equal(invite.subject, `${aName} te ha invitado a Palique`)
 const code = inviteCode(invite.text)
 const optout = invite.text.match(/http:\/\/localhost:8080\/no-invites\?t=\S+/)?.[0]
 assert.ok(optout, 'opt-out link in the email')
+assert.ok(
+  invite.text.replace(/\r/g, '').includes(`\n\n${code}\n\n`),
+  'the code is also written out'
+)
+
+// The "Create my account" page opens the app with the invite; an unknown one is refused.
+const join = await fetch(`http://localhost:8080/join?t=${code}&l=es`)
+assert.equal(join.status, 200)
+assert.ok((await join.text()).includes(`palique://signup?t=${code}`), 'the page opens the app')
+assert.equal((await fetch('http://localhost:8080/join?t=inventado')).status, 404)
 
 // Same address again this week: nothing goes out and no invite is used.
 assert.deepEqual(await A.inviteByEmail(mail(newbieName)), { max: 3, used: 1 })
@@ -118,7 +128,7 @@ await A.login(a, pass)
 // A colored name reaches the email as plain text.
 await A.setNick(`[c=#e11d48]${aName}[/c]`)
 await A.inviteByEmail(mail(`invx${id}`))
-assert.equal((await lastMail(mail(`invx${id}`))).subject, `${aName} quiere agregarte en Palique`)
+assert.equal((await lastMail(mail(`invx${id}`))).subject, `${aName} te ha invitado a Palique`)
 assert.deepEqual(await A.inviteByEmail(mail(`invy${id}`)), { max: 3, used: 3 })
 await assert.rejects(A.inviteByEmail(mail(`invz${id}`)), /limit/)
 await assert.rejects(A.inviteByEmail(mail(memberName)), /limit/)

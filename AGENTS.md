@@ -65,12 +65,12 @@ compose.yaml       local server stack
 - **Sign-in:** the app asks the account service `POST /cuenta {email}` → `{username}` and does normal SASL with it. Unknown addresses get a made-up, stable localpart (HMAC of the email), so a wrong address fails exactly like a wrong password.
 - **Registration is invite-only, by email:**
   1. Someone invites an address (the admin, without limit, or a user, 3 each; expired unused invites stop counting).
-  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email carries `palique://signup?t=TOKEN` and the code.
+  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email has two steps: download the app (`DOWNLOADS_URL`, palique.io's downloads page by default) and create the account at `/join?t=TOKEN`, a page of the service that opens `palique://signup?t=TOKEN`. The code is in the email too, for pasting by hand.
   3. The app gets `POST /signup {token}` → `{email, username}`, registers with XEP-0401 preauth + XEP-0077, and publishes the nick.
   4. Prosody announces the new account to the service and makes inviter and invitee mutual contacts.
 - **Adding contacts:** by email. Iq `lookup` to the account service → JID or nothing. If nothing, the user may explicitly invite them.
 - **Changing the email:** a link goes to the new address. Until it's opened, the old one still signs in. If the new one is taken, the app gets the same answer and that inbox is told instead.
-- **Password recovery:** `POST /recover {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails `palique://reset?e=EMAIL&t=TOKEN` plus the code. The app re-registers the same account with it.
+- **Password recovery:** `POST /recover {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails a link to `/reset?e=EMAIL&t=TOKEN`, a page that opens `palique://reset?e=EMAIL&t=TOKEN`, plus the code. The app re-registers the same account with it.
 - **Passwords:** at least 8 characters, with a lowercase and an uppercase letter, a digit and a symbol (ASCII classes, so ñ counts as a symbol). The app checks it as you type (`src/renderer/src/password.ts`); Prosody enforces it (`mod_palique_passwords`). Existing passwords keep working.
 
 ### Account service (`server/accounts`)
@@ -84,6 +84,8 @@ compose.yaml       local server stack
 - **HTTP**, for the signed-out app and email links:
   - `POST /account`, `/signup`, `/recover`
   - `GET /verify`, `/no-invites`
+  - `GET /join`, `/reset`: where the email buttons land. They open the app (`palique://…`) and show the code; `/join` also links to the downloads
+- **Emails:** one template (`mail.ts`), a Palique conversation window in the app's colors. Someone says a line, then a heading, a short intro, steps or one button, and the code as a fallback. The service's pages share its look (`page()` in `main.ts`).
   - `POST /admin/invite`, only from loopback, used by `src/invite.ts`
 - **Storage:** SQLite at `$DATA_DIR/accounts.sqlite`, with tables `accounts` (email unique), `invites` and `invite_optout`.
 - **Rate limits** are in memory, so a restart clears them:

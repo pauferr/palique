@@ -14,7 +14,7 @@ export type Account = {
 
 export type Invite = { token: string; email: string; jid: string; inviter: string | null }
 
-const WEEK = 7 * 24 * 60 * 60 * 1000
+export const WEEK = 7 * 24 * 60 * 60 * 1000
 const token = (): string => randomBytes(24).toString('base64url')
 
 type AccountRow = {
