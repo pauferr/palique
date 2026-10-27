@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, Plus, Search } from '@lucide/svelte'
+  import { ChevronDown, Search } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import type { MenuLabel } from '../../preload'
@@ -415,15 +415,6 @@
     {/if}
   </div>
 
-  <!-- With no contacts, the empty list offers it already. -->
-  {#if roster.contacts.length && !addOpen}
-    <footer class="add-bar">
-      <button onclick={openAdd}
-        ><Plus size={18} aria-hidden="true" />{_('Añadir o invitar a un contacto')}</button
-      >
-    </footer>
-  {/if}
-
   {#if addOpen}
     <div class="sheet" role="dialog" aria-label={_('Añadir un contacto')}>
       <h3>
@@ -573,23 +564,6 @@
 
   .notice.warning {
     background: var(--warning-bg);
-  }
-
-  .add-bar {
-    padding: 12px 14px;
-    border-top: 1px solid var(--line);
-    background: var(--bar-bg);
-  }
-
-  .add-bar button {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    padding: 10px;
-    font-size: 15px;
-    font-weight: 800;
   }
 
   .list {
