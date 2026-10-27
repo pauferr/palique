@@ -279,7 +279,7 @@ async function invite(
     bubble: inviter
       ? _('¡Ey! Quiero tenerte en mi lista de contactos de Palique 🙂')
       : _('¡Ey! Te hemos guardado un sitio 🙂❤️'),
-    heading: _('El messenger de siempre, para hablar con los tuyos'),
+    heading: _('El chat de siempre, para hablar con los tuyos'),
     intro: _('Palique es una app de chat para el ordenador, como las de antes:'),
     features: [
       _('Ves quién está conectado y le hablas al momento'),

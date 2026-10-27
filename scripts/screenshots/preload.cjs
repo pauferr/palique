@@ -51,7 +51,7 @@ const contacts = [
     'ruben',
     '[c=#ffb300]Rubén[/c=#ff0040] (8)',
     'away',
-    say('Escuchando: Estopa – Como Camarón', 'Listening to: Oasis – Wonderwall')
+    say('Escuchando: mi lista del verano', 'Listening to: my summer playlist')
   ),
   friend(
     'lucia',

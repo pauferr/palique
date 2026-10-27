@@ -43,7 +43,7 @@ export const packs: Pack[] = [
   {
     id: 'classic',
     name: N_('Clásico'),
-    note: N_('El mensaje de siempre, con conectado y zumbido de marimba.'),
+    note: N_('Un aviso de mensaje clásico, con conectado y zumbido de marimba.'),
     message: { src: messageOgg, length: 0.25 },
     online(s) {
       ;[3, 7, 10].forEach((n, i) => marimba(s, hz(n), i * 0.07, i === 2 ? 0.3 : 0.12, 0.18))

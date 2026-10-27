@@ -3,7 +3,7 @@
   "version": "0.0.0-dev",
   "stage": "beta",
   "private": true,
-  "description": "Desktop instant messenger inspired by MSN Messenger and AIM",
+  "description": "Desktop instant messaging app, like the ones from the 2000s",
   "license": "AGPL-3.0-or-later",
   "main": "./out/main/index.js",
   "author": {

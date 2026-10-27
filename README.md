@@ -4,7 +4,7 @@
 
 # Palique
 
-**El messenger de toda la vida, hecho de nuevo.**
+**El chat de toda la vida, hecho de nuevo.**
 
 Tu lista de contactos, tu estado, los guiños…<br>
 y ese sonidito de cuando alguien se conecta.
@@ -53,13 +53,13 @@ Del beso al cerdo bailón, cada uno con su musiquilla. Nítidos a cualquier tama
 
 ### Tu nombre, a todo color
 
-Negrita, colores y degradados como en Messenger Plus!, sin instalar nada aparte.
+Negrita, colores y degradados con códigos de formato en tu nombre, sin instalar nada aparte.
 
 <p align="center"><img src="docs/images/nombre.png" width="340" alt="La ventana para cambiar tu nombre, con negrita, colores, fondos y degradados"></p>
 
 ### Hazlo tuyo
 
-Tres temas con el cielo de siempre: Claro, Cálido para la tarde y Oscuro para cuando se apagan las luces. Además, eliges fuente (sí, hay una tipo Comic Sans), sonidos y estado, Invisible incluido.
+Tres temas con el cielo de siempre: Claro, Cálido para la tarde y Oscuro para cuando se apagan las luces. Además, eliges fuente (sí, hay una de cómic), sonidos y estado, Invisible incluido.
 
 <p align="center">
   <img src="docs/images/tema-claro.png" width="200" alt="Tema Claro">
