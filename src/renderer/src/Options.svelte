@@ -18,7 +18,12 @@
     { id: 'alerts', icon: Bell, label: _('Alertas') },
     { id: 'account', icon: KeyRound, label: _('Cuenta') }
   ] as const
-  let section: (typeof sections)[number]['id'] = $state('personal')
+  // Kept for the session: changing the language reloads the window, and it should stay here.
+  const saved = sessionStorage.getItem('options-section')
+  let section: (typeof sections)[number]['id'] = $state(
+    sections.find((s) => s.id === saved)?.id ?? 'personal'
+  )
+  $effect(() => sessionStorage.setItem('options-section', section))
 
   const themes: { id: Theme; label: string; font: string }[] = [
     { id: 'light', label: _p('tema', 'Claro'), font: 'Nunito' },
@@ -304,7 +309,6 @@
           </label>
         </section>
       </div>
-      <p class="hint">{_('Vista previa: ¡Hola! ¿Hablamos luego? 😎')}</p>
     {:else if section === 'messages'}
       <h1>{_('Mensajes')}</h1>
       <section>
