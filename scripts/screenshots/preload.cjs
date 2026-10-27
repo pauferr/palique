@@ -106,7 +106,7 @@ const values = {
   currentAccount: account,
   getUnread: { 'nerea@localhost': 2 },
   getChatHistory: history,
-  version: 'v0.12.0 (alpha)',
+  version: 'v0.15.0 (beta)',
   language: 'es',
   getSettings: {
     language: 'auto',
