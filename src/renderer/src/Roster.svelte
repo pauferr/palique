@@ -2,11 +2,12 @@
   import { ChevronDown, Search } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
-  import type { MenuLabel } from '../../preload'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import { _, _n, lang } from './i18n'
   import { emojify } from './emoticons'
+  import { helpItems, popup, type MenuItem } from './menu'
+  import MenuBar from './MenuBar.svelte'
   import { avatarPng } from './picture'
   import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
@@ -99,45 +100,30 @@
     }
   }
 
-  // Menus like MSN's, each action in one place: the bar on top (Archivo, Contactos,
-  // Herramientas, Ayuda), your picture (status and picture), and a right click on a contact.
-  // Native, so they can go past the window.
   const ownLabels: Record<OwnShow, string> = { ...labels, invisible: _('Invisible') }
-  type MenuItem = { label: string; checked?: boolean; run: () => void } | '-'
 
-  // Under the button clicked, or where the right click was.
-  async function popup(event: MouseEvent, items: MenuItem[]): Promise<void> {
-    const at =
-      event.type === 'contextmenu'
-        ? { left: event.clientX, bottom: event.clientY }
-        : (event.currentTarget as HTMLElement).getBoundingClientRect()
-    const labels = items.map((item): MenuLabel =>
-      item === '-' ? item : { label: item.label, checked: item.checked }
-    )
-    const item = items[await window.api.popupMenu(labels, at.left, at.bottom)]
-    if (item && item !== '-') item.run()
-  }
-
-  const fileMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [
-      { label: _('Cambiar mi nombre…'), run: window.api.openNick },
-      { label: _('Cambiar mi mensaje personal…'), run: () => (editing = true) },
-      '-',
-      { label: _('Cerrar sesión'), run: onlogout },
-      { label: _('Salir de Palique'), run: window.api.quit }
-    ])
-
-  const contactsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [{ label: _('Añadir o invitar a un contacto…'), run: openAdd }])
-
-  const toolsMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [{ label: _('Opciones…'), run: window.api.openOptions }])
-
-  const helpMenu = (e: MouseEvent): Promise<void> =>
-    popup(e, [
-      { label: _('Registro de errores…'), run: window.api.openLogs },
-      { label: _('Acerca de Palique'), run: window.api.openAbout }
-    ])
+  // The bar on top, like MSN's. The app's own menu is named after it, as on a Mac.
+  const menus = [
+    {
+      label: 'Palique',
+      items: (): MenuItem[] => [
+        { label: _('Cambiar mi nombre…'), run: window.api.openNick },
+        { label: _('Cambiar mi mensaje personal…'), run: () => (editing = true) },
+        '-',
+        { label: _('Cerrar sesión'), run: onlogout },
+        { label: _('Salir de Palique'), run: window.api.quit }
+      ]
+    },
+    {
+      label: _('Contactos'),
+      items: (): MenuItem[] => [{ label: _('Añadir o invitar a un contacto…'), run: openAdd }]
+    },
+    {
+      label: _('Herramientas'),
+      items: (): MenuItem[] => [{ label: _('Opciones…'), run: window.api.openOptions }]
+    },
+    { label: _('Ayuda'), items: helpItems }
+  ]
 
   // Your picture: your status (its frame shows it) or another picture.
   const meMenu = (e: MouseEvent): Promise<void> =>
@@ -257,12 +243,7 @@
 </script>
 
 <section class="roster">
-  <div class="menubar" role="menubar">
-    <button role="menuitem" aria-haspopup="menu" onclick={fileMenu}>{_('Archivo')}</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={contactsMenu}>{_('Contactos')}</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={toolsMenu}>{_('Herramientas')}</button>
-    <button role="menuitem" aria-haspopup="menu" onclick={helpMenu}>{_('Ayuda')}</button>
-  </div>
+  <MenuBar {menus} />
 
   <header>
     <button
@@ -799,29 +780,6 @@
   }
 
   /* The menu bar on top, like MSN Messenger's. */
-  .menubar {
-    position: relative;
-    display: flex;
-    gap: 2px;
-    padding: 4px 8px;
-    background: var(--bar-bg);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .menubar > button {
-    padding: 6px 8px;
-    border-color: transparent;
-    border-radius: 6px;
-    background: none;
-    box-shadow: none;
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  .menubar > button:hover:not(:disabled) {
-    background: var(--row-hover-bg);
-  }
-
   /* Panels that rise from the bottom of the list: adding someone, About. */
   .sheet {
     display: grid;

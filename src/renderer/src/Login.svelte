@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import type { Settings } from '../../main/settings'
   import type { AuthLink } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import { helpItems, type MenuItem } from './menu'
+  import MenuBar from './MenuBar.svelte'
   import { PASSWORD_RULE, strongPassword } from './password'
   import UpdateNotice from './UpdateNotice.svelte'
   import { _ } from './i18n'
@@ -18,6 +21,32 @@
     unreachable: _('No se puede conectar con el servidor.'),
     unknown: _('Algo ha fallado. Inténtalo de nuevo.')
   }
+
+  // Signed out there's no Options window: the language is picked here, and the account's
+  // own language takes over on sign-in.
+  let language: Settings['language'] = $state('auto')
+  const languages: { id: Settings['language']; label: string }[] = [
+    { id: 'auto', label: _('Automático') },
+    // Each language named in itself.
+    { id: 'es', label: 'Español' },
+    { id: 'en', label: 'English' }
+  ]
+  const menus = [
+    {
+      label: 'Palique',
+      items: (): MenuItem[] => [{ label: _('Salir de Palique'), run: window.api.quit }]
+    },
+    {
+      label: _('Idioma'),
+      items: (): MenuItem[] =>
+        languages.map((l) => ({
+          label: l.label,
+          checked: l.id === language,
+          run: () => window.api.setSettings({ language: l.id })
+        }))
+    },
+    { label: _('Ayuda'), items: helpItems }
+  ]
 
   // register: with an invite from an email. forgot: ask for a recovery email.
   // reset: new password with the emailed code.
@@ -74,7 +103,10 @@
   onMount(() => {
     window.api.lastEmail().then((value) => (email ||= value))
     window.api.version().then((value) => (version = value))
-    window.api.getSettings().then((s) => (remember = s.autoLogin))
+    window.api.getSettings().then((s) => {
+      remember = s.autoLogin
+      language = s.language
+    })
     window.api.remembered().then((r) => (canRemember = r.available))
     // A link from an email comes first; otherwise sign in by itself if asked to.
     window.api.pendingLink().then(async (link) => {
@@ -138,6 +170,7 @@
 </script>
 
 <div class="login">
+  <MenuBar {menus} />
   <UpdateNotice />
   <!-- The sky: tall when signing in, shorter for the longer forms. -->
   <header class:tall={mode === 'login'}>
@@ -307,8 +340,9 @@
     box-sizing: border-box;
   }
 
+  /* Shorter by the menu bar above it, so the form still fits without scrolling. */
   header.tall {
-    min-height: 250px;
+    min-height: 210px;
     padding-bottom: 18px;
   }
 
