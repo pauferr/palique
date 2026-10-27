@@ -34,19 +34,13 @@ export const isWinkId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-z0-9-]{1,64}$/.test(id)
 
 export type AuthError =
-  | 'conflict' // the invite's account already exists
-  | 'not-acceptable' // password rejected by the server
   | 'not-authorized' // wrong email or password
-  | 'invalid-invite' // missing, wrong, used or expired invite code
   | 'wait' // too many attempts, try again in a minute
   | 'outdated' // this app is older than the server accepts: update it
   | 'unreachable'
   | 'unknown'
 
 export type AuthResult = { ok: true; jid: string } | { ok: false; error: AuthError }
-
-// palique:// links from emails. `email` only for password resets.
-export type AuthLink = { kind: 'invite' | 'reset'; token: string; email: string }
 
 export type Show = 'online' | 'away' | 'dnd'
 export type OwnShow = Show | 'invisible' // contacts never look invisible: they look offline
@@ -357,79 +351,27 @@ async function loadRoster(): Promise<void> {
   for (const bare of roster.keys()) loadNick(bare).then(emit, () => {})
 }
 
-// In-band registration (XEP-0077) on the already-encrypted stream, before SASL.
-// Registration is invite-only: hand the code to the server first (XEP-0401).
-async function registerAccount(
-  entity: Client,
-  username: string,
-  password: string,
-  invite: string
-): Promise<void> {
-  const preauth = await entity.sendReceive(
-    xml(
-      'iq',
-      { type: 'set', id: randomUUID() },
-      xml('preauth', { xmlns: 'urn:xmpp:pars:0', token: invite })
-    )
-  )
-  if (preauth.attrs.type !== 'result') {
-    throw Object.assign(new Error('invalid invite'), { condition: 'invalid-invite' })
-  }
-  const res = await entity.sendReceive(
-    xml(
-      'iq',
-      { type: 'set', id: randomUUID() },
-      xml(
-        'query',
-        { xmlns: 'jabber:iq:register' },
-        xml('username', {}, username),
-        xml('password', {}, password)
-      )
-    )
-  )
-  if (res.attrs.type !== 'result') {
-    const condition = res
-      .getChild('error')
-      ?.getChildElements()
-      .find((el) => el.name !== 'text')?.name
-    throw Object.assign(new Error('registration failed'), { condition })
-  }
-}
-
 function toAuthError(e: unknown): AuthError {
   const { condition, code } = (e ?? {}) as { condition?: string; code?: string }
-  if (
-    condition === 'conflict' ||
-    condition === 'not-acceptable' ||
-    condition === 'not-authorized' ||
-    condition === 'invalid-invite'
-  ) {
-    return condition
-  }
+  if (condition === 'not-authorized') return condition
   if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ETIMEDOUT') return 'unreachable'
   return unexpected('sign-in', e)
 }
 
-// Signs in with the account's JID localpart (see accountFor). Passing an invite code
-// creates the account first, and `nick` publishes its display name. `show` and `status`:
-// status and personal message to sign in with, so an invisible user is never briefly visible.
+// Signs in with the account's JID localpart (see accountFor). Accounts are made on the
+// website (the account service), never here. `show` and `status`: status and personal
+// message to sign in with, so an invisible user is never briefly visible.
 export async function login(
   username: string,
   password: string,
-  {
-    invite,
-    show = 'online',
-    status = '',
-    nick
-  }: { invite?: string; show?: OwnShow; status?: string; nick?: string } = {}
+  { show = 'online', status = '' }: { show?: OwnShow; status?: string } = {}
 ): Promise<AuthResult> {
   await logout()
   own = { show, status: status.trim().slice(0, 140) }
   const entity = client({
     service: SERVICE,
     domain: DOMAIN,
-    credentials: async (authenticate, mechanisms, _fast, conn) => {
-      if (invite !== undefined) await registerAccount(conn, username, password, invite)
+    credentials: async (authenticate, mechanisms) => {
       // The server requires TLS, so its preferred mechanism is safe to use as-is.
       await authenticate(
         { username, password },
@@ -462,7 +404,7 @@ export async function login(
     return true
   })
   // Also fires after automatic reconnects: refresh contacts and re-announce ourselves.
-  // The first time, login() waits for it (so a new account's name is surely published).
+  // The first time, login() waits for it, so we're fully signed in when it returns.
   let ready: Promise<void> = Promise.resolve()
   entity.on('online', (address) => {
     me = address.bare().toString()
@@ -481,7 +423,7 @@ export async function login(
           : undefined
       )
       // Our name first, so the first presence already carries it.
-      .then(() => (nick ? publishNick(nick) : loadNick(me).catch(() => {})))
+      .then(() => loadNick(me).catch(() => {}))
       .then(() => send(presenceStanza()))
       .then(emit)
       .then(loadEmails)
@@ -853,13 +795,5 @@ export async function accountFor(email: string): Promise<string> {
   return (await accountsPost<{ username: string }>('/account', { email })).username
 }
 
-// Which account an invite creates. Rejects with 'invalid-invite' if it's wrong or used.
-export function inviteInfo(token: string): Promise<{ email: string; username: string }> {
-  return accountsPost('/signup', { token })
-}
-
-// The service answers the same whether or not the address has an account. The email
-// goes out in the language the app is in.
-export async function requestPasswordReset(email: string): Promise<void> {
-  await accountsPost('/recover', { email, lang })
-}
+// "Forgot your password?" is a page of the account service, in the app's language.
+export const recoverUrl = (): string => `${ACCOUNTS_URL}/recover?l=${lang}`

@@ -12,7 +12,7 @@ import {
   safeStorage,
   screen
 } from 'electron'
-import { join, resolve } from 'path'
+import { join } from 'path'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import tls from 'node:tls'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -47,17 +47,16 @@ import {
   changeEmail,
   emailStatus,
   inviteByEmail,
-  inviteInfo,
   inviteStatus,
   lookupContact,
   onEmail,
-  requestPasswordReset,
   resendVerification,
   setNewsletter,
   setAccountLanguage,
   setNick,
   login,
   logout,
+  recoverUrl,
   onChange,
   onMessage,
   onTyping,
@@ -73,9 +72,7 @@ import {
   setAppVersion,
   setAvatar,
   setPresence,
-  cleanNick,
   snapshot,
-  type AuthLink,
   type AuthResult,
   type ChatMessage,
   type OwnShow,
@@ -111,52 +108,6 @@ app.on('render-process-gone', (_event, __, details) =>
   log.write('error', 'renderer gone:', details)
 )
 app.on('child-process-gone', (_event, details) => log.write('error', 'process gone:', details))
-
-// palique:// links (invite and password recovery emails). In development Electron itself
-// is the handler, so it needs the app's path to know what to open.
-if (process.defaultApp && process.argv[1]) {
-  app.setAsDefaultProtocolClient('palique', process.execPath, [resolve(process.argv[1])])
-} else {
-  app.setAsDefaultProtocolClient('palique')
-}
-
-let pendingLink: AuthLink | null = null
-
-// Only palique://signup?t=… and palique://reset?e=…&t=… with sane values; anything
-// else is ignored.
-function parseLink(value: string | undefined): AuthLink | null {
-  if (!value?.startsWith('palique://')) return null
-  try {
-    const url = new URL(value)
-    const token = url.searchParams.get('t') ?? ''
-    const email = url.searchParams.get('e') ?? ''
-    if (!/^[\w-]{8,64}$/.test(token)) return null
-    if (url.hostname === 'signup') return { kind: 'invite', token, email: '' }
-    if (url.hostname === 'reset' && email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email)) {
-      return { kind: 'reset', token, email }
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-// Opens the sign-up or "new password" form, filled in (never submitted by itself).
-function openLink(link: AuthLink | null): void {
-  if (!link) return
-  pendingLink = link
-  showMain()
-  mainWindow?.webContents.send('auth:link', link)
-}
-
-// macOS delivers links as an event (possibly before the app is ready)…
-app.on('open-url', (event, url) => {
-  event.preventDefault()
-  if (app.isReady()) openLink(parseLink(url))
-  else pendingLink = parseLink(url)
-})
-// …Linux and Windows as an argument, at launch or to the already running instance.
-pendingLink ??= parseLink(process.argv.find((arg) => arg.startsWith('palique://')))
 
 // On Wayland a window can't force itself above the rest in every compositor (GNOME
 // refuses), so winks play inside the conversation instead of full screen. (Forcing
@@ -679,17 +630,13 @@ app.whenReady().then(() => {
     const error = (e as Error).message
     return {
       ok: false,
-      error:
-        error === 'wait' || error === 'invalid-invite' || error === 'outdated'
-          ? error
-          : 'unreachable'
+      error: error === 'wait' || error === 'outdated' ? error : 'unreachable'
     }
   }
   // Signed in: remember the email for next time (pre-filled on the sign-in screen).
   const signedIn = (result: AuthResult, email: string): AuthResult => {
     if (result.ok) {
       account = result.jid
-      pendingLink = null
       settings.set({ email })
       useAccountLanguage()
     }
@@ -739,49 +686,8 @@ app.whenReady().then(() => {
     available: canRemember(),
     saved: canRemember() && (await savedPassword()) !== ''
   }))
-  // Which address an invite is for (the sign-up form shows it).
-  ipcMain.handle('auth:invite', async (_event, token: string) => {
-    try {
-      return { ok: true, email: (await inviteInfo(String(token).trim())).email }
-    } catch (e) {
-      return failed(e)
-    }
-  })
-  type Signup = { token: string; nick: string; password: string; newsletter: boolean }
-  ipcMain.handle('auth:register', async (_event, signup: Signup) => {
-    try {
-      const token = String(signup.token).trim()
-      const nick = cleanNick(signup.nick)
-      if (!nick) return { ok: false, error: 'unknown' }
-      const invite = await inviteInfo(token)
-      const result = await login(invite.username, String(signup.password), {
-        invite: token,
-        nick,
-        ...lastPresence()
-      })
-      if (result.ok && signup.newsletter) await setNewsletter(true).catch(() => {})
-      return signedIn(result, invite.email)
-    } catch (e) {
-      return failed(e)
-    }
-  })
-  ipcMain.handle('auth:forgot', (_event, email: string) => requestPasswordReset(clean(email)))
-  // Sets a new password with the emailed code, then signs in with it.
-  ipcMain.handle('auth:reset', async (_event, email: string, token: string, password: string) => {
-    try {
-      const username = await accountFor(clean(email))
-      const result = await login(username, String(password), {
-        invite: String(token).trim(),
-        ...lastPresence()
-      })
-      if (result.ok && settings.get().autoLogin) await rememberPassword(String(password))
-      return signedIn(result, clean(email))
-    } catch (e) {
-      return failed(e)
-    }
-  })
-  // A link may have opened the app before the sign-in screen was listening.
-  ipcMain.handle('auth:pending-link', () => pendingLink)
+  // Accounts are made and passwords reset on the website (the account service).
+  ipcMain.handle('auth:recover', () => shell.openExternal(recoverUrl()))
   ipcMain.handle('auth:last-email', () => settings.get().email)
   // Who's signed in ('' if nobody): a reloaded window goes back to the contact list.
   ipcMain.handle('auth:current', () => account)
@@ -1002,10 +908,7 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
-  app.on('second-instance', (_event, argv) => {
-    showMain()
-    openLink(parseLink(argv.find((arg) => arg.startsWith('palique://'))))
-  })
+  app.on('second-instance', showMain)
   // macOS: clicking the dock icon brings the contact list back.
   app.on('activate', showMain)
 })

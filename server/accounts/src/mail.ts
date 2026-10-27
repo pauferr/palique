@@ -9,8 +9,8 @@ export type Link = { href: string; label: string }
 
 // Every email has the same shape, top to bottom: someone says something (like a chat
 // message), a heading and a line on what it's about, then what to do: numbered steps with
-// a button each, or one button. A code to paste is the fallback when the button can't open
-// the app. A small note and a footer close it.
+// a button each, or one button. Buttons go to the website, never straight into the app. A
+// small note and a footer close it.
 export type Mail = {
   to: string
   lang: Language // the texts come translated; this is for the parts every email shares
@@ -25,7 +25,6 @@ export type Mail = {
   features?: string[]
   steps?: { title: string; text: string; link: Link }[]
   link?: Link
-  code?: { label: string; value: string }
   note?: string
   footer: string
   footerLink?: Link
@@ -36,7 +35,6 @@ export type Mail = {
 // supported. No images: most inboxes hide them until asked.
 const FONT =
   "Nunito,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
-const MONO = "ui-monospace,'SF Mono',Menlo,Consolas,monospace"
 const TEXT = '#13294b'
 const MUTED = '#4d6584'
 const STRONG = '#1f6fc4'
@@ -102,19 +100,13 @@ function html(mail: Mail): string {
 ${features ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px">${features}</table>` : ''}
 ${steps ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px">${steps}</table>` : ''}
 ${mail.link ? `<div style="margin:4px 0 18px">${button(mail.link, true)}</div>` : ''}
-${
-  mail.code
-    ? `<table role="presentation" class="line" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;border:1px dashed ${SOFT_LINE};border-radius:12px"><tr><td style="padding:10px 14px"><p class="muted" style="margin:0 0 4px;font-size:13px;color:${MUTED}">${escape(mail.code.label)}</p><div class="fg" style="font-family:${MONO};font-size:16px;font-weight:700;letter-spacing:0.06em;color:${TEXT};word-break:break-all;-webkit-user-select:all;user-select:all">${escape(mail.code.value)}</div></td></tr></table>`
-    : ''
-}
 ${mail.note ? `<p class="muted" style="margin:0 0 18px;font-size:13px;color:${MUTED}">${escape(mail.note)}</p>` : ''}
 </td></tr>
 <tr><td class="muted line" style="padding:14px 30px 20px;border-top:1px solid ${LINE};font-size:12px;line-height:1.5;color:${MUTED}">${escape(mail.footer)}${mail.footerLink ? ` <a class="acc" href="${escape(mail.footerLink.href)}" style="color:${STRONG}">${escape(mail.footerLink.label)}</a>` : ''}</td></tr>
 </table></td></tr></table></body></html>`
 }
 
-// The same email as plain text, for clients that don't show HTML. The code gets a
-// paragraph of its own, so it's easy to copy.
+// The same email as plain text, for clients that don't show HTML.
 function text(mail: Mail): string {
   const _ = translator(mail.lang)
   return [
@@ -126,7 +118,6 @@ function text(mail: Mail): string {
       (step, i) => `${i + 1}. ${step.title}: ${step.text}\n${step.link.label}: ${step.link.href}`
     ),
     ...(mail.link ? [`${mail.link.label}: ${mail.link.href}`] : []),
-    ...(mail.code ? [mail.code.label, mail.code.value] : []),
     ...(mail.note ? [mail.note] : []),
     '--',
     mail.footerLink ? `${mail.footer} ${mail.footerLink.href}` : mail.footer

@@ -4,8 +4,6 @@ import type { ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
 import type { UpdateStatus } from '../main/updates'
 import type {
-  AuthError,
-  AuthLink,
   AuthResult,
   ChatMessage,
   EmailStatus,
@@ -25,26 +23,9 @@ const api = {
     ipcRenderer.invoke('auth:remembered'),
   // Opening at startup isn't available on Linux.
   platform: process.platform,
-  inviteEmail: (
-    token: string
-  ): Promise<{ ok: true; email: string } | { ok: false; error: AuthError }> =>
-    ipcRenderer.invoke('auth:invite', token),
-  register: (signup: {
-    token: string
-    nick: string
-    password: string
-    newsletter: boolean
-  }): Promise<AuthResult> => ipcRenderer.invoke('auth:register', signup),
-  forgotPassword: (email: string): Promise<void> => ipcRenderer.invoke('auth:forgot', email),
-  resetPassword: (email: string, token: string, password: string): Promise<AuthResult> =>
-    ipcRenderer.invoke('auth:reset', email, token, password),
+  // "Forgot your password?": the website's page, in the browser.
+  recoverPassword: (): Promise<void> => ipcRenderer.invoke('auth:recover'),
   lastEmail: (): Promise<string> => ipcRenderer.invoke('auth:last-email'),
-  pendingLink: (): Promise<AuthLink | null> => ipcRenderer.invoke('auth:pending-link'),
-  onLink: (callback: (link: AuthLink) => void): (() => void) => {
-    const listener = (_: unknown, link: AuthLink): void => callback(link)
-    ipcRenderer.on('auth:link', listener)
-    return () => ipcRenderer.off('auth:link', listener)
-  },
   getEmail: (): Promise<EmailStatus> => ipcRenderer.invoke('account:email'),
   changeEmail: (address: string): Promise<EmailStatus> =>
     ipcRenderer.invoke('account:set-email', address),

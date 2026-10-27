@@ -4,9 +4,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
-import { accountFor, inviteInfo, login, logout, snapshot } from '../src/main/xmpp.ts'
-import { strongPassword } from '../src/renderer/src/password.ts'
-import { adminInvite } from './invite.ts'
+import { accountFor, login, logout, snapshot } from '../src/main/xmpp.ts'
+import { adminInvite, inviteInfo, page } from './invite.ts'
 
 tls.setDefaultCACertificates([
   ...tls.getCACertificates('default'),
@@ -21,44 +20,48 @@ const token = await adminInvite(email)
 const invite = await inviteInfo(token)
 assert.equal(invite.email, email)
 assert.match(invite.username, /^[a-z2-7]{10}$/)
-await assert.rejects(inviteInfo('not-a-real-code'), /invalid-invite/)
+assert.equal((await page('/join?t=not-a-real-code')).status, 404)
 
 // Until it's used, signing in with that address points at the reserved account.
 assert.equal(await accountFor(email), invite.username)
 
-// Only strong passwords: 8+ characters, lowercase, uppercase, digit and symbol.
-for (const weak of ['Corta1!', 'sinmayus1!', 'SINMINUS1!', 'SinNumero!', 'SinSimbolo1', ''])
-  assert.equal(strongPassword(weak), false, weak)
-assert.equal(strongPassword('Segura-1'), true)
-assert.equal(strongPassword('Contraseña1'), true) // ñ counts as a symbol on the server too
-// The server refuses weak ones too, and the invite stays usable.
-assert.deepEqual(await login(invite.username, 'debil', { invite: token }), {
-  ok: false,
-  error: 'not-acceptable'
-})
+// The sign-up page shows the address, and asks for a name and the password twice.
+const form = await page(`/join?t=${token}`)
+assert.equal(form.status, 200)
+assert.ok(form.text.includes(email), 'the page shows the address')
+const join = (fields: Record<string, string>): ReturnType<typeof page> =>
+  page(`/join?t=${token}&l=es`, fields)
+// Only strong passwords (8+ characters, lowercase, uppercase, digit and symbol): the
+// server refuses weak ones, and the invite stays usable. ñ counts as a symbol.
+for (const weak of ['Corta1!', 'sinmayus1!', 'SINMINUS1!', 'SinNumero!', 'SinSimbolo1']) {
+  const res = await join({ nick: 'Tere', password: weak, confirm: weak })
+  assert.equal(res.status, 400, weak)
+  assert.match(res.text, /no es segura/, weak)
+}
+assert.match(
+  (await join({ nick: 'Tere', password: pass, confirm: 'Otra-pass1' })).text,
+  /no coinciden/
+)
+assert.match((await join({ nick: ' ', password: pass, confirm: pass })).text, /Escribe tu nombre/)
 
-// The invite can only create its own account.
-assert.deepEqual(await login('someoneelse', pass, { invite: token }), {
-  ok: false,
-  error: 'not-acceptable'
-})
+const created = await join({ nick: 'Tere', password: 'Contraseña1', confirm: 'Contraseña1' })
+assert.equal(created.status, 200)
+assert.match(created.text, /Cuenta creada/)
 
-const reg = await login(invite.username, pass, { invite: token, nick: 'Tere' })
+// Used: it's gone, and can't create the account again.
+assert.equal((await page(`/join?t=${token}`)).status, 404)
+assert.equal((await join({ nick: 'Otra', password: pass, confirm: pass })).status, 404)
+
+// The name chosen on the website is the account's display name from the start.
+const reg = await login(invite.username, 'Contraseña1')
 assert.deepEqual(reg, { ok: true, jid: `${invite.username}@localhost` })
 await new Promise((r) => setTimeout(r, 300))
 assert.equal(snapshot().name, 'Tere')
 await logout()
 
-// Used: it's gone, and can't create the account again.
-await assert.rejects(inviteInfo(token), /invalid-invite/)
-assert.deepEqual(await login(invite.username, pass, { invite: token }), {
-  ok: false,
-  error: 'invalid-invite'
-})
-
 // Signing in by email, case and spaces don't matter (the app cleans them up).
 assert.equal(await accountFor(email), invite.username)
-assert.deepEqual(await login(await accountFor(email), pass), {
+assert.deepEqual(await login(await accountFor(email), 'Contraseña1'), {
   ok: true,
   jid: `${invite.username}@localhost`
 })
@@ -79,7 +82,7 @@ const signedIn = client({
   service: 'xmpp://localhost:5222',
   domain: 'localhost',
   username: invite.username,
-  password: pass
+  password: 'Contraseña1'
 })
 signedIn.on('error', () => {})
 await signedIn.start()

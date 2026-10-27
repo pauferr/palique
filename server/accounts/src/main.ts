@@ -288,25 +288,19 @@ async function invite(
     ],
     steps: [
       {
-        title: _('Descarga Palique'),
-        text: _('Gratis, para Mac, Windows y Linux. Hazlo desde tu ordenador.'),
-        link: { href: DOWNLOADS, label: _('Descargar Palique') }
-      },
-      {
         title: _('Crea tu cuenta'),
-        text: _('Con la app ya instalada. Tu invitación va incluida, no tienes que copiar nada.'),
+        text: _('Elige tu nombre y tu contraseña. Puedes hacerlo desde el móvil.'),
         link: {
           href: `${PUBLIC_URL}/join?t=${encodeURIComponent(token)}&l=${lang}`,
           label: _('Crear mi cuenta')
         }
+      },
+      {
+        title: _('Descarga Palique y entra con tu correo'),
+        text: _('Gratis, para Mac, Windows y Linux.'),
+        link: { href: DOWNLOADS, label: _('Descargar Palique') }
       }
     ],
-    code: {
-      label: _(
-        '¿El botón no abre Palique? Pega este código en «¿Tienes una invitación? Crea tu cuenta»:'
-      ),
-      value: token
-    },
     note: inviter
       ? _('Entrarás con {email} y {name} ya estará en tu lista. La invitación caduca el {date}.', {
           email,
@@ -378,6 +372,10 @@ function ipLimit(max: number, windowMs: number): (ip: string) => boolean {
   }
 }
 
+// The app sends JSON; the website's forms, form fields.
+const isForm = (req: IncomingMessage): boolean =>
+  (req.headers['content-type'] ?? '').startsWith('application/x-www-form-urlencoded')
+
 function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
     let body = ''
@@ -387,7 +385,7 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
     })
     req.on('end', () => {
       try {
-        resolve(JSON.parse(body))
+        resolve(isForm(req) ? Object.fromEntries(new URLSearchParams(body)) : JSON.parse(body))
       } catch {
         resolve({})
       }
@@ -424,20 +422,12 @@ async function sendReset(email: string, lang: Language): Promise<void> {
     window: _('Mensaje de Palique'),
     bubble: _('Tranqui, nos ha pasado a todos 😉'),
     heading: _('Elige una contraseña nueva'),
-    intro: _(
-      'Pulsa el botón desde el ordenador donde tienes Palique y elige otra. Tus contactos y conversaciones siguen ahí.'
-    ),
+    intro: _('Pulsa el botón y elige otra. Tus contactos y conversaciones siguen ahí.'),
     link: {
       href: `${PUBLIC_URL}/reset?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}&l=${lang}`,
       label: _('Elegir contraseña nueva')
     },
-    code: {
-      label: _(
-        '¿El botón no abre Palique? Pega este código en «¿Olvidaste tu contraseña?» › «Ya tengo un código»:'
-      ),
-      value: token
-    },
-    note: _('El enlace y el código caducan en una hora y solo valen una vez.'),
+    note: _('El enlace caduca en una hora y solo vale una vez.'),
     footer: _('¿No lo has pedido tú? Ignora este correo: tu contraseña no cambia.')
   })
 }
@@ -449,6 +439,32 @@ const signInIps = ipLimit(Number(env('SIGNIN_LIMIT', '30')), 60_000)
 
 const pushStatus = (account: Account): void => {
   xmpp.send(xml('message', { to: account.jid }, status(account))).catch(() => {})
+}
+
+// Uses an invite (creating its account, named `nick`) or a password reset code, with the
+// password chosen on the website. Prosody checks both (mod_palique_invites).
+async function redeem(
+  token: string,
+  password: string,
+  nick?: string
+): Promise<'ok' | 'invalid' | 'weak' | 'error'> {
+  try {
+    await prosodyIq(
+      xml(
+        'redeem',
+        { xmlns: INVITES, token },
+        xml('password', {}, password),
+        ...(nick ? [xml('nick', {}, nick)] : [])
+      )
+    )
+    return 'ok'
+  } catch (e) {
+    const condition = (e as { condition?: string }).condition
+    if (condition === 'item-not-found' || condition === 'conflict') return 'invalid'
+    if (condition === 'not-acceptable') return 'weak'
+    console.error('redeem:', condition ?? (e as Error).message)
+    return 'error'
+  }
 }
 
 // Same look as the emails: a Palique window on the app's sky. `extra` is HTML made here,
@@ -463,7 +479,9 @@ main{width:min(440px,100% - 32px);background:var(--card);border:1px solid var(--
 .bar{padding:12px 18px;background:var(--bar);border-bottom:1px solid var(--line);font-weight:800;font-size:16px}.bar span{color:#2f9a3c}
 .body{padding:22px 28px 26px}h1{font-size:21px;font-weight:900;margin:0 0 6px}p{margin:0 0 14px;color:var(--muted)}a{color:var(--acc)}
 .btn{display:block;margin:18px 0;padding:13px 20px;border:1px solid #1a5fa8;border-radius:999px;background:linear-gradient(180deg,#5db2ff 0%,#1f6fc4 52%,#1a63b3 100%);box-shadow:inset 0 1px 0 rgb(255 255 255/70%),0 3px 8px rgb(31 111 196/30%);color:#fff;font-weight:800;text-align:center;text-decoration:none}
-.code{padding:10px 14px;border:1px dashed var(--soft-line);border-radius:12px}.code p{margin:0 0 4px;font-size:13px}.code b{font:700 16px ui-monospace,'SF Mono',Menlo,Consolas,monospace;letter-spacing:.06em;word-break:break-all;user-select:all}
+.btn{width:100%;font:inherit;font-weight:800;cursor:pointer}
+label{display:block;margin:0 0 12px;font-weight:700}input{display:block;box-sizing:border-box;width:100%;margin-top:4px;padding:10px 14px;border:2px solid var(--soft-line);border-radius:999px;background:var(--card);color:var(--fg);font:inherit;font-weight:400}input:focus{outline:none;border-color:var(--acc)}input[readonly]{border-style:dashed;color:var(--muted)}.check{display:flex;gap:8px;align-items:center;font-weight:600}.check input{width:18px;height:18px;margin:0;accent-color:#2f9a3c}
+.hint{margin:-6px 0 12px;font-size:13px}.error{padding:10px 14px;border-radius:12px;background:#fdecea;color:#b42318;font-weight:700}@media (prefers-color-scheme:dark){.error{background:#3a1d1d;color:#ff9a8c}}
 </style></head>
 <body><main><div class="bar"><span>&#9679;</span>&nbsp;Palique</div><div class="body"><h1>${escape(title)}</h1><p>${escape(message)}</p>${extra}</div></main></body></html>`
 }
@@ -483,7 +501,7 @@ createServer(async (req, res) => {
     res.end(JSON.stringify(body))
   }
 
-  if (req.method === 'POST' && APP_PATHS.has(url.pathname)) {
+  if (req.method === 'POST' && APP_PATHS.has(url.pathname) && !isForm(req)) {
     const version = req.headers['x-palique-version']
     if (outdated(MIN_APP_VERSION, Array.isArray(version) ? version[0] : version)) {
       return json(426, { error: 'outdated' })
@@ -504,7 +522,7 @@ createServer(async (req, res) => {
     if (!invite) return json(404, { error: 'invalid-invite' })
     return json(200, { email: invite.email, username: invite.jid.split('@')[0] })
   }
-  if (req.method === 'POST' && url.pathname === '/recover') {
+  if (req.method === 'POST' && url.pathname === '/recover' && !isForm(req)) {
     const body = await readJson(req)
     const email = cleanEmail(body.email)
     if (validEmail(email) && allowReset(email, clientIp(req))) {
@@ -533,47 +551,153 @@ createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' })
     res.end(page(lang, title, message, extra))
   }
-  // An email's button lands here: it opens the app at the right screen with `appLink`.
-  // The code is there too, for an app that doesn't take the link.
-  const openApp = (appLink: string, codeLabel: string, code: string, after = ''): string =>
-    `<a class="btn" href="${escape(appLink)}">${_('Abrir Palique')}</a>${after}<div class="code"><p>${escape(codeLabel)}</p><b>${escape(code)}</b></div>`
-  // The invite's "Create my account" button.
-  if (req.method === 'GET' && url.pathname === '/join') {
-    if (!signInIps(clientIp(req)))
-      return reply(429, _('Espera un momento'), _('Demasiados intentos. Espera un minuto.'))
+  // The website's forms: where the email buttons land. Everything about an account but
+  // signing in happens here, not in the app. Each one posts back to its own address.
+  const form = (fields: string, submit: string, error: string): string =>
+    `${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}<form method="post">${fields}<button class="btn">${escape(submit)}</button></form>`
+  const input = (name: string, label: string, type: string, attrs = ''): string =>
+    `<label>${escape(label)}<input name="${name}" type="${type}" ${attrs}></label>`
+  // The same rule as the app and Prosody (mod_palique_passwords); the browser checks it first.
+  const rule = _('Al menos 8 caracteres, con mayúscula, minúscula, número y símbolo.')
+  const newPassword = (): string =>
+    input(
+      'password',
+      _('Contraseña'),
+      'password',
+      `required minlength="8" autocomplete="new-password" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}" title="${escape(rule)}"`
+    ) +
+    `<p class="hint">${escape(rule)}</p>` +
+    input('confirm', _('Repite la contraseña'), 'password', 'required autocomplete="new-password"')
+  const isPage = req.method === 'GET' || req.method === 'POST'
+  const body = req.method === 'POST' ? await readJson(req) : {}
+  const field = (name: string): string => String(body[name] ?? '')
+  // A form sent back: the password must be typed twice alike; too many tries wait.
+  const problem = (): string =>
+    !signInIps(clientIp(req))
+      ? _('Demasiados intentos. Espera un minuto.')
+      : field('password') !== field('confirm')
+        ? _('Las contraseñas no coinciden.')
+        : ''
+  const failed = (result: string): string =>
+    result === 'weak'
+      ? `${_('Esa contraseña no es segura.')} ${rule}`
+      : _('Algo ha fallado. Inténtalo de nuevo.')
+
+  // The invite's "Create my account": name and password, then the downloads.
+  if (isPage && url.pathname === '/join') {
     const token = url.searchParams.get('t') ?? ''
-    if (!db.invite(token)) {
+    const invite = db.invite(token)
+    if (!invite) {
       return reply(
         404,
         _('Invitación no válida'),
         _('Esta invitación ya se ha usado o ha caducado. Pide otra a quien te invitó.')
       )
     }
+    const nick = field('nick').trim().slice(0, 64)
+    let error = ''
+    if (req.method === 'POST') {
+      error = problem() || (nick ? '' : _('Escribe tu nombre.'))
+      if (!error) {
+        const result = await redeem(token, field('password'), nick)
+        if (result === 'ok') {
+          // Claimed now rather than when Prosody's announcement arrives, to keep the choice.
+          if (db.account(invite.jid) && field('newsletter')) db.setNewsletter(invite.jid, true)
+          return reply(
+            200,
+            _('¡Cuenta creada!'),
+            _('Ya puedes entrar en Palique con {email} y tu contraseña.', { email: invite.email }),
+            `<a class="btn" href="${escape(DOWNLOADS)}">${_('Descargar Palique')}</a><p>${_('¿Ya lo tienes? Ábrelo e inicia sesión.')}</p>`
+          )
+        }
+        error =
+          result === 'invalid' ? _('Esta invitación ya se ha usado o ha caducado.') : failed(result)
+      }
+    }
     return reply(
-      200,
+      error ? 400 : 200,
       _('Crea tu cuenta de Palique'),
-      _('Pulsa el botón para abrir Palique con tu invitación.'),
-      openApp(
-        `palique://signup?t=${encodeURIComponent(token)}`,
-        _('¿No se abre? Pega este código en «¿Tienes una invitación? Crea tu cuenta»:'),
-        token,
-        `<p>${_('¿Aún no tienes Palique? {link}, instálalo y vuelve a esta página.', { link: `<a href="${escape(DOWNLOADS)}">${_('Descárgalo')}</a>` })}</p>`
+      _('Elige tu nombre y tu contraseña. Tus amigos te verán con ese nombre.'),
+      form(
+        input(
+          'email',
+          _('Correo electrónico'),
+          'email',
+          `value="${escape(invite.email)}" readonly`
+        ) +
+          input(
+            'nick',
+            _('Tu nombre'),
+            'text',
+            `value="${escape(nick)}" required maxlength="64" autocomplete="nickname"`
+          ) +
+          newPassword() +
+          `<label class="check"><input name="newsletter" type="checkbox"${field('newsletter') ? ' checked' : ''}>${escape(_('Quiero recibir novedades de Palique por correo'))}</label>`,
+        _('Crear mi cuenta'),
+        error
       )
     )
   }
-  // The password recovery email's button. The code is only checked when it's used.
-  if (req.method === 'GET' && url.pathname === '/reset') {
+  // The recovery email's button: a new password for that address.
+  if (isPage && url.pathname === '/reset') {
     const email = url.searchParams.get('e') ?? ''
     const token = url.searchParams.get('t') ?? ''
-    if (!email || !token) return reply(404, _('Enlace no válido'), _('Este enlace no existe.'))
+    const expired = (): void =>
+      reply(
+        404,
+        _('Enlace caducado'),
+        _('Este enlace ya se ha usado o ha caducado. Pide otro y te lo enviamos.'),
+        `<a class="btn" href="/recover?l=${lang}">${_('Pedir otro enlace')}</a>`
+      )
+    if (!email || !token) return expired()
+    let error = ''
+    if (req.method === 'POST') {
+      error = problem()
+      if (!error) {
+        const result = await redeem(token, field('password'))
+        if (result === 'ok') {
+          return reply(
+            200,
+            _('¡Contraseña cambiada!'),
+            _('Ya puedes entrar en Palique con {email} y tu contraseña nueva.', { email })
+          )
+        }
+        if (result === 'invalid') return expired()
+        error = failed(result)
+      }
+    }
+    return reply(
+      error ? 400 : 200,
+      _('Elige una contraseña nueva'),
+      _('Para entrar en Palique con {email}.', { email }),
+      form(newPassword(), _('Cambiar mi contraseña'), error)
+    )
+  }
+  // "Forgot your password?" from the app: the address to send the link to. Always the
+  // same answer, so it doesn't tell whether there's an account.
+  if (isPage && url.pathname === '/recover') {
+    if (req.method === 'POST') {
+      const email = cleanEmail(body.email)
+      if (validEmail(email) && allowReset(email, clientIp(req))) {
+        sendReset(email, lang).catch((e) => console.error('reset', e.message))
+      }
+      return reply(
+        200,
+        _('Mira tu correo'),
+        _(
+          'Si {email} tiene una cuenta de Palique, te hemos enviado un enlace para elegir otra contraseña. Caduca en una hora.',
+          { email }
+        )
+      )
+    }
     return reply(
       200,
-      _('Elige una contraseña nueva'),
-      _('Pulsa el botón para abrir Palique y cambiarla.'),
-      openApp(
-        `palique://reset?e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`,
-        _('¿No se abre? Pega este código en «¿Olvidaste tu contraseña?» › «Ya tengo un código»:'),
-        token
+      _('¿Olvidaste tu contraseña?'),
+      _('Escribe tu correo y te enviaremos un enlace para elegir otra.'),
+      form(
+        input('email', _('Correo electrónico'), 'email', 'required autocomplete="email"'),
+        _('Enviarme el enlace'),
+        ''
       )
     )
   }

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import Login from './Login.svelte'
   import Roster from './Roster.svelte'
 
@@ -16,14 +15,6 @@
     await window.api.logout()
     jid = ''
   }
-
-  // An invite or password recovery link while signed in: sign out so its form shows (it
-  // picks the link up itself).
-  onMount(() =>
-    window.api.onLink(() => {
-      if (jid) logout()
-    })
-  )
 </script>
 
 {#if !ready}

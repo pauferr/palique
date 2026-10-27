@@ -100,7 +100,6 @@ const history = [
 const values = {
   remembered: { available: true, saved: false },
   lastEmail: 'andrea@palique.com',
-  pendingLink: null,
   getEmail: { address: 'andrea@palique.com', pending: '', newsletter: true, language: '' },
   inviteStatus: { max: 3, used: 1 },
   getRoster: arg('nick') ? { ...snapshot, name: nick } : snapshot,

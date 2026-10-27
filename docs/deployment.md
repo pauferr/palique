@@ -93,7 +93,7 @@ Comprobación rápida: abre `https://tu-dominio.com` en el navegador. Debe salir
    - `XMPP_DOMAIN` = `tu-dominio.com`
    - `ACCOUNTS_URL` = `https://tu-dominio.com`
 2. Publica una versión: *Actions → Release → Run workflow* con **publish** activado. El número de versión sale solo de los commits.
-3. Cuando termine, publica el borrador en *Releases*, instala la app y crea tu cuenta con la invitación que te llegó en el paso 7. A partir de ahí, cada usuario puede invitar a 3 personas desde la propia app.
+3. Cuando termine, publica el borrador en *Releases*, crea tu cuenta con el botón de la invitación que te llegó en el paso 7 e inicia sesión en la app. A partir de ahí, cada usuario puede invitar a 3 personas desde la propia app.
 
 ---
 

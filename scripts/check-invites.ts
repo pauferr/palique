@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import * as A from '../src/main/xmpp.ts'
-import { inviteCode, register, signUp } from './invite.ts'
+import { inviteCode, page, register, signUp } from './invite.ts'
 import { lastMail, mailCount } from './mailpit.ts'
 
 tls.setDefaultCACertificates([
@@ -53,12 +53,6 @@ noInvite.on('error', () => {})
 await noInvite.start().catch(() => {})
 await noInvite.stop().catch(() => {})
 
-// A wrong code is rejected before anything is created.
-assert.deepEqual(await A.login(`nobody${id}`, pass, { invite: 'nope' }), {
-  ok: false,
-  error: 'invalid-invite'
-})
-
 const [aName, memberName, newbieName] = ['inva', 'invm', 'invn'].map((n) => `${n}${id}`)
 const member = await register(memberName, pass)
 await A.logout()
@@ -72,16 +66,10 @@ assert.equal(invite.subject, `${aName} te ha invitado a Palique`)
 const code = inviteCode(invite.text)
 const optout = invite.text.match(/http:\/\/localhost:8080\/no-invites\?t=\S+/)?.[0]
 assert.ok(optout, 'opt-out link in the email')
-assert.ok(
-  invite.text.replace(/\r/g, '').includes(`\n\n${code}\n\n`),
-  'the code is also written out'
-)
 
-// The "Create my account" page opens the app with the invite; an unknown one is refused.
-const join = await fetch(`http://localhost:8080/join?t=${code}&l=es`)
-assert.equal(join.status, 200)
-assert.ok((await join.text()).includes(`palique://signup?t=${code}`), 'the page opens the app')
-assert.equal((await fetch('http://localhost:8080/join?t=inventado')).status, 404)
+// Its "Create my account" button opens the sign-up form; a made-up code doesn't.
+assert.equal((await page(`/join?t=${code}&l=es`)).status, 200)
+assert.equal((await page('/join?t=inventado')).status, 404)
 
 // Same address again this week: nothing goes out and no invite is used.
 assert.deepEqual(await A.inviteByEmail(mail(newbieName)), { max: 3, used: 1 })
@@ -118,10 +106,10 @@ await until(
 
 // A used invite can't create a second account.
 await A.logout()
-assert.deepEqual(await A.login(`other${id}`, pass, { invite: code }), {
-  ok: false,
-  error: 'invalid-invite'
-})
+assert.equal(
+  (await page(`/join?t=${code}`, { nick: 'Otra', password: pass, confirm: pass })).status,
+  404
+)
 
 // Three per person. At the limit, the answer is "limit" even for a registered address.
 await A.login(a, pass)

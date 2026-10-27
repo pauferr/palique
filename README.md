@@ -75,8 +75,8 @@ Tres temas con el cielo de siempre: Claro, Cálido para la tarde y Oscuro para c
 ## Cómo empezar
 
 1. Recibe una invitación de un amigo que ya esté en Palique, o pídela en [chat@palique.io](mailto:chat@palique.io). Te llega por correo.
-2. Descarga Palique desde [Releases](https://github.com/pauferr/palique/releases).
-3. Abre el enlace del correo, o pega el código en *¿Tienes una invitación? Crea tu cuenta*, y elige nombre y contraseña.
+2. Pulsa *Crear mi cuenta* en el correo y elige nombre y contraseña. Se puede hacer desde el móvil.
+3. Descarga Palique desde [palique.io](https://palique.io/downloads/) y entra con tu correo.
 4. Añade a tus amigos por su correo. Si aún no están, invítales.
 5. A chatear. Y si alguien tarda en contestar, ya sabes qué hacer.
 

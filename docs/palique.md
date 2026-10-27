@@ -157,12 +157,12 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID, y solo se lo da a los contactos mutuos: pregunta a Prosody quiénes son (el roster está allí) antes de responder. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie más. El JID no se muestra nunca.
 - El nombre visible es XEP-0172: se publica en PEP (lo leen los contactos, como el avatar) y viaja en cada presencia y en las solicitudes de amistad, para que se vea antes de aceptar.
 - Iniciar sesión: la app pregunta al servicio de cuentas (HTTP) qué JID corresponde al correo y entra con él (SASL normal). A un correo sin cuenta le responde un JID inventado y siempre el mismo, así que falla igual que una contraseña mal escrita y no se sabe si la cuenta existe. Limitado por IP.
-- Registro desde el cliente mediante XEP-0077 (*In-Band Registration*). Requisito de diseño: encapsular la autenticación en el cliente para poder añadir otros métodos sin rehacer el flujo.
+- La app solo inicia sesión. Crear la cuenta y recuperar la contraseña se hace en la web (páginas del servicio de cuentas en el mismo dominio): un clic desde el correo, también desde el móvil, sin códigos que pegar ni enlaces `palique://` que algunos programas de correo bloquean.
 
 **Invitaciones** (también es la principal medida contra el registro masivo):
 - Solo por correo. Sin invitación no se puede crear cuenta (`registration_invite_only` en Prosody, XEP-0401).
-- Al invitar, el servicio de cuentas elige el JID de la futura cuenta y pide a Prosody una invitación que solo puede crear esa cuenta (módulo propio en `server/modules/`). El correo trae un botón que abre Palique (`palique://signup?t=…`) y el código escrito. Caduca a la semana.
-- Como la invitación llegó a ese correo, la cuenta nace con el correo verificado. Al registrarse se elige el nombre visible y la contraseña; el correo no se escribe.
+- Al invitar, el servicio de cuentas elige el JID de la futura cuenta y pide a Prosody una invitación que solo puede crear esa cuenta (módulo propio en `server/modules/`). El correo lleva dos pasos: crear la cuenta en la web (`/join`, con el código en el enlace) y descargar Palique. Caduca a la semana.
+- Como la invitación llegó a ese correo, la cuenta nace con el correo verificado. Al registrarse en la web se elige el nombre visible y la contraseña; el correo no se escribe. El servicio de cuentas se los pasa a Prosody con el código (`redeem` en el módulo propio), que crea la cuenta con las mismas comprobaciones que el registro dentro de XMPP y publica el nombre.
 - Los primeros usuarios los invita el administrador (`docker compose exec accounts node src/invite.ts correo`, sin límite). Cada usuario puede invitar a **3 personas**; las invitaciones que caducan sin usarse vuelven a contar. Más adelante se abrirá el registro.
 - Quien entra con una invitación queda añadido automáticamente como contacto de quien le invitó, en los dos sentidos.
 - Invitar es siempre una acción explícita, con confirmación. Contra el spam:
@@ -179,11 +179,10 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Lo gestiona un servicio propio, el **servicio de cuentas** (`server/accounts/`, TypeScript, en Docker junto a Prosody, con su propio SQLite):
   - Se conecta a Prosody como componente XMPP (XEP-0114). Con sesión, la app le habla por la conexión XMPP, así el servidor garantiza de qué cuenta viene (por HTTP cualquiera podría cambiar el correo de una cuenta ajena y robarla con la recuperación).
   - Envía los correos de invitación, de cambio de correo y de recuperación.
-  - Recuperación de contraseña, sin páginas web (por ahora):
-    - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" pide el correo. La app lo envía al servicio por HTTP (con la sesión cerrada no hay conexión XMPP autenticada). El servicio responde siempre lo mismo, para no revelar si la cuenta existe, y limita las peticiones.
-    - Si el correo es de una cuenta, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y lo envía por correo.
-    - El correo trae un botón que abre Palique (`palique://reset?…`, registrado como protocolo de la app) y también el código escrito, porque algunos programas de correo no dejan pulsar enlaces que no sean web.
-    - La app usa el código igual que una invitación (XEP-0401) para poner la nueva contraseña. No hace falta una cuenta de administrador.
+  - Recuperación de contraseña, en la web:
+    - En la pantalla de inicio de sesión, "¿Olvidaste tu contraseña?" abre en el navegador la página `/recover`, que pide el correo. El servicio responde siempre lo mismo, para no revelar si la cuenta existe, y limita las peticiones.
+    - Si el correo es de una cuenta, el servicio pide a Prosody un código de restablecimiento de un solo uso, que caduca en una hora (invitación de restablecimiento de `mod_invites`), y envía un enlace a `/reset` con él.
+    - En esa página se elige la contraseña nueva; el servicio la pasa a Prosody con el código (`redeem`). No hace falta una cuenta de administrador.
 - Desarrollo: los correos se capturan con Mailpit (buzón falso en Docker con página web); no sale ningún correo real.
 
 **Boletín de novedades:**

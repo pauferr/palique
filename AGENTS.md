@@ -16,7 +16,7 @@ A desktop instant messenger in the spirit of MSN Messenger and AIM: Electron + S
 
 ```
 src/main/          Electron main process
-  index.ts         windows, tray, notifications, IPC handlers, palique:// links, anti-spam
+  index.ts         windows, tray, notifications, IPC handlers, anti-spam
   xmpp.ts          the only module that touches XMPP; one connection; account service calls
   history.ts       local chat history (node:sqlite, history.sqlite in userData)
   settings.ts      app preferences (settings.json in userData)
@@ -63,15 +63,17 @@ compose.yaml       local server stack
 - **The email is the account.** Each account has a random, permanent JID localpart (10 chars, `[a-z2-7]`, e.g. `k3f9x2ab7q@domain`). Only the account service knows which email goes with which JID, and it tells only mutual contacts (subscription `both`, asked to Prosody each time). Changing the email touches nothing else. Mutual contacts see it in the conversation header, as the contact list tooltip and in «Copiar correo».
 - **Display name:** XEP-0172 nick, published in PEP and sent in every presence and subscription request. The UI never shows JIDs; unknown names show as "Sin nombre". It may carry Messenger Plus!-style codes (`[b]`, `[c=#hex]…[/c]`, gradients `[c=A]…[/c=B]`, `[a=…]` backgrounds), parsed in `src/renderer/src/plus.ts` into styled text (never HTML) and stripped for plain-text places (titles, notifications). It's edited in its own window (`#nick`), opened by clicking the name in the contact list.
 - **Sign-in:** the app asks the account service `POST /cuenta {email}` → `{username}` and does normal SASL with it. Unknown addresses get a made-up, stable localpart (HMAC of the email), so a wrong address fails exactly like a wrong password.
+- **The app only signs in.** Accounts are created, and forgotten passwords replaced, on the website: pages of the account service (`/join`, `/recover`, `/reset`), so they work from a phone too and need no `palique://` links.
 - **Registration is invite-only, by email:**
   1. Someone invites an address (the admin, without limit, or a user, 3 each; expired unused invites stop counting).
-  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email has two steps: download the app (`DOWNLOADS_URL`, palique.io's downloads page by default) and create the account at `/join?t=TOKEN`, a page of the service that opens `palique://signup?t=TOKEN`. The code is in the email too, for pasting by hand.
-  3. The app gets `POST /signup {token}` → `{email, username}`, registers with XEP-0401 preauth + XEP-0077, and publishes the nick.
+  2. The account service picks the new account's JID and asks Prosody (`mod_palique_invites`) for an invite that can only create that account. The email has two steps: create the account at `/join?t=TOKEN`, then download the app (`DOWNLOADS_URL`, palique.io's downloads page by default) and sign in.
+  3. `/join` asks for a name and the password twice. The service hands them to Prosody with the code (`redeem`), which creates the account with the same checks as in-band registration and publishes the name (XEP-0172 in PEP).
   4. Prosody announces the new account to the service and makes inviter and invitee mutual contacts.
+  - Apps from before this still register in-band (`POST /signup` + XEP-0401 + XEP-0077); Prosody keeps allowing it.
 - **Adding contacts:** by email. Iq `lookup` to the account service → JID or nothing. If nothing, the user may explicitly invite them.
 - **Changing the email:** a link goes to the new address. Until it's opened, the old one still signs in. If the new one is taken, the app gets the same answer and that inbox is told instead.
-- **Password recovery:** `POST /recover {email}` (always the same answer). The service gets a one-hour reset token from Prosody and emails a link to `/reset?e=EMAIL&t=TOKEN`, a page that opens `palique://reset?e=EMAIL&t=TOKEN`, plus the code. The app re-registers the same account with it.
-- **Passwords:** at least 8 characters, with a lowercase and an uppercase letter, a digit and a symbol (ASCII classes, so ñ counts as a symbol). The app checks it as you type (`src/renderer/src/password.ts`); Prosody enforces it (`mod_palique_passwords`). Existing passwords keep working.
+- **Password recovery:** «¿Olvidaste tu contraseña?» in the app opens `/recover` in the browser (always the same answer). The service gets a one-hour reset code from Prosody and emails a link to `/reset?e=EMAIL&t=TOKEN`, where the new password is set (`redeem` again).
+- **Passwords:** at least 8 characters, with a lowercase and an uppercase letter, a digit and a symbol (ASCII classes, so ñ counts as a symbol). The website's forms check it first (an HTML `pattern`); Prosody enforces it (`mod_palique_passwords`). Existing passwords keep working.
 
 ### Account service (`server/accounts`)
 
@@ -81,12 +83,12 @@ compose.yaml       local server stack
   - `lookup`
   - `contacts`: the emails of your mutual contacts
   - `invites` get, `invite-email` set
-- **HTTP**, for the signed-out app and email links:
-  - `POST /account`, `/signup`, `/recover`
-  - `GET /verify`, `/no-invites`
-  - `GET /join`, `/reset`: where the email buttons land. They open the app (`palique://…`) and show the code; `/join` also links to the downloads
-- **Emails:** one template (`mail.ts`), a Palique conversation window in the app's colors. Someone says a line, then a heading, a short intro, steps or one button, and the code as a fallback. The service's pages share its look (`page()` in `main.ts`).
+- **HTTP**, for the app and the website:
+  - `POST /account` (the app's sign-in), `/signup` and `/recover` (JSON, apps from before the website)
+  - `GET`/`POST /join`, `/reset`, `/recover`: the website's forms (create the account, set a new password, ask for the link)
+  - `GET /verify`, `/no-invites`: email links
   - `POST /admin/invite`, only from loopback, used by `src/invite.ts`
+- **Emails and pages:** one email template (`mail.ts`), a Palique conversation window in the app's colors: someone says a line, then a heading, a short intro, and steps or one button, always to the website. The pages share its look (`page()` in `main.ts`).
 - **Storage:** SQLite at `$DATA_DIR/accounts.sqlite`, with tables `accounts` (email unique), `invites` and `invite_optout`.
 - **Rate limits** are in memory, so a restart clears them:
   - recovery: one per email every 5 minutes, and 10 per IP every 15 minutes
@@ -101,6 +103,7 @@ compose.yaml       local server stack
 - `mod_palique_invites` is for trusted components only (`palique_invites_trusted`), via iqs to the host in `urn:palique:invite:0`:
   - `<account username inviter?>`: an invite tied to a localpart; the module enforces it, because stock `mod_invites_register` doesn't
   - `<reset for>`: password reset token
+  - `<redeem token><password/><nick/>?</redeem>`: uses an invite (creates its account, publishing the nick) or a reset code (sets the password), for the website's forms. It fires the same events as in-band registration, so every check below still applies
   - `<contacts username>` (get): the user's mutual contacts, so emails go only to them
   - On `user-registered`, it messages the component `<registered username/>` and subscribes inviter ↔ invitee.
 - `mod_palique_invisible`: XEP-0186-style invisibility.
@@ -110,7 +113,7 @@ compose.yaml       local server stack
 
 | XEP / namespace | Use |
 |---|---|
-| XEP-0077, XEP-0401 | registration with invite (preauth) |
+| XEP-0077, XEP-0401 | registration with invite, only for apps from before the website |
 | XEP-0280 | carbons |
 | XEP-0085 | typing |
 | XEP-0224 | buzz (attention) |
@@ -131,14 +134,13 @@ npm run dev                    # app with hot reload (renderer only; restart for
 
 - Docker: any engine works (OrbStack on macOS).
 - **Logs and reset:** `docker compose logs -f` follows the server logs. `docker compose down -v` deletes every account.
-- **First accounts:** `docker compose exec accounts node src/invite.ts tere@correo.test` (add `en` for the email in English). Open the email in Mailpit (http://localhost:8025) and paste its code into "¿Tienes una invitación? Crea tu cuenta". Any address works; nothing is really sent.
+- **First accounts:** `docker compose exec accounts node src/invite.ts tere@correo.test` (add `en` for the email in English). Open the email in Mailpit (http://localhost:8025) and press «Crear mi cuenta»: the form is at http://localhost:8080/join. Any address works; nothing is really sent.
 - **Second instance** to chat with yourself (the dev server must be running):
 
   ```bash
   ELECTRON_RENDERER_URL=http://localhost:5173 npx electron . --user-data-dir="$HOME/.palique-ana"
   ```
 
-- **`palique://` links in development on macOS** don't reach the dev app, because macOS ties them to the generic Electron binary. Paste the code instead, or use a packaged build (`npm run build:unpack`). On Linux and Windows the dev app receives them.
 - **TLS:** a dev-only self-signed certificate (`server/certs`). The app trusts it only when the domain is `localhost`.
 - **Rate limits:** if repeated testing hits one, `docker compose restart accounts`.
 
@@ -183,13 +185,13 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 
 | Check | Covers |
 |---|---|
-| `auth` | sign-up with an invite, sign-in by email, unknown address = wrong password |
+| `auth` | sign-up on the website with an invite (name, strong password, used once), sign-in by email, unknown address = wrong password |
 | `roster` | add by email, presence, names on requests, accept/reject, emails only for mutual contacts |
 | `chat` | messages, buzz, carbons, stranger filtering |
 | `avatar` | publish and fetch avatars |
 | `invites` | invites by email, 3-per-user limit, inviter becomes a contact, opt-out |
 | `email` | changing the email, uniqueness, old address works until confirmed |
-| `reset` | password recovery by email, in the app's language |
+| `reset` | password recovery on the website, by email, in the page's language |
 | `newsletter` | newsletter choice, language kept with the account |
 | `invisible` | invisible status (needs the server module) |
 | `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
