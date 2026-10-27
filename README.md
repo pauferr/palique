@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="build/icon.svg" width="140" alt="El logo de Palique: tres amigos de los colores de estado de palique; el verde, con gafas de sol, suelta un bombazo, uno alucina y otro se parte de risa">
+<img src="build/icon.svg" width="140" alt="El logo de Palique: un bocadillo naranja que se ríe y tiembla con un zumbido, sobre el cielo azul, con el punto verde de conectado">
 
 # Palique
 
