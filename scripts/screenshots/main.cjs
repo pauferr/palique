@@ -26,6 +26,7 @@ const SHOTS = {
     run: "document.querySelectorAll('details.picker')[1].open = true"
   },
   nombre: { hash: 'nick', w: 480, h: 640, args: ['--nick=1'] },
+  integrada: { hash: '', w: 900, h: 620, args: ['--chats=together'], run: BOTTOM },
   'tema-claro': { hash: '', w: 360, h: 640, theme: 'light' },
   'tema-calido': { hash: '', w: 360, h: 640, theme: 'warm' },
   'tema-oscuro': { hash: '', w: 360, h: 640, theme: 'dark' },

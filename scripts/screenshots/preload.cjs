@@ -127,6 +127,7 @@ const values = {
   getRoster: arg('nick') ? { ...snapshot, name: nick } : snapshot,
   currentAccount: account,
   getUnread: { 'nerea@localhost': 2 },
+  getShownChat: arg('chats') === 'together' ? 'iker@localhost' : '',
   getChatHistory: history,
   version: 'v0.15.0 (beta)',
   language: lang,
@@ -147,7 +148,8 @@ const values = {
     soundPack: 'classic',
     emoticons: true,
     shake: true,
-    typing: true
+    typing: true,
+    chats: arg('chats') || 'windows'
   },
   update: null
 }

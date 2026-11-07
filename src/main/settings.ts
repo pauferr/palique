@@ -23,6 +23,10 @@ export type Font = (typeof FONTS)[number]
 export const SOUND_PACKS = ['classic', 'velvet', 'crystal', 'bubble'] as const
 export type SoundPack = (typeof SOUND_PACKS)[number]
 
+// Conversations in their own windows, or beside the contact list in the main one.
+export const CHAT_LAYOUTS = ['windows', 'together'] as const
+export type ChatLayout = (typeof CHAT_LAYOUTS)[number]
+
 export type Settings = {
   language: 'auto' | Language // 'auto' = the computer's language
   theme: Theme
@@ -41,6 +45,7 @@ export type Settings = {
   emoticons: boolean // show (L), :) … as emoji
   shake: boolean // buzzes shake the conversation window
   typing: boolean // show "está escribiendo…"
+  chats: ChatLayout
 }
 
 export const AWAY_MINUTES = [0, 5, 10, 15, 30]
@@ -62,7 +67,8 @@ const DEFAULTS: Settings = {
   soundPack: 'classic',
   emoticons: true,
   shake: true,
-  typing: true
+  typing: true,
+  chats: 'windows'
 }
 
 // What the Options window may change: only known keys with valid values.
@@ -89,6 +95,7 @@ export function validPatch(patch: unknown): Partial<Settings> {
   if (SOUND_PACKS.includes(given.soundPack as SoundPack))
     valid.soundPack = given.soundPack as SoundPack
   if (AWAY_MINUTES.includes(given.away as number)) valid.away = given.away as number
+  if (CHAT_LAYOUTS.includes(given.chats as ChatLayout)) valid.chats = given.chats as ChatLayout
   return valid
 }
 

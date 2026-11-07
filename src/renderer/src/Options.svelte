@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Font, Settings, SoundPack, Theme } from '../../main/settings'
+  import type { ChatLayout, Font, Settings, SoundPack, Theme } from '../../main/settings'
   import type { EmailStatus, InviteStatus, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import { Bell, KeyRound, MessageCircle, Monitor, User } from '@lucide/svelte'
@@ -261,6 +261,17 @@
         {:else if settings?.autoLogin && !remembered.saved}
           <p class="hint">{_('Se activará la próxima vez que inicies sesión.')}</p>
         {/if}
+      </section>
+      <section>
+        <h2>{_('Conversaciones')}</h2>
+        <select
+          value={settings?.chats}
+          onchange={(e) => set({ chats: e.currentTarget.value as ChatLayout })}
+          aria-label={_('Conversaciones')}
+        >
+          <option value="windows">{_('En ventanas separadas')}</option>
+          <option value="together">{_('En la ventana de contactos')}</option>
+        </select>
       </section>
       <section>
         <h2>{_('Tema')}</h2>

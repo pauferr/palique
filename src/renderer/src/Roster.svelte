@@ -3,6 +3,7 @@
   import { onMount } from 'svelte'
   import type { Contact, InviteStatus, OwnShow, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import Chat from './Chat.svelte'
   import Emoticons from './Emoticons.svelte'
   import { _, _n, lang } from './i18n'
   import { emojify } from './emoticons'
@@ -63,10 +64,15 @@
 
   // Messages waiting in conversations that aren't open (contact → count).
   let unread: Record<string, number> = $state({})
+  // «Together» option: the conversation shown beside the list ('' = none). Main decides.
+  let shown = $state('')
+  const together = $derived(prefs.chats === 'together')
 
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
     window.api.getUnread().then((value) => (unread = value))
+    window.api.getShownChat().then((value) => (shown = value))
+    const offShow = window.api.onChatShow((value) => (shown = value))
     const offRoster = window.api.onRoster((value) => {
       roster = value
     })
@@ -82,6 +88,7 @@
       offUnread()
       offIncoming()
       offOnline()
+      offShow()
     }
   })
 
@@ -242,210 +249,256 @@
   }
 </script>
 
-<section class="roster">
-  <MenuBar {menus} />
-
-  <header>
-    <button
-      class="me"
-      aria-haspopup="menu"
-      onclick={meMenu}
-      title={_('{status}. Cambiar tu estado o tu imagen', { status: ownLabels[roster.show] })}
-    >
-      <Avatar
-        {jid}
-        name={roster.name}
-        url={roster.avatar}
-        show={roster.show === 'invisible' ? 'offline' : roster.show}
-        size={72}
-      />
-    </button>
-    <input
-      bind:this={picker}
-      type="file"
-      accept="image/png,image/jpeg,image/gif,image/webp"
-      onchange={chooseAvatar}
-      hidden
-    />
-    <div class="identity">
-      <div class="line">
-        <!-- The name opens its own window, with the formatting tools. -->
-        <button class="nick" onclick={() => window.api.openNick()} title={_('Cambiar tu nombre')}
-          ><Emoticons text={roster.name} plus /></button
-        >
-      </div>
-      {#if editing}
-        <input
-          class="personal"
-          bind:value={status}
-          onchange={() => updatePresence(roster.show)}
-          onblur={() => (editing = false)}
-          onkeydown={commitOnEnter}
-          use:focus
-          maxlength="140"
-          placeholder={_('Escribe un mensaje personal')}
-          aria-label={_('Mensaje personal')}
-        />
+{#if together}
+  <div class="together">
+    {@render list()}
+    <div class="panel">
+      {#if shown}
+        {#key shown}<Chat jid={shown} embedded />{/key}
       {:else}
-        <button
-          class="personal"
-          class:empty={!status}
-          onclick={() => (editing = true)}
-          title={_('Cambiar tu mensaje personal')}
-          >{#if status}<Emoticons text={status} />{:else}{_(
-              'Escribe un mensaje personal'
-            )}{/if}</button
-        >
+        <p class="choose">{_('Elige un contacto para hablar')}</p>
       {/if}
     </div>
-  </header>
+  </div>
+{:else}
+  {@render list()}
+{/if}
 
-  <UpdateNotice />
-  {#if avatarError}<p class="notice error" role="alert">{avatarError}</p>{/if}
-  {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
-  {#if roster.show === 'invisible'}
-    <p class="notice">
-      {_('Estás invisible: tus contactos te ven sin conexión, pero puedes chatear.')}
-    </p>
-  {/if}
-  {#if !roster.connected}
-    <p class="notice warning" role="status">{_('Reconectando…')}</p>
-  {/if}
+{#snippet list()}
+  <section class="roster">
+    <MenuBar {menus} />
 
-  <div class="list">
-    {#each roster.requests as request (request.jid)}
-      <div class="request">
-        <span
-          >{around(_('{name} quiere añadirte'))[0]}<strong
-            ><Emoticons text={request.name} plus /></strong
-          >{around(_('{name} quiere añadirte'))[1]}</span
-        >
-        <button onclick={() => window.api.acceptRequest(request.jid)}>{_('Aceptar')}</button>
-        <button onclick={() => window.api.rejectRequest(request.jid)}>{_('Rechazar')}</button>
-      </div>
-    {/each}
-
-    {#if roster.contacts.length}
-      <label class="search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          type="search"
-          bind:value={query}
-          placeholder={_('Buscar contactos')}
-          aria-label={_('Buscar contactos')}
+    <header>
+      <button
+        class="me"
+        aria-haspopup="menu"
+        onclick={meMenu}
+        title={_('{status}. Cambiar tu estado o tu imagen', { status: ownLabels[roster.show] })}
+      >
+        <Avatar
+          {jid}
+          name={roster.name}
+          url={roster.avatar}
+          show={roster.show === 'invisible' ? 'offline' : roster.show}
+          size={72}
         />
-      </label>
-      {#if !found.length}<p class="no-match">{_('Nadie se llama así.')}</p>{/if}
-      <!-- While searching, only the groups with someone in them. -->
-      {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
-        <details open>
-          <summary
-            ><ChevronDown size={14} strokeWidth={3} aria-hidden="true" />{group.label} ({group
-              .contacts.length})</summary
+      </button>
+      <input
+        bind:this={picker}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        onchange={chooseAvatar}
+        hidden
+      />
+      <div class="identity">
+        <div class="line">
+          <!-- The name opens its own window, with the formatting tools. -->
+          <button class="nick" onclick={() => window.api.openNick()} title={_('Cambiar tu nombre')}
+            ><Emoticons text={roster.name} plus /></button
           >
-          <ul>
-            {#each group.contacts as contact (contact.jid)}
-              <!-- Recreated on each new message, so the row blinks again. -->
-              {#key unread[contact.jid]}
-                <li
-                  class:unread={unread[contact.jid]}
-                  class:offline={contact.show === 'offline'}
-                  title={contact.email || undefined}
-                  oncontextmenu={(e) => contactMenu(e, contact)}
-                >
-                  <span title={labels[contact.show]}>
-                    <Avatar
-                      jid={contact.jid}
-                      name={contact.name}
-                      url={contact.avatar}
-                      show={contact.show}
-                      size={46}
-                    />
-                  </span>
-                  <!-- Name, and the personal message under it. -->
-                  <button class="name" onclick={() => window.api.openChat(contact.jid)}>
-                    <span><Emoticons text={contact.name} plus /></span>
-                    {#if contact.pending}
-                      <small>{_('Esperando a que te acepte')}</small>
-                    {:else if contact.status}
-                      <small><Emoticons text={contact.status} /></small>
-                    {/if}
-                  </button>
-                  {#if unread[contact.jid]}
-                    <span class="badge" title={_('Mensajes sin leer')}
-                      >{unread[contact.jid] > 9 ? '9+' : unread[contact.jid]}</span
-                    >
-                  {/if}
-                </li>
-              {/key}
-            {/each}
-          </ul>
-        </details>
+        </div>
+        {#if editing}
+          <input
+            class="personal"
+            bind:value={status}
+            onchange={() => updatePresence(roster.show)}
+            onblur={() => (editing = false)}
+            onkeydown={commitOnEnter}
+            use:focus
+            maxlength="140"
+            placeholder={_('Escribe un mensaje personal')}
+            aria-label={_('Mensaje personal')}
+          />
+        {:else}
+          <button
+            class="personal"
+            class:empty={!status}
+            onclick={() => (editing = true)}
+            title={_('Cambiar tu mensaje personal')}
+            >{#if status}<Emoticons text={status} />{:else}{_(
+                'Escribe un mensaje personal'
+              )}{/if}</button
+          >
+        {/if}
+      </div>
+    </header>
+
+    <UpdateNotice />
+    {#if avatarError}<p class="notice error" role="alert">{avatarError}</p>{/if}
+    {#if presenceError}<p class="notice error" role="alert">{presenceError}</p>{/if}
+    {#if roster.show === 'invisible'}
+      <p class="notice">
+        {_('Estás invisible: tus contactos te ven sin conexión, pero puedes chatear.')}
+      </p>
+    {/if}
+    {#if !roster.connected}
+      <p class="notice warning" role="status">{_('Reconectando…')}</p>
+    {/if}
+
+    <div class="list">
+      {#each roster.requests as request (request.jid)}
+        <div class="request">
+          <span
+            >{around(_('{name} quiere añadirte'))[0]}<strong
+              ><Emoticons text={request.name} plus /></strong
+            >{around(_('{name} quiere añadirte'))[1]}</span
+          >
+          <button onclick={() => window.api.acceptRequest(request.jid)}>{_('Aceptar')}</button>
+          <button onclick={() => window.api.rejectRequest(request.jid)}>{_('Rechazar')}</button>
+        </div>
       {/each}
-    {:else}
-      <div class="no-contacts">
-        <p>
-          {_('Aún no tienes contactos.')}<br />{_(
-            'Añade a alguien con su correo; si no está en Palique, podrás invitarle.'
-          )}
-        </p>
-        <button class="add-link" onclick={openAdd}
-          ><b>+</b><span>{_('Añadir un contacto')}</span></button
-        >
+
+      {#if roster.contacts.length}
+        <label class="search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            bind:value={query}
+            placeholder={_('Buscar contactos')}
+            aria-label={_('Buscar contactos')}
+          />
+        </label>
+        {#if !found.length}<p class="no-match">{_('Nadie se llama así.')}</p>{/if}
+        <!-- While searching, only the groups with someone in them. -->
+        {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
+          <details open>
+            <summary
+              ><ChevronDown size={14} strokeWidth={3} aria-hidden="true" />{group.label} ({group
+                .contacts.length})</summary
+            >
+            <ul>
+              {#each group.contacts as contact (contact.jid)}
+                <!-- Recreated on each new message, so the row blinks again. -->
+                {#key unread[contact.jid]}
+                  <li
+                    class:unread={unread[contact.jid]}
+                    class:open={together && contact.jid === shown}
+                    class:offline={contact.show === 'offline'}
+                    title={contact.email || undefined}
+                    oncontextmenu={(e) => contactMenu(e, contact)}
+                  >
+                    <span title={labels[contact.show]}>
+                      <Avatar
+                        jid={contact.jid}
+                        name={contact.name}
+                        url={contact.avatar}
+                        show={contact.show}
+                        size={46}
+                      />
+                    </span>
+                    <!-- Name, and the personal message under it. -->
+                    <button class="name" onclick={() => window.api.openChat(contact.jid)}>
+                      <span><Emoticons text={contact.name} plus /></span>
+                      {#if contact.pending}
+                        <small>{_('Esperando a que te acepte')}</small>
+                      {:else if contact.status}
+                        <small><Emoticons text={contact.status} /></small>
+                      {/if}
+                    </button>
+                    {#if unread[contact.jid]}
+                      <span class="badge" title={_('Mensajes sin leer')}
+                        >{unread[contact.jid] > 9 ? '9+' : unread[contact.jid]}</span
+                      >
+                    {/if}
+                  </li>
+                {/key}
+              {/each}
+            </ul>
+          </details>
+        {/each}
+      {:else}
+        <div class="no-contacts">
+          <p>
+            {_('Aún no tienes contactos.')}<br />{_(
+              'Añade a alguien con su correo; si no está en Palique, podrás invitarle.'
+            )}
+          </p>
+          <button class="add-link" onclick={openAdd}
+            ><b>+</b><span>{_('Añadir un contacto')}</span></button
+          >
+        </div>
+      {/if}
+    </div>
+
+    {#if addOpen}
+      <div class="sheet" role="dialog" aria-label={_('Añadir un contacto')}>
+        <h3>
+          {_('Añadir un contacto')}
+          <button class="close" onclick={() => (addOpen = false)} aria-label={_('Cerrar')}>×</button
+          >
+        </h3>
+        <p class="hint">{_('Escribe su correo. Si aún no está en Palique, podrás invitarle.')}</p>
+        <form onsubmit={add}>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            type="email"
+            spellcheck="false"
+            bind:value={address}
+            required
+            maxlength="254"
+            placeholder={_('Su correo')}
+            aria-label={_('Correo del contacto')}
+            autofocus
+          />
+          <button class="primary" type="submit">{_('Añadir')}</button>
+        </form>
+        {#if notFound}
+          <div class="result" role="status">
+            <p>
+              {around(_('{email} aún no está en Palique.'), '{email}')[0]}<strong>{notFound}</strong
+              >{around(_('{email} aún no está en Palique.'), '{email}')[1]}
+            </p>
+            <div class="row">
+              <button onclick={() => sendInvite(notFound)} disabled={!left}
+                >{_('Enviarle una invitación')}</button
+              >
+              <span class="hint">
+                {invites
+                  ? _n('Te queda 1 de {max}.', 'Te quedan {n} de {max}.', left, {
+                      max: invites.max
+                    })
+                  : _n('Te queda 1.', 'Te quedan {n}.', left)}
+              </span>
+            </div>
+          </div>
+        {:else if addNote}
+          <p class="result" role="status">{addNote}</p>
+        {/if}
       </div>
     {/if}
-  </div>
-
-  {#if addOpen}
-    <div class="sheet" role="dialog" aria-label={_('Añadir un contacto')}>
-      <h3>
-        {_('Añadir un contacto')}
-        <button class="close" onclick={() => (addOpen = false)} aria-label={_('Cerrar')}>×</button>
-      </h3>
-      <p class="hint">{_('Escribe su correo. Si aún no está en Palique, podrás invitarle.')}</p>
-      <form onsubmit={add}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <input
-          type="email"
-          spellcheck="false"
-          bind:value={address}
-          required
-          maxlength="254"
-          placeholder={_('Su correo')}
-          aria-label={_('Correo del contacto')}
-          autofocus
-        />
-        <button class="primary" type="submit">{_('Añadir')}</button>
-      </form>
-      {#if notFound}
-        <div class="result" role="status">
-          <p>
-            {around(_('{email} aún no está en Palique.'), '{email}')[0]}<strong>{notFound}</strong
-            >{around(_('{email} aún no está en Palique.'), '{email}')[1]}
-          </p>
-          <div class="row">
-            <button onclick={() => sendInvite(notFound)} disabled={!left}
-              >{_('Enviarle una invitación')}</button
-            >
-            <span class="hint">
-              {invites
-                ? _n('Te queda 1 de {max}.', 'Te quedan {n} de {max}.', left, { max: invites.max })
-                : _n('Te queda 1.', 'Te quedan {n}.', left)}
-            </span>
-          </div>
-        </div>
-      {:else if addNote}
-        <p class="result" role="status">{addNote}</p>
-      {/if}
-    </div>
-  {/if}
-</section>
+  </section>
+{/snippet}
 
 <style>
   .roster {
     display: flex;
     flex-direction: column;
     height: 100vh;
+  }
+
+  /* «Together» option: the list on the left, the conversation chosen on the right. */
+  .together {
+    display: grid;
+    grid-template-columns: 330px minmax(0, 1fr);
+    height: 100vh;
+  }
+
+  .panel {
+    min-width: 0;
+    height: 100vh;
+    overflow: hidden;
+    border-left: 1px solid var(--line);
+    background: var(--window-bg);
+  }
+
+  .choose {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    margin: 0;
+    padding: 24px;
+    color: var(--text-muted);
+    text-align: center;
   }
 
   header {
@@ -606,6 +659,12 @@
     padding: 7px 8px;
     border: 1px solid transparent;
     border-radius: var(--radius);
+  }
+
+  /* The one open beside the list (an unread row still wins: it comes later). */
+  li.open {
+    background: var(--row-hover-bg);
+    border-color: var(--line);
   }
 
   li.offline .name {

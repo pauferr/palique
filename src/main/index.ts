@@ -155,6 +155,9 @@ function createWindow(): void {
     mainWindow?.hide()
   })
   mainWindow.on('closed', () => (mainWindow = null))
+  // In the tray, the conversation beside the list is closed: messages wait as unread.
+  mainWindow.on('hide', () => shown && showInMain(''))
+  mainWindow.on('focus', () => mainWindow?.flashFrame(false))
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -302,8 +305,67 @@ let account = '' // bare JID of the signed-in user
 // xmpp already knows who we are by then, so they're saved too.
 const signedInAs = (): string => account || snapshot().jid
 
-function openChat(contact: string, focus: boolean): BrowserWindow {
+// «Together» option: the conversation shown beside the contact list ('' = none).
+let shown = ''
+const together = (): boolean => settings.get().chats === 'together'
+
+// The window showing this conversation, if any: its own, or the main one beside the list.
+// Sent to the tray, the main one closes it (see createWindow); minimized, it stays open.
+function hostOf(contact: string): BrowserWindow | undefined {
+  const own = chats.get(contact)
+  if (own) return own
+  if (together() && shown === contact && mainWindow) return mainWindow
+  return undefined
+}
+
+function showInMain(contact: string): void {
+  if (shown) pending.delete(shown)
+  shown = contact
+  // Like a new window: live messages wait until the conversation says it's listening.
+  if (contact) pending.set(contact, [])
+  mainWindow?.webContents.send('chat:show', contact)
+}
+
+// Wide with the conversation beside the list; back to the narrow contact list when that
+// ends. A list the user widened in the usual layout is left as it is.
+let widened = false
+function fitMainWindow(): void {
+  if (!mainWindow) return
+  const [width, height] = mainWindow.getSize()
+  if (together() && account) {
+    widened = true
+    mainWindow.setMinimumSize(720, 0)
+    if (width < 720) {
+      // Wider, but still whole on its screen (a list kept at the right edge moves left).
+      const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea
+      const [x, y] = mainWindow.getPosition()
+      const w = Math.min(900, area.width)
+      const h = Math.min(Math.max(height, 620), area.height)
+      mainWindow.setBounds({
+        x: Math.min(Math.max(x, area.x), area.x + area.width - w),
+        y: Math.min(Math.max(y, area.y), area.y + area.height - h),
+        width: w,
+        height: h
+      })
+    }
+  } else if (widened) {
+    widened = false
+    mainWindow.setMinimumSize(0, 0)
+    mainWindow.setSize(360, height)
+  }
+}
+
+function openChat(contact: string, focus: boolean): BrowserWindow | null {
   setUnread(contact, 0)
+  if (together()) {
+    if (shown !== contact) showInMain(contact)
+    if (focus && mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    return mainWindow
+  }
   const existing = chats.get(contact)
   if (existing) {
     if (focus) {
@@ -509,7 +571,8 @@ function deliver(message: ChatMessage, quiet = false): void {
   if (owner) history.save(owner, message)
   const dnd = !message.mine && ownShow() === 'dnd'
   const silent = quiet || dnd
-  if (!chats.has(message.with)) {
+  const win = hostOf(message.with)
+  if (!win) {
     // Ours from another device are only history.
     if (message.mine) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
@@ -523,7 +586,6 @@ function deliver(message: ChatMessage, quiet = false): void {
     if (!notified.take(message.with)) notifyMessage(message)
     return
   }
-  const win = openChat(message.with, false)
   const queue = pending.get(message.with)
   if (queue) queue.push([message, silent])
   else win.webContents.send('chat:message', message, silent)
@@ -551,7 +613,7 @@ function playWink(message: ChatMessage): void {
   // Only in an open conversation (otherwise it waits there, and can be replayed from it).
   // The wink video has sound, so not while busy either.
   const show = !isLate(message) && ownShow() !== 'dnd'
-  const chat = chats.get(message.with)
+  const chat = hostOf(message.with)
   if (show && chat) showWink(message.wink, chat)
 }
 
@@ -641,6 +703,7 @@ app.whenReady().then(() => {
   const signedIn = (result: AuthResult, email: string): AuthResult => {
     if (result.ok) {
       account = result.jid
+      fitMainWindow()
       settings.set({ email })
       useAccountLanguage()
     }
@@ -698,6 +761,8 @@ app.whenReady().then(() => {
   ipcMain.handle('auth:logout', async () => {
     await logout()
     account = ''
+    showInMain('')
+    fitMainWindow()
     for (const contact of [...unread.keys()]) setUnread(contact, 0)
     unseenWinks.clear()
     chats.forEach((win) => win.close())
@@ -792,7 +857,14 @@ app.whenReady().then(() => {
     if (valid.autoLogin === false) forgetPassword()
     const languageChanged =
       valid.language !== undefined && valid.language !== settings.get().language
+    const layoutChanged = valid.chats !== undefined && valid.chats !== settings.get().chats
     const current = settings.set(valid)
+    // Switching layouts closes every conversation: open windows, or the one beside the list.
+    if (layoutChanged) {
+      chats.forEach((win) => win.close())
+      showInMain('')
+      fitMainWindow()
+    }
     BrowserWindow.getAllWindows().forEach((win) =>
       win.webContents.send('settings:changed', current)
     )
@@ -807,27 +879,30 @@ app.whenReady().then(() => {
     return current
   })
   // Typing only matters if the conversation is open; it never opens a window.
-  onTyping((contact, typing) =>
-    chats.get(contact)?.webContents.send('chat:typing', contact, typing)
-  )
+  onTyping((contact, typing) => hostOf(contact)?.webContents.send('chat:typing', contact, typing))
   ipcMain.handle('chat:typing', (_event, contact: string, typing: boolean) =>
     sendTyping(String(contact), Boolean(typing))
   )
   ipcMain.handle('chat:open', (_event, contact: string) => {
     openChat(String(contact), true)
   })
-  ipcMain.on('chat:ready', (_event, contact: string) => {
-    const win = chats.get(String(contact))
+  ipcMain.on('chat:ready', (event, contact: string) => {
+    const win = hostOf(String(contact))
+    // Only from the conversation that's really showing it: one chosen and left at once
+    // beside the list may still say it's ready, and would take its waiting winks with it.
+    if (win?.webContents !== event.sender) return
     pending.get(String(contact))?.forEach(([message, quiet]) => {
-      win?.webContents.send('chat:message', message, quiet)
+      win.webContents.send('chat:message', message, quiet)
     })
     pending.delete(String(contact))
     // Unseen winks play now, in order (not while busy, like live ones).
     const winks = unseenWinks.get(String(contact)) ?? []
     unseenWinks.delete(String(contact))
-    if (ownShow() !== 'dnd') winks.forEach((id) => showWink(id, win ?? null))
+    if (ownShow() !== 'dnd') winks.forEach((id) => showWink(id, win))
   })
   ipcMain.handle('chat:unread', () => Object.fromEntries(unread))
+  // After a reload (e.g. a new language), the contact list shows the same conversation again.
+  ipcMain.handle('chat:shown', () => (together() ? shown : ''))
   // Clicking a wink in a conversation plays it again.
   ipcMain.on('chat:replay-wink', (event, wink: string) => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))

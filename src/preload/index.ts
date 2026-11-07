@@ -73,6 +73,13 @@ const api = {
   setPresence: (show: OwnShow, status: string): Promise<void> =>
     ipcRenderer.invoke('presence:set', show, status),
   openChat: (contact: string): Promise<void> => ipcRenderer.invoke('chat:open', contact),
+  // «Together» option: the conversation to show beside the contact list ('' = none).
+  getShownChat: (): Promise<string> => ipcRenderer.invoke('chat:shown'),
+  onChatShow: (callback: (contact: string) => void): (() => void) => {
+    const listener = (_: unknown, contact: string): void => callback(contact)
+    ipcRenderer.on('chat:show', listener)
+    return () => ipcRenderer.off('chat:show', listener)
+  },
   // Tell the main process this chat window is listening for live messages.
   chatReady: (contact: string): void => ipcRenderer.send('chat:ready', contact),
   // Unread messages per contact (bare JID → count), for the contact list.

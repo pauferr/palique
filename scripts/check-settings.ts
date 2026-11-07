@@ -25,7 +25,8 @@ const defaults = {
   soundPack: 'classic',
   emoticons: true,
   shake: true,
-  typing: true
+  typing: true,
+  chats: 'windows'
 }
 assert.deepEqual(openSettings(file).get(), defaults, 'defaults on first run')
 openSettings(file).set({ winks: false })
@@ -54,7 +55,8 @@ assert.deepEqual(
     font: 'comic',
     away: 15,
     soundPack: 'bubble',
-    language: 'en'
+    language: 'en',
+    chats: 'together'
   }),
   {
     language: 'en',
@@ -62,7 +64,8 @@ assert.deepEqual(
     sounds: false,
     soundPack: 'bubble',
     theme: 'warm',
-    away: 15
+    away: 15,
+    chats: 'together'
   }
 )
 assert.deepEqual(
@@ -74,7 +77,8 @@ assert.deepEqual(
     theme: 'neon',
     away: 7,
     email: 'x@y.z',
-    show: 'dnd'
+    show: 'dnd',
+    chats: 'tabs'
   }),
   {},
   'wrong types, unknown values and other keys are dropped'

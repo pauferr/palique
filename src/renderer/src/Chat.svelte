@@ -13,7 +13,8 @@
   import { findWink, winkLabel, winks } from './winks'
   import { _, lang } from './i18n'
 
-  let { jid }: { jid: string } = $props()
+  // `embedded`: inside the contact list window (the «together» option), not a window of its own.
+  let { jid, embedded = false }: { jid: string; embedded?: boolean } = $props()
 
   const TYPING_IDLE = 5000 // stop "typing" after this long without keystrokes
   const TYPING_TIMEOUT = 30000 // hide their indicator if they never say they stopped
@@ -29,7 +30,8 @@
   // Their display name can change while the window is open.
   const name = $derived(contact?.name ?? '')
   $effect(() => {
-    if (name) document.title = prefs.emoticons ? emojify(stripPlus(name)) : stripPlus(name)
+    if (name && !embedded)
+      document.title = prefs.emoticons ? emojify(stripPlus(name)) : stripPlus(name)
   })
   let draft = $state('')
   let shaking = $state(false)
@@ -117,6 +119,9 @@
       list.scrollTop = list.scrollHeight
     })
     return () => {
+      // Inside the contact list it goes away when another contact is chosen: stop "typing".
+      stopTyping()
+      window.removeEventListener('beforeunload', stopTyping)
       offMessage()
       offTyping()
       offRoster()
@@ -229,7 +234,7 @@
     plus
   />{after}{/snippet}
 
-<div class="chat" class:shaking onanimationend={() => (shaking = false)}>
+<div class="chat" class:embedded class:shaking onanimationend={() => (shaking = false)}>
   {#if playing}
     <!-- A click closes it. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -378,6 +383,16 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+  }
+
+  /* Beside the contact list: its own column's height, and winks over it, not the list. */
+  .chat.embedded {
+    position: relative;
+    height: 100%;
+  }
+
+  .embedded .wink-layer {
+    position: absolute;
   }
 
   header {
