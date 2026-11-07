@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
-  import { Lock, LockOpen, ShieldCheck, Smile, Star, Vibrate } from '@lucide/svelte'
-  import type { ChatMessage, Contact, DeviceTrust, TrustNote } from '../../main/xmpp'
+  import { Lock, LockOpen, Pencil, ShieldCheck, Smile, Star, Vibrate } from '@lucide/svelte'
+  import type { ChatMessage, Contact, DeviceTrust, Snapshot, TrustNote } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
+  import GroupAvatar from './GroupAvatar.svelte'
+  import GroupMembers from './GroupMembers.svelte'
+  import { eventText, face, isRoom, others, plainName } from './group'
   import Emoticons from './Emoticons.svelte'
   import EmoticonCanvas from './EmoticonCanvas.svelte'
   import { EMOTICONS, emojify } from './emoticons'
@@ -12,7 +15,7 @@
   import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
   import { findWink, winkLabel, winks } from './winks'
-  import { _, lang } from './i18n'
+  import { _, _n, lang } from './i18n'
 
   // `embedded`: inside the contact list window (the «together» option), not a window of its own.
   let { jid, embedded = false }: { jid: string; embedded?: boolean } = $props()
@@ -27,9 +30,17 @@
   }
 
   let messages: ChatMessage[] = $state([])
-  let contact: Contact | undefined = $state()
-  // Their display name can change while the window is open.
-  const name = $derived(contact?.name ?? '')
+  let roster: Snapshot | undefined = $state()
+  // A group's conversation: its members beside it (when there's room), its sheets over it.
+  const room = $derived(isRoom(jid))
+  const contact = $derived(roster?.contacts.find((c) => c.jid === jid))
+  const group = $derived(roster?.groups.find((g) => g.jid === jid))
+  // Beside the contact list there's little room: closed until asked for.
+  // svelte-ignore state_referenced_locally
+  let membersOpen = $state(!embedded)
+  let editingGroup = $state(false)
+  // Their display name (or the group's) can change while the window is open.
+  const name = $derived((room ? group?.name : contact?.name) ?? '')
   $effect(() => {
     if (name && !embedded)
       document.title = prefs.emoticons ? emojify(stripPlus(name)) : stripPlus(name)
@@ -42,6 +53,7 @@
   const verified = $derived(devices.length > 0 && devices.every((d) => d.verified))
   const blocked = $derived(devices.filter((d) => d.blocked))
   const loadDevices = async (): Promise<void> => {
+    if (room) return // groups have no codes to compare
     devices = (await window.api.getVerify(jid)).devices
   }
   let shaking = $state(false)
@@ -83,10 +95,14 @@
     requestAnimationFrame(() => (shaking = true))
   }
 
+  const byTime = (a: ChatMessage, b: ChatMessage): number => a.at - b.at
+
   // `alert` = it just happened: play the sound and shake for buzzes.
   async function add(message: ChatMessage, alert: boolean): Promise<void> {
     if (messages.some((m) => m.id === message.id)) return
     messages.push(message)
+    // A group's live messages can come before the archive's catch-up: in time order.
+    if (messages.length > 1 && messages.at(-2)!.at > message.at) messages.sort(byTime)
     if (!message.mine) theyType = false
     if (alert && !message.mine) {
       if (message.buzz && prefs.shake) shake()
@@ -128,19 +144,19 @@
     })
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => {
-      contact = s.contacts.find((c) => c.jid === jid)
+      roster = s
     })
     const offWink = window.api.onWinkPlay((id) => {
       if (!findWink(id)) return
       if (playing) queued.push(id)
       else playing = id
     })
-    window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
+    window.api.getRoster().then((s) => (roster = s))
     // History never triggers effects; live messages (even the one that opened this window)
     // come through onChatMessage. Keep them after the history, without duplicates.
     window.api.getChatHistory(jid).then(async (history) => {
       const known = new Set(history.map((m) => m.id))
-      messages = [...history, ...messages.filter((m) => !known.has(m.id))]
+      messages = [...history, ...messages.filter((m) => !known.has(m.id))].sort(byTime)
       await tick()
       list.scrollTop = list.scrollHeight
     })
@@ -238,6 +254,17 @@
     setTimeout(() => (canWink = true), await window.api.sendWink(jid, id))
   }
 
+  // Who wrote a group message: a contact as we know them, anyone else as the group does.
+  const sender = (message: ChatMessage): ReturnType<typeof face> =>
+    roster
+      ? face(roster, message.sender ?? '', message.senderName)
+      : {
+          jid: message.sender ?? '',
+          name: plainName(message.senderName ?? ''),
+          url: '',
+          show: 'offline'
+        }
+
   const GROUP_GAP = 5 * 60 * 1000 // messages closer than this share one "X dice:"
 
   const time = (at: number): string =>
@@ -269,7 +296,9 @@
       !newDay(i) &&
       !before.buzz &&
       !before.wink &&
+      !before.event &&
       before.mine === message.mine &&
+      before.sender === message.sender &&
       message.at - before.at < GROUP_GAP
     )
   }
@@ -277,10 +306,8 @@
 
 <!-- A sentence with the contact's name, which a component draws: split the translated
      text around {name}. -->
-{#snippet named(text: string)}{@const [before, after] = text.split('{name}')}{before}<Emoticons
-    text={name}
-    plus
-  />{after}{/snippet}
+{#snippet named(text: string, who = name)}{@const [before, after] =
+    text.split('{name}')}{before}<Emoticons text={who} plus />{after}{/snippet}
 
 {#snippet noted(from: number, to: number)}
   {#each notes.filter((n) => n.at > from && n.at <= to) as note (`${note.at}-${note.deviceId}-${note.kind}`)}
@@ -294,196 +321,261 @@
   {/each}
 {/snippet}
 
-<div class="chat" class:embedded class:shaking onanimationend={() => (shaking = false)}>
-  {#if playing}
-    <!-- A click closes it. -->
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="wink-layer" onclick={nextWink}>
-      {#key playing}
-        <WinkPlayer id={playing} playing sound={prefs.sounds} onended={nextWink} />
-      {/key}
-    </div>
-  {/if}
-  <!-- Only here: the rest keeps the native copy and paste menu. -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <header oncontextmenu={menu}>
-    <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={60} />
-    <div class="to">
-      <span class="name">{_('Para:')} <strong><Emoticons text={name} plus /></strong></span>
-      <small
-        >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
-            contact?.show ?? 'offline'
-          ]}{/if}</small
-      >
-      {#if contact?.email}<small class="email">{contact.email}</small>{/if}
-    </div>
-    <button
-      class="lock"
-      onclick={() => window.api.openVerify(jid)}
-      title={verified
-        ? _('Conversación cifrada y verificada')
-        : _('Conversación cifrada. Pulsa para verificarla.')}
-      aria-label={_('Verificar cifrado…')}
-    >
-      {#if verified}<ShieldCheck size={14} />{:else}<Lock size={14} />{/if}
-    </button>
-  </header>
-
-  <ol bind:this={list} aria-live="polite">
-    {#each messages as message, i (message.id)}
-      {@render noted(i === 0 ? 0 : messages[i - 1].at, message.at)}
-      {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
-      {#if message.buzz}
-        <li class="event buzz">
-          🫨 {#if message.mine}{_('Has enviado un zumbido')}{:else}{@render named(
-              _('{name} te ha enviado un zumbido')
-            )}{/if}
-          <time>{time(message.at)}</time>
-        </li>
-      {:else if message.wink}
-        <li class="event wink-line">
-          🎬 {#if message.mine}{_('Has enviado el guiño')}{:else}{@render named(
-              _('{name} te ha enviado el guiño')
-            )}{/if}
-          <button
-            class="replay"
-            onclick={() => window.api.replayWink(message.wink!)}
-            title={_('Volver a ver el guiño')}>«{winkLabel(message.wink)}» ▶</button
-          >
-          <time>{time(message.at)}</time>
-        </li>
-      {:else}
-        <li class:mine={message.mine} class:continues={continues(i)}>
-          {#if !continues(i)}
-            <span class="meta"
-              >{#if message.mine}{_('Tú dices:')}{:else}{@render named(_('{name} dice:'))}{/if}
-              <time>{time(message.at)}</time></span
+<div class="window" class:embedded>
+  <div class="chat" class:shaking onanimationend={() => (shaking = false)}>
+    {#if playing}
+      <!-- A click closes it. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="wink-layer" onclick={nextWink}>
+        {#key playing}
+          <WinkPlayer id={playing} playing sound={prefs.sounds} onended={nextWink} />
+        {/key}
+      </div>
+    {/if}
+    <!-- Only here: the rest keeps the native copy and paste menu. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    {#if room}
+      <header class="group">
+        {#if roster && group}
+          {#if group.owner}
+            <button
+              class="edit"
+              onclick={() => (editingGroup = true)}
+              title={_('Cambiar nombre y foto')}
+              aria-label={_('Cambiar nombre y foto')}
             >
-          {/if}
-          {#if message.undecryptable}
-            <p class="event warn">{_('No se ha podido descifrar este mensaje')}</p>
+              <GroupAvatar {group} {roster} size={56} />
+              <span class="pen" aria-hidden="true"><Pencil size={12} strokeWidth={2.5} /></span>
+            </button>
           {:else}
-            <p title={time(message.at)}><Emoticons text={message.body} /></p>
-            {#if !message.encrypted}
-              <small class="plain"><LockOpen size={11} /> {_('Este mensaje no está cifrado')}</small
+            <GroupAvatar {group} {roster} size={56} />
+          {/if}
+          <div class="to">
+            <strong><Emoticons text={name} /></strong>
+            <span class="faces">
+              {#each others(roster, group).slice(0, 5) as f (f.jid)}
+                <Avatar jid={f.jid} name={f.name} url={f.url} show={f.show} size={24} />
+              {/each}
+              <small>{_n('1 persona', '{n} personas', group.members.length)}</small>
+            </span>
+          </div>
+          <button
+            class="members"
+            aria-pressed={membersOpen}
+            onclick={() => (membersOpen = !membersOpen)}>{_('Miembros')}</button
+          >
+        {/if}
+      </header>
+    {:else}
+      <header oncontextmenu={menu}>
+        <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={60} />
+        <div class="to">
+          <span class="name">{_('Para:')} <strong><Emoticons text={name} plus /></strong></span>
+          <small
+            >{#if contact?.status}<Emoticons text={contact.status} />{:else}{labels[
+                contact?.show ?? 'offline'
+              ]}{/if}</small
+          >
+          {#if contact?.email}<small class="email">{contact.email}</small>{/if}
+        </div>
+        <button
+          class="lock"
+          onclick={() => window.api.openVerify(jid)}
+          title={verified
+            ? _('Conversación cifrada y verificada')
+            : _('Conversación cifrada. Pulsa para verificarla.')}
+          aria-label={_('Verificar cifrado…')}
+        >
+          {#if verified}<ShieldCheck size={14} />{:else}<Lock size={14} />{/if}
+        </button>
+      </header>
+    {/if}
+
+    <ol bind:this={list} aria-live="polite">
+      {#each messages as message, i (message.id)}
+        {@render noted(i === 0 ? 0 : messages[i - 1].at, message.at)}
+        {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
+        {#if message.event}
+          <li class="event notice">
+            <Emoticons text={roster ? eventText(roster, group, message.event) : ''} />
+          </li>
+        {:else if message.buzz}
+          <li class="event buzz">
+            🫨 {#if message.mine}{_('Has enviado un zumbido')}{:else}{@render named(
+                _('{name} te ha enviado un zumbido')
+              )}{/if}
+            <time>{time(message.at)}</time>
+          </li>
+        {:else if message.wink}
+          <li class="event wink-line">
+            🎬 {#if message.mine}{_('Has enviado el guiño')}{:else if room}{@render named(
+                _('{name} ha enviado el guiño'),
+                sender(message).name
+              )}{:else}{@render named(_('{name} te ha enviado el guiño'))}{/if}
+            <button
+              class="replay"
+              onclick={() => window.api.replayWink(message.wink!)}
+              title={_('Volver a ver el guiño')}>«{winkLabel(message.wink)}» ▶</button
+            >
+            <time>{time(message.at)}</time>
+          </li>
+        {:else}
+          <li class:mine={message.mine} class:continues={continues(i)}>
+            {#if !continues(i)}
+              <span class="meta"
+                >{#if message.mine}{_('Tú dices:')}{:else if room}{@const f =
+                    sender(message)}<Avatar
+                    jid={f.jid}
+                    name={f.name}
+                    url={f.url}
+                    show={f.show}
+                    size={22}
+                  />
+                  {@render named(_('{name} dice:'), f.name)}{:else}{@render named(
+                    _('{name} dice:')
+                  )}{/if}
+                <time>{time(message.at)}</time></span
               >
             {/if}
-          {/if}
-        </li>
-      {/if}
-    {/each}
-    {@render noted(messages.at(-1)?.at ?? 0, Infinity)}
-  </ol>
-
-  <p class="typing" aria-live="polite">
-    {#if theyType && prefs.typing}{@render named(_('{name} está escribiendo…'))}{/if}
-  </p>
-
-  {#if sendError}
-    <p class="send-error event warn" role="alert">
-      {#if sendError === 'no-devices'}{@render named(
-          _('{name} tiene que actualizar Palique para recibir mensajes cifrados')
-        )}{:else}{sendError}{/if}
-    </p>
-  {/if}
-
-  {#if blocked.length}
-    <div class="blocked" role="alert">
-      <span>{@render named(_('La clave de cifrado de {name} ha cambiado'))}</span>
-      <button onclick={acceptKeys}>{_('Aceptar la clave nueva')}</button>
-    </div>
-  {/if}
-
-  <div class="compose">
-    <div class="toolbar">
-      <details class="picker" bind:open={emoticonsOpen}>
-        <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}><Smile size={18} /></summary>
-        <ul class="emoticons">
-          {#each EMOTICONS as { id, codes, name } (id)}
-            <li>
-              <!-- Still until pointed at, so the open picker isn't 21 things moving at once. -->
-              <button
-                onclick={() => insertEmoticon(codes[0])}
-                onpointerenter={() => (hovered = id)}
-                onpointerleave={() => (hovered = '')}
-                title="{_(name)} {codes[0]}"
-                aria-label="{_(name)} {codes[0]}"
-                ><EmoticonCanvas {id} code={codes[0]} still={hovered !== id} /></button
-              >
-            </li>
-          {/each}
-        </ul>
-      </details>
-      <details class="picker" bind:open={pickerOpen}>
-        <summary
-          class:disabled={!canWink}
-          title={canWink ? _('Enviar un guiño') : _('Espera un poco para enviar otro guiño')}
-        >
-          <Star size={16} />
-          {_('Guiño')}</summary
-        >
-        <!-- Thumbnails: a still frame, the animation (muted) on hover or focus. -->
-        <div class="popup">
-          <h2>{_('Enviar un guiño')}</h2>
-          <ul class="winks">
-            {#each winks() as { id } (id)}
-              <li>
-                <button
-                  class="wink"
-                  onclick={() => wink(id)}
-                  disabled={!canWink}
-                  aria-label={_('Enviar el guiño {name}', { name: winkLabel(id) })}
-                  onmouseenter={() => (previewing = id)}
-                  onmouseleave={() => (previewing = '')}
-                  onfocus={() => (previewing = id)}
-                  onblur={() => (previewing = '')}
+            {#if message.undecryptable}
+              <p class="event warn">{_('No se ha podido descifrar este mensaje')}</p>
+            {:else}
+              <p title={time(message.at)}><Emoticons text={message.body} /></p>
+              {#if !message.encrypted}
+                <small class="plain"
+                  ><LockOpen size={11} /> {_('Este mensaje no está cifrado')}</small
                 >
-                  <span class="thumb">
-                    {#if pickerOpen}<WinkPlayer {id} playing={previewing === id} loop />{/if}
-                  </span>
-                  <span>{winkLabel(id)}</span>
-                </button>
+              {/if}
+            {/if}
+          </li>
+        {/if}
+      {/each}
+      {@render noted(messages.at(-1)?.at ?? 0, Infinity)}
+    </ol>
+
+    <p class="typing" aria-live="polite">
+      {#if theyType && prefs.typing}{@render named(_('{name} está escribiendo…'))}{/if}
+    </p>
+
+    {#if sendError}
+      <p class="send-error event warn" role="alert">
+        {#if sendError === 'no-devices'}{@render named(
+            _('{name} tiene que actualizar Palique para recibir mensajes cifrados')
+          )}{:else}{sendError}{/if}
+      </p>
+    {/if}
+
+    {#if blocked.length}
+      <div class="blocked" role="alert">
+        <span>{@render named(_('La clave de cifrado de {name} ha cambiado'))}</span>
+        <button onclick={acceptKeys}>{_('Aceptar la clave nueva')}</button>
+      </div>
+    {/if}
+
+    <div class="compose">
+      <div class="toolbar">
+        <details class="picker" bind:open={emoticonsOpen}>
+          <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}><Smile size={18} /></summary
+          >
+          <ul class="emoticons">
+            {#each EMOTICONS as { id, codes, name } (id)}
+              <li>
+                <!-- Still until pointed at, so the open picker isn't 21 things moving at once. -->
+                <button
+                  onclick={() => insertEmoticon(codes[0])}
+                  onpointerenter={() => (hovered = id)}
+                  onpointerleave={() => (hovered = '')}
+                  title="{_(name)} {codes[0]}"
+                  aria-label="{_(name)} {codes[0]}"
+                  ><EmoticonCanvas {id} code={codes[0]} still={hovered !== id} /></button
+                >
               </li>
             {/each}
           </ul>
-          {#if !canWink}<p class="wait">{_('Espera un poco para enviar otro guiño.')}</p>{/if}
-        </div>
-      </details>
-      <button
-        onclick={buzz}
-        disabled={!canBuzz}
-        title={canBuzz ? _('Enviar un zumbido') : _('Espera un poco para enviar otro zumbido')}
-      >
-        <Vibrate size={16} />
-        {_('Zumbido')}</button
-      >
-    </div>
-    <div class="write">
-      <textarea
-        bind:this={input}
-        bind:value={draft}
-        onkeydown={onKeydown}
-        oninput={onInput}
-        maxlength="4000"
-        rows="2"
-        placeholder={_('Escribe un mensaje…')}
-        aria-label={_('Mensaje')}
-      ></textarea>
-      <button class="send primary" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
+        </details>
+        <details class="picker" bind:open={pickerOpen}>
+          <summary
+            class:disabled={!canWink}
+            title={canWink ? _('Enviar un guiño') : _('Espera un poco para enviar otro guiño')}
+          >
+            <Star size={16} />
+            {_('Guiño')}</summary
+          >
+          <!-- Thumbnails: a still frame, the animation (muted) on hover or focus. -->
+          <div class="popup">
+            <h2>{_('Enviar un guiño')}</h2>
+            <ul class="winks">
+              {#each winks() as { id } (id)}
+                <li>
+                  <button
+                    class="wink"
+                    onclick={() => wink(id)}
+                    disabled={!canWink}
+                    aria-label={_('Enviar el guiño {name}', { name: winkLabel(id) })}
+                    onmouseenter={() => (previewing = id)}
+                    onmouseleave={() => (previewing = '')}
+                    onfocus={() => (previewing = id)}
+                    onblur={() => (previewing = '')}
+                  >
+                    <span class="thumb">
+                      {#if pickerOpen}<WinkPlayer {id} playing={previewing === id} loop />{/if}
+                    </span>
+                    <span>{winkLabel(id)}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            {#if !canWink}<p class="wait">{_('Espera un poco para enviar otro guiño.')}</p>{/if}
+          </div>
+        </details>
+        {#if !room}
+          <button
+            onclick={buzz}
+            disabled={!canBuzz}
+            title={canBuzz ? _('Enviar un zumbido') : _('Espera un poco para enviar otro zumbido')}
+          >
+            <Vibrate size={16} />
+            {_('Zumbido')}</button
+          >
+        {/if}
+      </div>
+      <div class="write">
+        <textarea
+          bind:this={input}
+          bind:value={draft}
+          onkeydown={onKeydown}
+          oninput={onInput}
+          maxlength="4000"
+          rows="2"
+          placeholder={room ? _('Escribe un mensaje al grupo…') : _('Escribe un mensaje…')}
+          aria-label={_('Mensaje')}
+        ></textarea>
+        <button class="send primary" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
+      </div>
     </div>
   </div>
+  {#if roster && group}
+    <GroupMembers {group} {roster} open={membersOpen} bind:editing={editingGroup} />
+  {/if}
 </div>
 
 <style>
-  .chat {
+  /* The conversation, and a group's members beside it; sheets go over both. */
+  .window {
+    position: relative;
     display: flex;
-    flex-direction: column;
     height: 100vh;
   }
 
+  .chat {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
   /* Beside the contact list: its own column's height, and winks over it, not the list. */
-  .chat.embedded {
-    position: relative;
+  .window.embedded {
     height: 100%;
   }
 
@@ -498,6 +590,72 @@
     padding: 12px 16px;
     background: var(--header-bg);
     border-bottom: 1px solid var(--line);
+  }
+
+  /* A group: its picture (a pencil on it for admins), name, some faces and «Miembros». */
+  header.group {
+    gap: 12px;
+    min-height: 60px;
+    padding: 10px 14px;
+  }
+
+  .edit {
+    position: relative;
+    display: grid;
+    padding: 0;
+    border: none;
+    border-radius: var(--avatar-radius);
+    background: none;
+    box-shadow: none;
+  }
+
+  .edit:hover:not(:disabled) {
+    background: none;
+  }
+
+  .pen {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-bg);
+    box-shadow: var(--accent-shadow);
+    color: var(--accent-text);
+  }
+
+  .group .to {
+    flex: 1;
+  }
+
+  .faces {
+    display: flex;
+    align-items: center;
+  }
+
+  .faces > :global(.avatar + .avatar) {
+    margin-left: -6px;
+  }
+
+  .faces small {
+    margin-left: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .members {
+    padding: 3px 12px;
+    font-size: 12.5px;
+  }
+
+  .members[aria-pressed='true'] {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    box-shadow: var(--accent-shadow);
+    color: var(--accent-text);
   }
 
   /* «Para: Ana», then their personal message and their email. */
@@ -568,6 +726,12 @@
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 700;
+  }
+
+  /* In groups, the writer's small picture before their name. */
+  .meta > :global(.avatar) {
+    margin-right: 4px;
+    vertical-align: middle;
   }
 
   time {

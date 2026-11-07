@@ -17,7 +17,9 @@ A desktop instant messaging app in the style of the early 2000s chat apps: Elect
 ```
 src/main/          Electron main process
   index.ts         windows, tray, notifications, IPC handlers, anti-spam
-  xmpp.ts          the only module that touches XMPP; one connection; account service calls
+  xmpp.ts          with groups.ts, the only code that touches XMPP; one connection; account service calls; exports an internal API for groups.ts
+  groups.ts        group chats: rooms (XEP-0045), bookmarks, member list, group OMEMO, archive catch-up
+  session.ts       ordering of a conversation's messages in memory (live and archived)
   omemo.ts         OMEMO end-to-end encryption: keys, sessions, encrypt/decrypt (omemo.sqlite in userData)
   settings.ts      app preferences (settings.json in userData)
   presence.ts      "came online" detection
@@ -25,11 +27,12 @@ src/main/          Electron main process
   log.ts           error log (palique.log), with nothing personal in it
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
-                   '' → App (Login / Roster), #chat=<jid>, #verify=<jid>, #options, #nick, #about, #wink=<id>
+                   '' → App (Login / Roster), #chat=<jid>, #newgroup, #verify=<jid>, #options, #nick, #about, #wink=<id>
+  GroupAvatar / NewGroup / GroupMembers .svelte  group photo (or face mosaic), creation window, member list
   themes/          light, warm, dark: «Claro», «Cálido», «Oscuro» (CSS variables; light.css defines them all)
 server/
   prosody.cfg.lua  development Prosody config
-  modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible, mod_palique_passwords
+  modules/         our Prosody modules (Lua): mod_palique_invites, mod_palique_invisible, mod_palique_passwords, mod_palique_groups
   accounts/        account service (own package.json, Dockerfile)
   certs/           dev-only self-signed cert for localhost
 deploy/            production: compose, Prosody config, Caddyfile, setup.sh, certs.sh
@@ -46,7 +49,7 @@ compose.yaml       local server stack
 
 - **One XMPP connection** for the whole app, owned by `src/main/xmpp.ts`. It keeps the roster, presences, avatars and display names in memory and emits a `Snapshot` on every change. `index.ts` broadcasts it to every window (`roster:changed`).
 - **Menu bar:** `MenuBar.svelte` on top of the main window, signed in or not (Palique, Idioma and Ayuda on the sign-in screen; Palique, Contactos, Herramientas and Ayuda signed in). Each menu is native (`menu.ts` → `menu:popup`), so it can go past the window.
-- **Windows:** contact list (main), one window per conversation (as chat apps used to), Options, and a transparent click-through overlay for winks (on Wayland, where a window can't force itself on top everywhere, or with «Mostrar los guiños a pantalla completa» off, winks play inside the conversation window instead). Closing the contact list hides it (tray keeps the app running). With «Conversaciones: En la ventana de contactos» (`chats: 'together'`), the conversation chosen shows beside the list instead (`<Chat embedded>` in `Roster.svelte`); `shown` and `hostOf()` in `index.ts` decide which window each message, wink and typing notice goes to.
+- **Windows:** contact list (main), one window per conversation (as chat apps used to), Options, the new-group window (`#newgroup`), and a transparent click-through overlay for winks (on Wayland, where a window can't force itself on top everywhere, or with «Mostrar los guiños a pantalla completa» off, winks play inside the conversation window instead). Closing the contact list hides it (tray keeps the app running). With «Conversaciones: En la ventana de contactos» (`chats: 'together'`), the conversation chosen shows beside the list instead (`<Chat embedded>` in `Roster.svelte`); `shown` and `hostOf()` in `index.ts` decide which window each message, wink and typing notice goes to.
 - **IPC:** `ipcMain.handle('area:action')` in `index.ts`, wrapped one-to-one in `src/preload/index.ts`. Validate everything that comes from the renderer in main (types, sizes, ids).
 - **Single instance** per data folder (`app.requestSingleInstanceLock`). To run a second copy for testing, give it its own folder (see Development).
 - **Local data:** there is no chat history: nothing said is written to disk (server archive is off too). `settings.json` and `omemo.sqlite` (the encryption keys, sealed with `safeStorage` when the system has it) live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
@@ -54,7 +57,7 @@ compose.yaml       local server stack
 - **Icons:** [Lucide](https://lucide.dev) through `@lucide/svelte`, imported one by one (`import { Bell } from '@lucide/svelte'`, `size={16}`), so only those end up in the app. Line icons in `currentColor`, so they follow every theme.
 - **Design "Cielo":** a 2005 chat app made today: sky headers (`--sky`, `--header-bg`), glossy pill buttons, rounded fields, Nunito. A window's main action is `<button class="primary">`. Components use theme variables only, never colors of their own, so every theme works.
 - **Theme and font:** chosen in Options, applied as `data-theme` / `data-font` on every window's root. A font overrides the theme's `--font` (`themes/fonts.css`) and is scaled to the theme font's x-height (`--x-height`, `font-size-adjust` in `base.css`), so every font looks the same size. All bundled fonts are free (OFL), Comic Relief among them for a comic-style option.
-- **Messages:** contacts only; strangers can't message you. The text of 1:1 messages is end-to-end encrypted with OMEMO (XEP-0384); winks, buzzes and typing notices are unencrypted signals. Fallback `<body>` («Mensaje cifrado con OMEMO») for clients that can't read it. Conversations and unread messages live in memory for the session only. Contacts' keys are verified in `#verify`. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
+- **Messages:** contacts only; strangers can't message you (in a group, members who aren't your contacts can write too, but only inside the group). The text of 1:1 messages is end-to-end encrypted with OMEMO (XEP-0384); winks, buzzes and typing notices are unencrypted signals. Fallback `<body>` («Mensaje cifrado con OMEMO») for clients that can't read it. Conversations and unread messages live in memory for the session only. Contacts' keys are verified in `#verify`. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).
 
 ### Accounts and identity
@@ -98,7 +101,7 @@ compose.yaml       local server stack
 
 ### Prosody
 
-- Invite-only registration (`invites`, `invites_register`, `registration_invite_only`), MAM off, no federation (s2s off).
+- Invite-only registration (`invites`, `invites_register`, `registration_invite_only`), MAM off for one-to-one chats (groups keep a week), no federation (s2s off).
 - `mod_palique_invites` is for trusted components only (`palique_invites_trusted`), via iqs to the host in `urn:palique:invite:0`:
   - `<account username inviter?>`: an invite tied to a localpart; the module enforces it, because stock `mod_invites_register` doesn't
   - `<reset for>`: password reset token
@@ -106,6 +109,14 @@ compose.yaml       local server stack
   - `<contacts username>` (get): the user's mutual contacts, so emails go only to them
   - On `user-registered`, it messages the component `<registered username/>` and subscribes inviter ↔ invitee.
 - `mod_palique_invisible`: XEP-0186-style invisibility.
+- **Groups:** MUC component `groups.<domain>` (private, members-only, persistent rooms with real JIDs visible to members; members may invite; local users create them). Their messages are archived for a week (`muc_mam`) so offline members catch up. Palique's «Admin» is the XMPP `owner`; the group photo is the room's vCard. `mod_palique_groups`, in `urn:palique:groups:0`:
+  - `<leave/>` (iq set to the room): drops your affiliation. The last owner hands over to the oldest member first; the last member destroys the room
+  - `<members/>` (iq get, members only): `<member jid affiliation name since/>`; the name comes from `<nick>` in the member's join presence
+  - every change is a `groupchat` message in the room with `<event kind actor actor-name jid name/>` (`created`, `added`, `left`, `removed`, `name`, `photo`, `owner`, `unowner`) and a Spanish `<body>` for other clients
+  - room nick = your own localpart (enforced); room registration (`jabber:iq:register`) is off; `whois` locked to public
+  - private messages and iqs to occupants are refused like an absent nick
+  - invisible members: presences dropped for the others (with `mod_palique_invisible`)
+  - names of 1 to 40 characters, up to 50 people
 - `mod_palique_passwords`: strong passwords only, on sign-up, reset and signed-in changes (`not-acceptable` otherwise). The invite or reset code survives a refused attempt.
 
 ### Protocols in use
@@ -123,6 +134,9 @@ compose.yaml       local server stack
 | `urn:palique:wink:0` | winks (Palique only; body is a text fallback) |
 | `urn:palique:accounts:0` | account service |
 | `urn:palique:invite:0` | account service ↔ Prosody |
+| XEP-0045, XEP-0313 on rooms | group chats; mediated invites (XEP-0045 §7.8, XEP-0249 is the direct kind we don't send) |
+| XEP-0402 | group bookmarks in PEP (private, autojoin) |
+| `urn:palique:groups:0` | groups: leave, members, events |
 
 ## Development
 
@@ -167,6 +181,17 @@ Gettext style, no library: the Spanish text is the key (`src/renderer/src/i18n.t
 - The account service's emails and the pages their links open are translated the same way, with their own `server/accounts/src/i18n.ts` (a copy: the service is built on its own) and catalog `server/accounts/src/locales/`; `check:i18n` covers both. A function makes the translator per email, `const _ = translator(lang)`, as each one has its own language.
 - An email goes out in the language of the app that asked for it (`lang` in the iq or the `/recover` body; an invite, in the inviter's). Its links carry it (`&l=en`) for the page they open. The admin's invites take it as an argument (`src/invite.ts correo [es|en]`, Spanish by default).
 
+## Groups
+
+Group chats over an XMPP MUC (`groups.<domain>`), code in `src/main/groups.ts`; the server side is in Prosody.
+
+- **Admin** is the XMPP `owner` affiliation (several allowed). Owners rename, change the photo (room vCard), remove members and make or unmake admins. Any member adds their own contacts (mediated invites). Max 50 people, names 1 to 40 characters.
+- **Invites** are accepted only from your contacts; others are ignored. Room JIDs are random. Members' apps see each other's JIDs (`public_jids`), the UI never shows them.
+- **Leaving:** the last admin leaving hands over to the oldest member; the last member leaving destroys the room (a 31-day tombstone answers `gone`).
+- **Messages** are OMEMO-encrypted for every device of every member. Winks yes, buzz no. The archive keeps a week; after a restart only plaintext events and winks come back (encrypted ones can't be re-read), shown as quiet history.
+- **Presence:** invisible users stay in their groups and receive live, but nobody sees them present (dropped server-side by `mod_palique_invisible` + `mod_palique_groups`; the disco count excludes them). Writing still shows they're there. Away/busy/status changes don't reach rooms.
+- **Bookmarks** (XEP-0402, whitelist, autojoin) bring the groups back on any computer.
+
 ## Winks
 
 Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/renderer/src/winks/`, so they're sharp at any size (thumbnail, conversation, full screen) and weigh a few KB.
@@ -196,6 +221,9 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `reset` | password recovery on the website, by email, in the page's language |
 | `newsletter` | newsletter choice, language kept with the account |
 | `invisible` | invisible status (needs the server module) |
+| `groups-server` | group rooms: defaults, members and names, member invites, owners only for name and photo, leaving and succession, events, archive, strangers out, 50-person limit |
+| `groups` | group logic in main (no server) |
+| `session` | message ordering (no server) |
 | `omemo` | OMEMO encryption: sessions, key changes, verification |
 | `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `log` | error log: format, size limit, nothing personal written |
@@ -220,7 +248,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
 - **License:** AGPL-3.0-or-later ([LICENSE](LICENSE)). Anything added (dependencies, fonts, sounds, images) must be compatible: permissive (MIT, BSD, ISC, Apache-2.0), OFL for fonts, GPL-3.0 or AGPL-3.0 when there's no permissive option (the OMEMO library: Palique as a whole is then AGPL-3.0 only), or your own work.
 - **Simplicity:**
   - Prefer the standard library and platform features. Avoid new dependencies.
-  - One module owns each concern: XMPP only in `xmpp.ts`, IPC only in `index.ts` and the preload.
+  - One module owns each concern: XMPP only in `xmpp.ts` and `groups.ts` (which uses the internal API `xmpp.ts` exports for it), IPC only in `index.ts` and the preload.
 - **Security and privacy:**
   - Anything from the network is untrusted: validate ids, sizes and types (see the avatar and wink checks).
   - Never show JIDs to other users. Emails only to mutual contacts.

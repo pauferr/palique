@@ -70,3 +70,20 @@ VirtualHost "localhost"
 -- Account service (server/accounts).
 Component "accounts.localhost"
 	component_secret = "dev-only-accounts-secret" -- dev only; same as in compose.yaml
+
+-- Group chats: private, members-only rooms that local users create; members may add people
+-- (their invite makes them members). Our module adds leaving, the member list with names,
+-- the group's events and the size limit (server/modules/mod_palique_groups.lua).
+-- Their messages are archived for a week, so members who were offline catch up.
+Component "groups.localhost" "muc"
+	modules_enabled = { "muc_mam", "palique_groups" }
+	restrict_room_creation = "local"
+	muc_room_default_public = false
+	muc_room_default_members_only = true
+	muc_room_default_persistent = true
+	muc_room_default_public_jids = true -- members see who writes (the app needs the real JID)
+	muc_room_default_allow_member_invites = true
+	muc_room_default_change_subject = false
+	muc_room_default_history_length = 0 -- catching up is MAM's job, not join history
+	muc_log_by_default = true
+	muc_log_expires_after = "1w"

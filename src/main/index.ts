@@ -27,6 +27,19 @@ import {
   cooldown
 } from './cooldown'
 import { openLog } from './log'
+import { insertSorted } from './session'
+import {
+  addMembers,
+  createGroup,
+  groups,
+  leaveGroup,
+  removeMember,
+  sendGroupMessage,
+  sendGroupWink,
+  setName,
+  setOwner,
+  setPhoto
+} from './groups' // also hooks the group rooms into xmpp.ts
 import { openOmemo, type Seal } from './omemo'
 import { installNow, startUpdates, type UpdateStatus } from './updates'
 import { cameOnline } from './presence'
@@ -38,6 +51,7 @@ import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
   DOMAIN,
+  GROUPS_DOMAIN,
   acceptKey,
   acceptRequest,
   deviceTrust,
@@ -250,10 +264,52 @@ function notify(title: string, body: string, onClick: () => void): void {
 
 // Native titles can't hold images or colors: emoticon codes become plain emoji, and
 // formatting codes go.
-const contactName = (jid: string): string => {
-  const name =
-    stripPlus(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '') || _('Sin nombre')
-  return settings.get().emoticons ? emojify(name) : name
+const plain = (name: string): string => {
+  const text = stripPlus(name) || _('Sin nombre')
+  return settings.get().emoticons ? emojify(text) : text
+}
+const contactName = (jid: string): string =>
+  plain(snapshot().contacts.find((c) => c.jid === jid)?.name ?? '')
+
+const isRoom = (jid: string): boolean => jid.endsWith(`@${GROUPS_DOMAIN}`)
+const chatTitle = (jid: string): string =>
+  isRoom(jid) ? plain(groups().find((g) => g.jid === jid)?.name ?? '') : contactName(jid)
+// A room that's one of ours (what the renderer sends is checked with this).
+const ownGroup = (value: unknown): string => {
+  if (typeof value !== 'string' || !isRoom(value) || !groups().some((g) => g.jid === value)) {
+    throw new Error('invalid')
+  }
+  return value
+}
+const groupMember = (room: string, value: unknown): string => {
+  if (
+    typeof value !== 'string' ||
+    !groups()
+      .find((g) => g.jid === room)
+      ?.members.some((m) => m.jid === value)
+  ) {
+    throw new Error('invalid')
+  }
+  return value
+}
+// Contacts only, no repeats, 1 to `max` (what still fits in a group of 50).
+const GROUP_MAX = 50
+const contactList = (value: unknown, max: number): string[] => {
+  const contacts = snapshot().contacts
+  if (
+    !Array.isArray(value) ||
+    !value.every((j) => typeof j === 'string' && contacts.some((c) => c.jid === j))
+  ) {
+    throw new Error('invalid')
+  }
+  const list = [...new Set<string>(value)]
+  if (!list.length || list.length > max) throw new Error('invalid')
+  return list
+}
+const groupTitle = (value: unknown): string => {
+  const title = typeof value === 'string' ? value.trim() : ''
+  if (!title || [...title].length > 40) throw new Error('invalid')
+  return title
 }
 
 function notifyMessage(message: ChatMessage): void {
@@ -265,7 +321,13 @@ function notifyMessage(message: ChatMessage): void {
       : message.body.length > 120
         ? `${message.body.slice(0, 120)}…`
         : message.body
-  notify(contactName(message.with), body, () => openChat(message.with, true))
+  const group = isRoom(message.with)
+    ? plain(groups().find((g) => g.jid === message.with)?.name ?? '')
+    : ''
+  const title = group
+    ? _('{name} en {group}', { name: plain(message.senderName ?? ''), group })
+    : contactName(message.with)
+  notify(title, body, () => openChat(message.with, true))
 }
 
 // "lolo se ha conectado", except for the burst of presences right after we sign in.
@@ -277,7 +339,8 @@ let previous: Snapshot = {
   name: '',
   avatar: '',
   show: 'online',
-  status: ''
+  status: '',
+  groups: []
 }
 let connectedAt = 0
 const arrivals = cooldown(ARRIVAL_INTERVAL)
@@ -383,12 +446,13 @@ function openChat(contact: string, focus: boolean): BrowserWindow | null {
     return existing
   }
   const win = new BrowserWindow({
-    ...centered(440, 520),
+    // Groups: room for the members beside the conversation.
+    ...(isRoom(contact) ? centered(720, 600) : centered(440, 520)),
     minWidth: 320,
     minHeight: 360,
     show: false,
     autoHideMenuBar: true,
-    title: contactName(contact),
+    title: chatTitle(contact),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: { preload, sandbox: false, autoplayPolicy: 'no-user-gesture-required' }
   })
@@ -466,6 +530,28 @@ function openNick(): void {
   nickWindow.on('closed', () => (nickWindow = null))
   nickWindow.once('ready-to-show', () => nickWindow?.show())
   loadRenderer(nickWindow, 'nick')
+}
+
+// Creating a group: a small window of its own.
+let newGroupWindow: BrowserWindow | null = null
+
+function openNewGroup(): void {
+  if (newGroupWindow) {
+    newGroupWindow.focus()
+    return
+  }
+  newGroupWindow = new BrowserWindow({
+    ...centered(400, 640),
+    show: false,
+    resizable: false,
+    autoHideMenuBar: true,
+    title: _('Nuevo grupo…'),
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false }
+  })
+  newGroupWindow.on('closed', () => (newGroupWindow = null))
+  newGroupWindow.once('ready-to-show', () => newGroupWindow?.show())
+  loadRenderer(newGroupWindow, 'newgroup')
 }
 
 // Comparing encryption codes with a contact: one small window per contact.
@@ -578,15 +664,21 @@ function setUnread(contact: string, count: number): void {
 // list instead, buzzes too.
 // `quiet`: no shaking, sounds, flashing or toasts (old messages, e.g. while offline).
 // Busy (dnd): no sounds, shaking or toasts, but windows still flash.
+// An archived encrypted group message is new to us (its key works once): it counts as unread.
+const isSystem = (m: ChatMessage): boolean =>
+  Boolean(m.event) || (isRoom(m.with) && Boolean(m.delayed) && !m.encrypted)
+
 function deliver(message: ChatMessage, quiet = false): void {
-  const kept = session.get(message.with) ?? []
-  if (!kept.some((m) => m.id === message.id)) session.set(message.with, [...kept, message])
+  session.set(message.with, insertSorted(session.get(message.with) ?? [], message))
   const dnd = !message.mine && ownShow() === 'dnd'
-  const silent = quiet || dnd
+  // The room's own announcements are lines in the conversation, never an alert. Neither is
+  // what a group's archive replays after a restart: it's history.
+  const system = isSystem(message)
+  const silent = quiet || dnd || system
   const win = hostOf(message.with)
   if (!win) {
     // Ours from another device are only kept in the session.
-    if (message.mine) return
+    if (message.mine || system) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
     if (message.wink && !quiet) {
       unseenWinks.set(message.with, [...(unseenWinks.get(message.with) ?? []), message.wink])
@@ -601,7 +693,7 @@ function deliver(message: ChatMessage, quiet = false): void {
   const queue = pending.get(message.with)
   if (queue) queue.push([message, silent])
   else win.webContents.send('chat:message', message, silent)
-  if (message.mine || quiet || win.isFocused()) return
+  if (message.mine || quiet || system || win.isFocused()) return
   win.flashFrame(true)
   // A burst of messages from one contact gets one toast.
   if (!notified.take(message.with)) notifyMessage(message)
@@ -791,12 +883,25 @@ app.whenReady().then(() => {
     chats.forEach((win) => win.close())
     options?.close()
     nickWindow?.close()
+    newGroupWindow?.close()
   })
 
   // Every window gets the full contact list on each change.
   onChange((state) => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('roster:changed', state))
     announceArrivals(state)
+    // Groups: a renamed one retitles its window; one we're no longer in closes its conversation.
+    for (const [room, win] of chats) {
+      if (!isRoom(room)) continue
+      if (state.groups.some((g) => g.jid === room)) win.setTitle(chatTitle(room))
+      else win.close()
+    }
+    for (const room of new Set([shown, ...unread.keys()])) {
+      if (!isRoom(room) || state.groups.some((g) => g.jid === room)) continue
+      if (shown === room) showInMain('')
+      setUnread(room, 0)
+      unseenWinks.delete(room)
+    }
   })
   onEmail((email) => {
     BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('account:email', email))
@@ -840,8 +945,15 @@ app.whenReady().then(() => {
   })
   onMessage((message) => {
     const effect = !message.mine && (message.buzz || message.wink)
-    if (effect && (message.buzz ? gotBuzzes : gotWinks).take(message.with)) return
+    if (effect && (message.buzz ? gotBuzzes : gotWinks).take(message.sender ?? message.with)) return
     deliver(message, isLate(message))
+    // The room is already gone, so there's no conversation to show this in: a toast, outside
+    // the per-contact cooldown.
+    if (message.event?.kind === 'kicked') {
+      notify('Palique', _('Te han quitado de «{name}»', { name: plain(message.event.name) }), () =>
+        mainWindow?.show()
+      )
+    }
     // Our own winks sent from another device aren't replayed here.
     if (message.wink && !message.mine) playWink(message)
   })
@@ -850,7 +962,9 @@ app.whenReady().then(() => {
     if (!isWinkId(wink)) return 0
     const wait = sentWinks.take(String(contact))
     if (wait) return wait
-    const message = await sendWink(String(contact), wink)
+    const message = isRoom(String(contact))
+      ? await sendGroupWink(ownGroup(contact), wink)
+      : await sendWink(String(contact), wink)
     deliver(message)
     playWink(message)
     return WINK_INTERVAL
@@ -904,9 +1018,10 @@ app.whenReady().then(() => {
   // Typing only matters if the conversation is open; it never opens a window.
   onTyping((contact, typing) => hostOf(contact)?.webContents.send('chat:typing', contact, typing))
   ipcMain.handle('chat:typing', (_event, contact: string, typing: boolean) =>
-    sendTyping(String(contact), Boolean(typing))
+    isRoom(String(contact)) ? undefined : sendTyping(String(contact), Boolean(typing))
   )
   ipcMain.handle('chat:open', (_event, contact: string) => {
+    if (isRoom(String(contact)) && !groups().some((g) => g.jid === contact)) return
     openChat(String(contact), true)
   })
   ipcMain.on('chat:ready', (event, contact: string) => {
@@ -933,7 +1048,12 @@ app.whenReady().then(() => {
   ipcMain.handle('chat:history', (_event, contact: string) => session.get(String(contact)) ?? [])
   ipcMain.handle('chat:send', async (_event, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)
-    if (text) deliver(await sendMessage(String(contact), text))
+    if (!text) return
+    deliver(
+      isRoom(String(contact))
+        ? await sendGroupMessage(ownGroup(contact), text)
+        : await sendMessage(String(contact), text)
+    )
   })
   ipcMain.handle(
     'chat:trust-list',
@@ -941,6 +1061,8 @@ app.whenReady().then(() => {
   )
   onTrust((changes) =>
     changes.forEach((change) => {
+      // Group members who aren't contacts: nothing to tell, nowhere to show it.
+      if (change.jid !== account && !snapshot().contacts.some((c) => c.jid === change.jid)) return
       const note: TrustNote = { ...change, at: Date.now() }
       trustNotes.set(change.jid, [...(trustNotes.get(change.jid) ?? []), note])
       hostOf(change.jid)?.webContents.send('chat:trust', note)
@@ -970,11 +1092,46 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('chat:verify-open', (_event, contact: string) => openVerify(String(contact)))
   ipcMain.handle('chat:buzz', async (_event, contact: string) => {
+    if (isRoom(String(contact))) throw new Error('invalid') // no buzzing groups
     const wait = sentBuzzes.take(String(contact))
     if (wait) return wait
     deliver(await sendBuzz(String(contact)))
     return BUZZ_INTERVAL
   })
+  ipcMain.handle('group:create', (_event, name: string, members: string[]) =>
+    createGroup(groupTitle(name), contactList(members, GROUP_MAX - 1))
+  )
+  ipcMain.handle('group:add', (_event, room: string, members: string[]) =>
+    addMembers(
+      ownGroup(room),
+      contactList(members, GROUP_MAX - (groups().find((g) => g.jid === room)?.members.length ?? 0))
+    )
+  )
+  ipcMain.handle('group:remove', (_event, room: string, member: string) =>
+    removeMember(ownGroup(room), groupMember(room, member))
+  )
+  ipcMain.handle('group:owner', (_event, room: string, member: string, owner: boolean) => {
+    if (typeof owner !== 'boolean') throw new Error('invalid')
+    return setOwner(ownGroup(room), groupMember(room, member), owner)
+  })
+  ipcMain.handle('group:name', (_event, room: string, name: string) =>
+    setName(ownGroup(room), groupTitle(name))
+  )
+  ipcMain.handle('group:photo', (_event, room: string, png: unknown) => {
+    const valid =
+      png === null ||
+      (png instanceof Uint8Array &&
+        png.length <= AVATAR_MAX_BYTES &&
+        Buffer.from(png.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+    if (!valid) throw new Error('invalid')
+    return setPhoto(ownGroup(room), png as Uint8Array | null)
+  })
+  ipcMain.handle('group:leave', (_event, room: string) => leaveGroup(ownGroup(room)))
+  // «Añadir como contacto» on a member who isn't one: we only know them from the group.
+  ipcMain.handle('group:contact', (_event, room: string, member: string) =>
+    addContact(groupMember(ownGroup(room), member))
+  )
+  ipcMain.handle('group:new-window', () => openNewGroup())
   ipcMain.handle('options:open', () => openOptions())
   ipcMain.handle('app:quit', () => app.quit())
   ipcMain.handle('nick:open', () => openNick())

@@ -15,6 +15,13 @@ const OUT = process.env.OUT || path.join(ROOT, 'docs/images')
 const BOTTOM =
   "document.querySelectorAll('ol').forEach((list) => (list.scrollTop = list.scrollHeight))"
 
+const NEW_GROUP = `{
+  const name = document.querySelector('.field input')
+  name.value = 'Cumple de Dani'
+  name.dispatchEvent(new Event('input', { bubbles: true }))
+  document.querySelectorAll('.friends input').forEach((box, i) => i === 1 || i === 3 ? box.click() : null)
+}`
+
 // Each one: the view (hash), window size, theme, and what to do before the capture.
 const SHOTS = {
   contactos: { hash: '', w: 360, h: 820 },
@@ -34,6 +41,19 @@ const SHOTS = {
     run: BOTTOM
   },
   nombre: { hash: 'nick', w: 480, h: 640, args: ['--nick=1'] },
+  // Groups: the list, a new one, and a conversation with its members.
+  'grupos-lista': { hash: '', w: 360, h: 820 },
+  'grupos-lista-oscuro': { hash: '', w: 360, h: 820, theme: 'dark' },
+  'grupos-nuevo': { hash: 'newgroup', w: 400, h: 640, run: NEW_GROUP },
+  'grupos-nuevo-oscuro': { hash: 'newgroup', w: 400, h: 640, theme: 'dark', run: NEW_GROUP },
+  'grupos-conversacion': { hash: 'chat=insti@groups.localhost', w: 760, h: 640, run: BOTTOM },
+  'grupos-conversacion-oscuro': {
+    hash: 'chat=insti@groups.localhost',
+    w: 760,
+    h: 640,
+    theme: 'dark',
+    run: BOTTOM
+  },
   integrada: { hash: '', w: 900, h: 620, args: ['--chats=together'], run: BOTTOM },
   'tema-claro': { hash: '', w: 360, h: 640, theme: 'light' },
   'tema-calido': { hash: '', w: 360, h: 640, theme: 'warm' },

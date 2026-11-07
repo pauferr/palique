@@ -17,6 +17,7 @@ import EmoticonGallery from './EmoticonGallery.svelte'
 import NickEditor from './NickEditor.svelte'
 import About from './About.svelte'
 import Verify from './Verify.svelte'
+import NewGroup from './NewGroup.svelte'
 
 // Every window follows the theme and font chosen in Options, live.
 const applyTheme = ({ theme, font }: { theme: string; font: string }): void => {
@@ -50,12 +51,14 @@ const app = wink
           ? mount(WinkGallery, { target })
           : params.has('nick')
             ? mount(NickEditor, { target })
-            : params.has('about')
-              ? mount(About, { target })
-              : params.has('sounds')
-                ? mount(SoundGallery, { target })
-                : params.has('emoticons')
-                  ? mount(EmoticonGallery, { target })
-                  : mount(App, { target })
+            : params.has('newgroup')
+              ? mount(NewGroup, { target })
+              : params.has('about')
+                ? mount(About, { target })
+                : params.has('sounds')
+                  ? mount(SoundGallery, { target })
+                  : params.has('emoticons')
+                    ? mount(EmoticonGallery, { target })
+                    : mount(App, { target })
 
 export default app

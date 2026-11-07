@@ -5,6 +5,8 @@
   import Avatar from './Avatar.svelte'
   import Chat from './Chat.svelte'
   import Emoticons from './Emoticons.svelte'
+  import GroupAvatar from './GroupAvatar.svelte'
+  import { who } from './group'
   import { _, _n, lang } from './i18n'
   import { emojify } from './emoticons'
   import { helpItems, popup, type MenuItem } from './menu'
@@ -32,7 +34,8 @@
     name: '',
     avatar: '',
     show: 'online',
-    status: ''
+    status: '',
+    groups: []
   })
   let picker: HTMLInputElement
   let avatarError = $state('')
@@ -57,6 +60,12 @@
   const fold = (text: string): string =>
     emojify(stripPlus(text)).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
   let found = $derived(sorted.filter((c) => fold(c.name).includes(fold(query.trim()))))
+  // Groups first, alphabetical too; the search finds them by name.
+  let foundGroups = $derived(
+    roster.groups
+      .filter((g) => fold(g.name).includes(fold(query.trim())))
+      .sort((a, b) => a.name.localeCompare(b.name, lang) || a.jid.localeCompare(b.jid))
+  )
   let groups = $derived([
     { label: _('En línea'), contacts: found.filter((c) => c.show !== 'offline') },
     { label: _('Sin conexión'), contacts: found.filter((c) => c.show === 'offline') }
@@ -127,7 +136,10 @@
     },
     {
       label: _('Contactos'),
-      items: (): MenuItem[] => [{ label: _('Añadir o invitar a un contacto…'), run: openAdd }]
+      items: (): MenuItem[] => [
+        { label: _('Añadir o invitar a un contacto…'), run: openAdd },
+        { label: _('Nuevo grupo…'), run: window.api.openNewGroup }
+      ]
     },
     {
       label: _('Herramientas'),
@@ -362,17 +374,55 @@
         </div>
       {/each}
 
-      {#if roster.contacts.length}
+      {#if roster.contacts.length || roster.groups.length}
         <label class="search">
           <Search size={16} aria-hidden="true" />
           <input
             type="search"
             bind:value={query}
-            placeholder={_('Buscar contactos')}
-            aria-label={_('Buscar contactos')}
+            placeholder={_('Buscar contactos y grupos')}
+            aria-label={_('Buscar contactos y grupos')}
           />
         </label>
-        {#if !found.length}<p class="no-match">{_('Nadie se llama así.')}</p>{/if}
+        {#if !found.length && !foundGroups.length}
+          <p class="no-match">{_('Nadie se llama así.')}</p>
+        {/if}
+        {#if foundGroups.length || !query.trim()}
+          <details open>
+            <summary
+              ><ChevronDown size={14} strokeWidth={3} aria-hidden="true" />{_('Grupos ({n})', {
+                n: roster.groups.length
+              })}
+              <!-- Inside the summary: it mustn't fold the section too. -->
+              <button
+                class="new-group"
+                onclick={(e) => {
+                  e.preventDefault()
+                  window.api.openNewGroup()
+                }}
+                aria-label={_('Nuevo grupo…')}>{_('+ Nuevo')}</button
+              ></summary
+            >
+            <ul>
+              {#each foundGroups as group (group.jid)}
+                {#key unread[group.jid]}
+                  <li class:unread={unread[group.jid]} class:open={together && group.jid === shown}>
+                    <GroupAvatar {group} {roster} size={46} />
+                    <button class="name" onclick={() => window.api.openChat(group.jid)}>
+                      <span><Emoticons text={group.name} /></span>
+                      <small><Emoticons text={who(roster, group)} /></small>
+                    </button>
+                    {#if unread[group.jid]}
+                      <span class="badge" title={_('Mensajes sin leer')}
+                        >{unread[group.jid] > 9 ? '9+' : unread[group.jid]}</span
+                      >
+                    {/if}
+                  </li>
+                {/key}
+              {/each}
+            </ul>
+          </details>
+        {/if}
         <!-- While searching, only the groups with someone in them. -->
         {#each groups.filter((g) => g.contacts.length || !query.trim()) as group (group.label)}
           <details open>
@@ -658,6 +708,14 @@
     font-weight: 800;
     list-style: none;
     cursor: pointer;
+  }
+
+  /* «+ Nuevo», a small pill at the end of the groups' heading. */
+  .new-group {
+    margin-left: auto;
+    padding: 1px 10px;
+    font-size: 12px;
+    font-weight: 800;
   }
 
   summary::-webkit-details-marker {

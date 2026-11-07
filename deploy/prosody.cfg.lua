@@ -65,3 +65,17 @@ VirtualHost (ENV_PALIQUE_DOMAIN)
 
 Component ("accounts." .. ENV_PALIQUE_DOMAIN)
 	component_secret = ENV_ACCOUNTS_SECRET
+
+-- Group chats (same as development; see server/prosody.cfg.lua for notes).
+Component ("groups." .. ENV_PALIQUE_DOMAIN) "muc"
+	modules_enabled = { "muc_mam", "palique_groups" }
+	restrict_room_creation = "local"
+	muc_room_default_public = false
+	muc_room_default_members_only = true
+	muc_room_default_persistent = true
+	muc_room_default_public_jids = true
+	muc_room_default_allow_member_invites = true
+	muc_room_default_change_subject = false
+	muc_room_default_history_length = 0
+	muc_log_by_default = true
+	muc_log_expires_after = "1w"

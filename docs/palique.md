@@ -219,6 +219,8 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Notificaciones de escritorio.
 - Chats cifrados de extremo a extremo (OMEMO), sin historial en el equipo.
 
+- Grupos de chat: salas de Prosody (`groups.<dominio>`, hasta 50 personas, nombre de 1 a 40 caracteres), privadas y solo con invitación. «Admin» es el propietario de la sala (puede haber varios): cambia nombre y foto, quita miembros y nombra admins; cualquiera añade a sus propios contactos, y las invitaciones solo se aceptan de contactos. Mensajes cifrados con OMEMO para todos los dispositivos de todos los miembros; guiños sí, zumbido no. El servidor guarda una semana de archivo; tras reiniciar la app solo vuelven los avisos y guiños (los mensajes cifrados no se pueden releer). Quien está invisible sigue en sus grupos pero nadie lo ve conectado. Los grupos se recuerdan con marcadores privados (XEP-0402). Si se va el último admin, pasa a serlo el miembro más antiguo; si se va el último miembro, el grupo se borra.
+
 **Excluido del MVP** → ver hoja de ruta (sección 5).
 
 Criterio: el MVP debe transmitir la sensación buscada (sonidos, zumbidos, guiños, ventanas) sin abordar lo que más complejidad técnica añade.
@@ -228,7 +230,6 @@ Criterio: el MVP debe transmitir la sensación buscada (sonidos, zumbidos, guiñ
 Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es definitivo.
 
 **Siguientes versiones**
-- Conversaciones en grupo.
 - Envío de archivos.
 - Historial sincronizado entre dispositivos (XEP-0313).
 - Packs de guiños descargables.

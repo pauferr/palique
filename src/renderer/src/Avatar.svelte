@@ -7,8 +7,16 @@
     name = '',
     url = '',
     show = 'online',
-    size = 40
-  }: { jid: string; name?: string; url?: string; show?: Contact['show']; size?: number } = $props()
+    size = 40,
+    bare = false
+  }: {
+    jid: string
+    name?: string
+    url?: string
+    show?: Contact['show']
+    size?: number
+    bare?: boolean // just the face, no status frame (a cell of a group's mosaic)
+  } = $props()
 
   // Default avatar until the cast illustrations exist: initial on one of the theme's colors,
   // always the same for a given user.
@@ -18,7 +26,13 @@
   const initial = $derived([...(stripPlus(name).trim() || jid)][0].toUpperCase())
 </script>
 
-<span class="avatar {show}" style:--size="{size}px" style:--color={color} aria-hidden="true">
+<span
+  class="avatar {show}"
+  class:bare
+  style:--size="{size}px"
+  style:--color={color}
+  aria-hidden="true"
+>
   <span class="face">
     {#if url}
       <img src={url} alt="" />
@@ -60,6 +74,19 @@
     border-radius: var(--avatar-face-radius);
     background: var(--color);
     box-sizing: border-box;
+  }
+
+  .bare {
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    filter: none;
+  }
+
+  .bare .face {
+    border: none;
+    border-radius: 0;
   }
 
   img {

@@ -148,6 +148,22 @@ const api = {
   openOptions: (): Promise<void> => ipcRenderer.invoke('options:open'),
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
   openNick: (): Promise<void> => ipcRenderer.invoke('nick:open'),
+  openNewGroup: (): Promise<void> => ipcRenderer.invoke('group:new-window'),
+  createGroup: (name: string, members: string[]): Promise<string> =>
+    ipcRenderer.invoke('group:create', name, members),
+  addToGroup: (room: string, members: string[]): Promise<void> =>
+    ipcRenderer.invoke('group:add', room, members),
+  removeFromGroup: (room: string, member: string): Promise<void> =>
+    ipcRenderer.invoke('group:remove', room, member),
+  setGroupOwner: (room: string, member: string, owner: boolean): Promise<void> =>
+    ipcRenderer.invoke('group:owner', room, member, owner),
+  setGroupName: (room: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('group:name', room, name),
+  setGroupPhoto: (room: string, png: Uint8Array | null): Promise<void> =>
+    ipcRenderer.invoke('group:photo', room, png),
+  leaveGroup: (room: string): Promise<void> => ipcRenderer.invoke('group:leave', room),
+  addMemberAsContact: (room: string, member: string): Promise<void> =>
+    ipcRenderer.invoke('group:contact', room, member),
   openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),
   sendWink: (contact: string, wink: string): Promise<number> =>
     ipcRenderer.invoke('chat:wink', contact, wink),

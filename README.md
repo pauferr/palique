@@ -45,6 +45,10 @@ Quién está conectado, quién se ha ido a merendar y quién está de exámenes.
 
 Zumbidos que hacen temblar la ventana, los emoticonos de siempre y el mítico «está escribiendo…» 🤪
 
+### Grupos
+
+Crea un grupo con tus amigos, cada uno puede añadir a los suyos. Con nombre, foto y mensajes cifrados de extremo a extremo.
+
 ### Doce guiños
 
 Del beso al cerdo bailón, cada uno con su musiquilla. Nítidos a cualquier tamaño, también a pantalla completa.

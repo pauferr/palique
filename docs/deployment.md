@@ -6,6 +6,7 @@ Qué corre en el servidor (todo con Docker, archivos en `deploy/`):
 
 - **Prosody**: el servidor de mensajería (puerto 5222).
 - **Servicio de cuentas**: qué correo es de qué cuenta, invitaciones, cambios de correo y recuperación de contraseña.
+- **Grupos de chat**: un componente de Prosody (`groups.<tu dominio>`) con el módulo `mod_palique_groups`. Va dentro de Prosody: no necesita DNS, certificado, puerto ni configuración extra. Los clientes llegan a él por el puerto 5222 de tu dominio, igual que al servicio de cuentas.
 - **Caddy**: HTTPS para las páginas del servicio de cuentas. Consigue y renueva solo el certificado de Let's Encrypt, que también se pasa a Prosody.
 
 Tiempo aproximado: una hora la primera vez.

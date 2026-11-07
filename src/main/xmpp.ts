@@ -1,4 +1,5 @@
-// The only module that knows about the XMPP library. One connection for the whole app.
+// The XMPP connection, one for the whole app. groups.ts speaks the rooms' XMPP over it,
+// through the internal API at the end of this file.
 import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
@@ -12,6 +13,7 @@ import {
   type Omemo,
   type TrustChange
 } from './omemo.ts'
+import type { Group, GroupEvent } from './groups.ts'
 
 // Which server: fixed at build time for releases (MAIN_VITE_* variables, see the release
 // workflow), overridable with PALIQUE_* at run time, localhost in development.
@@ -30,6 +32,7 @@ const WINK = 'urn:palique:wink:0' // Palique-only: full-screen animation from th
 const INVISIBLE = 'urn:xmpp:invisible:0' // XEP-0186, server/modules/mod_palique_invisible.lua
 const ACCOUNTS = 'urn:palique:accounts:0' // account service, server/accounts
 export const ACCOUNTS_JID = process.env['PALIQUE_ACCOUNTS_JID'] ?? `accounts.${DOMAIN}`
+export const GROUPS_DOMAIN = `groups.${DOMAIN}` // group rooms (MUC), see groups.ts
 const PUBSUB = 'http://jabber.org/protocol/pubsub'
 const AVATAR_DATA = 'urn:xmpp:avatar:data' // avatars (XEP-0084), stored in each user's PEP
 const AVATAR_METADATA = 'urn:xmpp:avatar:metadata'
@@ -79,11 +82,12 @@ export type Snapshot = {
   avatar: string // our own avatar, data: URL or ''
   show: OwnShow // our own status
   status: string // our own personal message
+  groups: Group[]
 }
 
 export type ChatMessage = {
   id: string
-  with: string // the contact's bare JID
+  with: string // the contact's bare JID, or the group's room JID
   mine: boolean
   body: string
   buzz: boolean
@@ -92,6 +96,9 @@ export type ChatMessage = {
   delayed?: boolean // stored by the server while we were offline (saved, but no effects)
   encrypted: boolean // came (or went) with OMEMO
   undecryptable?: boolean // encrypted, but not for us or broken: no text to show
+  sender?: string // in groups: who wrote it (bare JID)
+  senderName?: string
+  event?: GroupEvent // in groups: a change announced by the room (body is '')
 }
 
 type Presence = { show: Show; status: string }
@@ -147,7 +154,8 @@ export function snapshot(): Snapshot {
     name: nameOf(me),
     avatar: avatars.get(me)?.url ?? '',
     show: own.show,
-    status: own.status
+    status: own.status,
+    groups: groupList()
   }
 }
 
@@ -169,7 +177,7 @@ export function onMessage(callback: (message: ChatMessage) => void): void {
   messageListener = callback
 }
 
-function send(stanza: Element): Promise<void> {
+export function send(stanza: Element): Promise<void> {
   return xmpp ? xmpp.send(stanza) : Promise.resolve()
 }
 
@@ -433,17 +441,19 @@ export async function login(
   })
   // Without a listener, connection errors would crash the main process.
   entity.on('error', () => {})
-  // Messages one at a time and in order: decrypting is async, and each one moves the
-  // OMEMO session on.
-  let incoming = Promise.resolve()
+  incoming = Promise.resolve()
   entity.on('stanza', (stanza) => {
-    if (stanza.is('presence')) handlePresence(stanza)
-    else if (stanza.is('message')) {
-      incoming = incoming
-        .then(() => handleMessage(stanza))
-        .catch((e) => {
-          unexpected('message', e)
-        })
+    // Rooms are groups.ts's: their presences right away (joining waits for them), their
+    // messages in order with everyone else's.
+    const from = stanza.attrs.from
+    const group = typeof from === 'string' && jid(from).getDomain() === GROUPS_DOMAIN
+    if (stanza.is('presence')) {
+      if (!group) handlePresence(stanza)
+      else Promise.resolve(groupHandler(stanza)).catch((e) => unexpected('group presence', e))
+    } else if (stanza.is('message')) {
+      inOrder(() => (group ? groupHandler(stanza) : handleMessage(stanza))).catch((e) => {
+        unexpected('message', e)
+      })
     }
   })
   // What we support, for the server's PEP: `+notify` gets us contacts' device lists.
@@ -492,6 +502,9 @@ export async function login(
       .then(startOmemo)
       .then(() => send(presenceStanza()))
       .then(emit)
+      .then(() => {
+        onlineListener()
+      })
       .then(loadEmails)
       .then(emit)
       .catch(() => {})
@@ -951,6 +964,26 @@ async function fetchBundle(d: Device): Promise<Bundle> {
   return readBundle(bundle, d.deviceId)
 }
 
+// A session with `device`, started from its bundle when there's none (or it broke).
+// false when it can't be had (no bundle, blocked).
+export async function ensureSession(device: Device): Promise<boolean> {
+  const store = omemo
+  if (!store) return false
+  const name = `${device.jid}/${device.deviceId}`
+  try {
+    if (stale.has(name) || !(await store.hasSession(device))) {
+      await store.startSession(device, await fetchBundle(device))
+      stale.delete(name)
+    }
+    return true
+  } catch (e) {
+    console.warn('omemo session:', e instanceof OmemoError ? e.code : (condition(e) ?? 'failed'))
+    return false
+  } finally {
+    trust(store.takeChanges())
+  }
+}
+
 // The devices of `bare` (but this one) we can encrypt for, starting sessions where
 // there are none. One that fails (no bundle, blocked) is left out.
 async function reachable(bare: string): Promise<Device[]> {
@@ -959,33 +992,28 @@ async function reachable(bare: string): Promise<Device[]> {
   const ready: Device[] = []
   for (const id of ids.filter((id) => id !== store.deviceId)) {
     const device = { jid: bare, deviceId: id }
-    const name = `${bare}/${id}`
-    try {
-      if (stale.has(name) || !(await store.hasSession(device))) {
-        await store.startSession(device, await fetchBundle(device))
-        stale.delete(name)
-      }
-      ready.push(device)
-    } catch (e) {
-      console.warn('omemo session:', e instanceof OmemoError ? e.code : (condition(e) ?? 'failed'))
-    }
+    if (await ensureSession(device)) ready.push(device)
   }
-  trust(store.takeChanges())
   return ready
 }
 
 // The text of an OMEMO message from `from`'s device. null: our own copy, sent from
-// another device of ours before this one existed (nothing to show).
-async function decryptBody(
+// another device of ours before this one existed (nothing to show), or an `archived` one
+// (a group's archive) that can't be read: most likely read already, as a message's keys
+// work once.
+// ponytail: so a group message nobody encrypted for us, missed while offline, is dropped
+// rather than shown as unreadable; keep read stanza-ids on disk if that matters.
+export async function decryptBody(
   el: Element,
   from: string,
-  mine: boolean
+  mine: boolean,
+  archived = false
 ): Promise<{ body: string; undecryptable: boolean } | null> {
   const store = omemo
   const message = readEncrypted(el)
   const key = message?.keys.find((k) => k.rid === store?.deviceId)
   if (!store || !message || !key)
-    return mine && store && message ? null : { body: '', undecryptable: true }
+    return (mine || archived) && store && message ? null : { body: '', undecryptable: true }
   // Before decrypting, which trusts an unknown device on first use: a new device of a
   // contact that writes before its list reaches us still gets noticed.
   trust(store.seen(from, [message.sid]))
@@ -994,6 +1022,7 @@ async function decryptBody(
     if (key.prekey) publishBundleSoon()
     return { body, undecryptable: false }
   } catch (e) {
+    if (archived) return null
     // Only the code: never the message or keys in the log.
     console.warn('omemo decrypt:', e instanceof OmemoError ? e.code : 'failed')
     // Their session and ours no longer match (e.g. they lost it): our next message starts
@@ -1197,3 +1226,52 @@ export async function accountFor(email: string): Promise<string> {
 
 // "Forgot your password?" is a page of the account service, in the app's language.
 export const recoverUrl = (): string => `${ACCOUNTS_URL}/recover?l=${lang}`
+
+// --- internal API for groups.ts (main process only) -------------------------------------
+
+let groupHandler: (stanza: Element) => Promise<void> | void = () => {}
+let onlineListener: () => void = () => {}
+let groupList: () => Group[] = () => []
+// Messages one at a time and in order, the rooms' too: decrypting is async, and each one
+// moves an OMEMO session on.
+let incoming = Promise.resolve()
+
+// Stanzas from groups.<domain> go here instead of to the contacts' handlers.
+export function onGroupStanza(handler: (stanza: Element) => Promise<void> | void): void {
+  groupHandler = handler
+}
+// After every sign-in or reconnect, once our presence is out.
+export function onOnline(callback: () => void): void {
+  onlineListener = callback
+}
+// Where the snapshot gets its groups from.
+export function setGroupList(list: () => Group[]): void {
+  groupList = list
+}
+// Runs `job` after the messages already received (and any job queued before it).
+export function inOrder(job: () => Promise<void> | void): Promise<void> {
+  const done = incoming.then(job)
+  incoming = done.catch(() => {})
+  return done
+}
+export function request(stanza: Element): Promise<Element> {
+  if (!xmpp) return Promise.reject(new Error('offline'))
+  return xmpp.iqCaller.request(stanza)
+}
+export const ownJid = (): string => me
+export const ownNick = (): string => nicks.get(me) ?? ''
+export const isContact = (bare: string): boolean => roster.has(bare)
+export const omemoStore = (): Omemo | null => omemo
+export const changed = emit
+export const deliver = (message: ChatMessage): void => messageListener(message)
+export const unexpectedError = unexpected
+export { condition as errorCondition }
+
+// Someone's OMEMO device ids, noticed with seen() (new ones are news). Contacts' lists
+// follow their PEP notifications; other people's are fetched every time.
+// ponytail: one iq per non-contact per group message; cache them if groups get busy.
+export async function devicesOf(bare: string): Promise<number[]> {
+  if (!omemo) return []
+  if (bare === me || roster.has(bare)) return devices.get(bare) ?? loadDevices(bare)
+  return loadDevices(bare)
+}

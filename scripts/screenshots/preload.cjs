@@ -79,6 +79,43 @@ const contacts = [
   friend('pablo', say('[s]El de mates[/s] Pablo :S', '[s]Maths guy[/s] Pablo :S'), 'offline', '')
 ]
 
+// Two groups like the approved design: one where Andrea is an admin, with two people who
+// aren't her contacts (Sara, Hugo), and one with unread messages.
+const member = (jid, name, owner, since) => ({
+  jid: `${jid}@localhost`,
+  name,
+  owner,
+  contact: contacts.some((c) => c.jid === `${jid}@localhost`),
+  since
+})
+const groups = [
+  {
+    jid: 'insti@groups.localhost',
+    name: say('Los del insti', 'The school gang'),
+    photo: '',
+    owner: true,
+    members: [
+      member('iker', 'Iker', true, 1),
+      member('andrea', 'Andrea', true, 2),
+      member('nerea', 'Nerea', false, 3),
+      member('dani', 'Dani', false, 4),
+      member('sara', '[c=#ff4fa3]Sara[/c=#ffb300] (F)', false, 5),
+      member('hugo', 'Hugo', false, 6)
+    ]
+  },
+  {
+    jid: 'viaje@groups.localhost',
+    name: say('Viaje fin de curso', 'End-of-year trip'),
+    photo: '',
+    owner: false,
+    members: [
+      member('marta', 'Marta', true, 1),
+      member('andrea', 'Andrea', false, 2),
+      member('lucia', 'Lucía', false, 3)
+    ]
+  }
+]
+
 const snapshot = {
   connected: true,
   jid: account,
@@ -90,7 +127,8 @@ const snapshot = {
     '~*~ Counting the days till the school trip ~*~'
   ),
   requests: [{ jid: 'sara@localhost', name: '[c=#ff4fa3]Sara[/c=#ffb300] (F)' }],
-  contacts
+  contacts,
+  groups
 }
 
 // The name being edited in the name window: bold, gradients, a background, italics.
@@ -120,6 +158,45 @@ const history = [
   msg('8', true, 'no me dejes así (L)', at(17, 6))
 ]
 
+// The first group's conversation: the room's notices, then who says what.
+const said = (id, from, name, body, time, extra = {}) =>
+  msg(id, from === 'andrea', body, time, {
+    with: 'insti@groups.localhost',
+    sender: `${from}@localhost`,
+    senderName: name,
+    ...extra
+  })
+const notice = (id, kind, actor, actorName, jid, name, time) =>
+  msg(id, false, '', time, {
+    with: 'insti@groups.localhost',
+    encrypted: false,
+    event: { kind, actor: `${actor}@localhost`, actorName, jid: `${jid}@localhost`, name }
+  })
+const groupHistory = [
+  notice('g1', 'created', 'iker', 'Iker', 'iker', '', at(16, 50)),
+  notice('g2', 'added', 'iker', 'Iker', 'sara', 'Sara', at(16, 51)),
+  notice('g3', 'added', 'iker', 'Iker', 'hugo', 'Hugo', at(16, 51)),
+  said(
+    'g4',
+    'iker',
+    'Iker',
+    say('¿quedamos el sábado para ver la peli?', 'movie on Saturday?'),
+    at(17, 0)
+  ),
+  said('g5', 'sara', 'Sara', say('yo me apunto (F)', "I'm in (F)"), at(17, 1)),
+  said('g6', 'sara', 'Sara', say('¿a qué hora?', 'what time?'), at(17, 1)),
+  said('g7', 'andrea', 'Andrea', say('yo después de comer puedo', 'I can after lunch'), at(17, 2)),
+  said('g8', 'hugo', 'Hugo', say('llevo palomitas :D', "I'll bring popcorn :D"), at(17, 3)),
+  said('g9', 'hugo', 'Hugo', '', at(17, 3), { wink: 'pig' }),
+  said(
+    'g10',
+    'nerea',
+    'Nerea',
+    say('jajaja vale, a las 5 en casa de Dani', 'haha ok, 5 at Dani’s'),
+    at(17, 4)
+  )
+]
+
 const values = {
   remembered: { available: true, saved: false },
   lastEmail: 'andrea@palique.com',
@@ -127,14 +204,17 @@ const values = {
   inviteStatus: { max: 3, used: 1 },
   getRoster: arg('nick') ? { ...snapshot, name: nick } : snapshot,
   currentAccount: account,
-  getUnread: { 'nerea@localhost': 2 },
+  getUnread: { 'nerea@localhost': 2, 'viaje@groups.localhost': 3 },
   getShownChat: arg('chats') === 'together' ? 'iker@localhost' : '',
-  getChatHistory: arg('notes')
-    ? [
-        ...history,
-        msg('9', false, 'te escribo desde otro programa :P', at(17, 7), { encrypted: false })
-      ]
-    : history,
+  getChatHistory: (jid) =>
+    jid === 'insti@groups.localhost'
+      ? groupHistory
+      : arg('notes')
+        ? [
+            ...history,
+            msg('9', false, 'te escribo desde otro programa :P', at(17, 7), { encrypted: false })
+          ]
+        : history,
   getVerify: {
     mine: 'a1b2c3d4 e5f60718 293a4b5c 6d7e8f90 0a1b2c3d 4e5f6071 8293a4b5 c6d7e8f9',
     devices: [
@@ -175,7 +255,8 @@ const values = {
 }
 
 // Every method of the real preload (read from its source, so this never falls behind):
-// calls answer the mock values, subscriptions answer nothing, except Iker typing.
+// calls answer the mock values (a function gets the call's arguments), subscriptions answer
+// nothing, except Iker typing.
 const source = require('node:fs').readFileSync(
   require('node:path').join(__dirname, '../../src/preload/index.ts'),
   'utf8'
@@ -185,7 +266,8 @@ const api = { platform: 'darwin' }
 for (const name of names) {
   api[name] = /^on[A-Z]/.test(name)
     ? () => () => {}
-    : () => Promise.resolve(name in values ? values[name] : undefined)
+    : (...args) =>
+        Promise.resolve(typeof values[name] === 'function' ? values[name](...args) : values[name])
 }
 api.onTyping = (callback) => {
   setTimeout(() => callback('iker@localhost', true), 300)
