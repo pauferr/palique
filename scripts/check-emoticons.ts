@@ -1,6 +1,7 @@
 // Emoticon parsing check (no server needed). Run: npm run check:emoticons
 import assert from 'node:assert/strict'
-import { emojify, parseEmoticons } from '../src/renderer/src/emoticons.ts'
+import { EMOTICONS, emojify, parseEmoticons } from '../src/renderer/src/emoticons.ts'
+import { drawings } from '../src/renderer/src/emoticons/draw.ts'
 
 // Shown as emoji, spaces kept around them.
 const show = (text: string): string =>
@@ -18,7 +19,15 @@ assert.equal(show(':-('), '[🙁]', 'longest code wins')
 assert.equal(show('<b>:)</b>'), '<b>[🙂]</b>', 'text is left as text')
 
 // The original code is kept, e.g. for tooltips.
-assert.deepEqual(parseEmoticons('ok (y)'), [{ text: 'ok ' }, { emoji: '👍', code: '(y)' }])
+assert.deepEqual(parseEmoticons('ok (y)'), [
+  { text: 'ok ' },
+  { id: 'yes', emoji: '👍', code: '(y)' }
+])
+
+// Every emoticon is drawn, ids are unique (they're how it's drawn) and nothing is left over.
+const ids = EMOTICONS.map((e) => e.id)
+assert.equal(new Set(ids).size, ids.length, 'unique ids')
+assert.deepEqual(Object.keys(drawings).sort(), [...ids].sort(), 'one drawing per emoticon')
 
 // Plain text for window titles and notifications.
 assert.equal(emojify('(L) Tere :)'), '❤️ Tere 🙂')

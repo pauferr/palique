@@ -1,10 +1,10 @@
 // The emote face shared by the expression winks: a round yellow smiley of radius 80
 // around (0, 0), with eyes, brows and mouth picked by name so each wink can act.
-import { heart, INK, lerp, type Ctx } from './kit'
+import { heart, INK, lerp, type Ctx } from './kit.ts'
 
 export type Eye = 'open' | 'happy' | 'closed' | 'heart' | 'wide' | 'sad'
 export type Mouth =
-  'smile' | 'grin' | 'laugh' | 'o' | 'kiss' | 'frown' | 'wail' | 'smirk' | 'flat' | 'pout'
+  'smile' | 'grin' | 'laugh' | 'o' | 'kiss' | 'frown' | 'wail' | 'smirk' | 'flat' | 'pout' | 'wavy'
 
 export type FaceOptions = {
   eyes?: Eye | [Eye, Eye]
@@ -227,6 +227,14 @@ export function face(c: Ctx, o: FaceOptions = {}): void {
     c.quadraticCurveTo(0, 24 + open * 6, -30, 14)
     c.fillStyle = '#7a1d1d'
     c.fill()
+    c.stroke()
+  } else if (mouth === 'wavy') {
+    // Unsure: a squiggle that wobbles.
+    const w = Math.sin(t * 5) * 3
+    c.beginPath()
+    c.moveTo(-30, 4)
+    c.bezierCurveTo(-18, -8 - w, -8, -8 - w, 0, 4)
+    c.bezierCurveTo(8, 16 + w, 18, 16 + w, 30, 4)
     c.stroke()
   } else if (mouth === 'smirk') {
     c.beginPath()

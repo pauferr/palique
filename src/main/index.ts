@@ -313,7 +313,7 @@ function openChat(contact: string, focus: boolean): BrowserWindow {
     return existing
   }
   const win = new BrowserWindow({
-    ...centered(440, 520),
+    ...centered(560, 520),
     minWidth: 320,
     minHeight: 360,
     show: false,

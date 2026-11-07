@@ -177,6 +177,8 @@ Winks are drawn live, not videos: canvas drawing and Web Audio sound in `src/ren
 - To see them all: `npm run dev`, then open the dev app at `#winks` (e.g. `ELECTRON_RENDERER_URL=http://localhost:5173 npx electron .` and change the hash, or load `http://localhost:5173/#winks` in its DevTools).
 - A new wink: its file, an entry in `catalog.ts` and a label in `src/renderer/src/wink-labels.ts`. Ids travel over the network and live in histories: never rename or reuse one.
 
+**Emoticons** are drawn the same way: the codes (`:)`, `(L)`…) and their ids are in `src/renderer/src/emoticons.ts`, one looping drawing per id in `emoticons/draw.ts` (reusing `face.ts` and the kit), played by `EmoticonCanvas.svelte` (one shared animation loop, only those on screen). `#emoticons` shows them all. The text sent stays as typed; plain-text places show the emoji instead.
+
 **Sounds** (message, contact online, buzz) come in collections chosen in Options (`soundPack` setting): `src/renderer/src/sounds.ts`, synthesized with the winks' `makeSound` except the classic message (a recording, cut shorter). `#sounds` shows them all side by side. A new collection: its entry in `packs` and its id in `SOUND_PACKS` (`src/main/settings.ts`).
 
 ## Checks

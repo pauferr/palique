@@ -13,6 +13,7 @@ import Options from './Options.svelte'
 import Wink from './Wink.svelte'
 import WinkGallery from './WinkGallery.svelte'
 import SoundGallery from './SoundGallery.svelte'
+import EmoticonGallery from './EmoticonGallery.svelte'
 import NickEditor from './NickEditor.svelte'
 import About from './About.svelte'
 
@@ -49,6 +50,8 @@ const app = wink
             ? mount(About, { target })
             : params.has('sounds')
               ? mount(SoundGallery, { target })
-              : mount(App, { target })
+              : params.has('emoticons')
+                ? mount(EmoticonGallery, { target })
+                : mount(App, { target })
 
 export default app

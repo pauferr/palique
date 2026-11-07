@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { Smile, Star, Vibrate } from '@lucide/svelte'
-  import type { ChatMessage, Contact } from '../../main/xmpp'
+  import type { ChatMessage, Contact, Snapshot } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
+  import EmoticonCanvas from './EmoticonCanvas.svelte'
   import { EMOTICONS, emojify } from './emoticons'
   import { stripPlus } from './plus'
   import { prefs } from './prefs.svelte'
@@ -25,6 +26,7 @@
 
   let messages: ChatMessage[] = $state([])
   let contact: Contact | undefined = $state()
+  let self: Snapshot | undefined = $state()
   // Their display name can change while the window is open.
   const name = $derived(contact?.name ?? '')
   $effect(() => {
@@ -36,6 +38,7 @@
   let canWink = $state(true)
   let pickerOpen = $state(false)
   let emoticonsOpen = $state(false)
+  let hovered = $state('')
   let input: HTMLTextAreaElement
   let theyType = $state(false)
   // A wink playing inside this window (on Wayland, or with full-screen winks off),
@@ -98,6 +101,7 @@
     })
     window.addEventListener('beforeunload', stopTyping)
     const offRoster = window.api.onRoster((s) => {
+      self = s
       contact = s.contacts.find((c) => c.jid === jid)
     })
     const offWink = window.api.onWinkPlay((id) => {
@@ -105,7 +109,10 @@
       if (playing) queued.push(id)
       else playing = id
     })
-    window.api.getRoster().then((s) => (contact = s.contacts.find((c) => c.jid === jid)))
+    window.api.getRoster().then((s) => {
+      self = s
+      contact = s.contacts.find((c) => c.jid === jid)
+    })
     // History never triggers effects; live messages (even the one that opened this window)
     // come through onChatMessage. Keep them after the history, without duplicates.
     window.api.getChatHistory(jid).then(async (history) => {
@@ -237,8 +244,15 @@
       {/key}
     </div>
   {/if}
+  {#snippet them(size: number)}<Avatar
+      {jid}
+      {name}
+      url={contact?.avatar}
+      show={contact?.show ?? 'offline'}
+      {size}
+    />{/snippet}
   <header>
-    <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={60} />
+    <span class="narrow">{@render them(60)}</span>
     <div class="to">
       <span class="name">{_('Para:')} <strong><Emoticons text={name} plus /></strong></span>
       <small
@@ -287,6 +301,9 @@
     {/each}
   </ol>
 
+  <!-- Both pictures on the right: theirs beside the conversation, ours by the box we write in. -->
+  <aside>{@render them(96)}</aside>
+
   <p class="typing" aria-live="polite">
     {#if theyType && prefs.typing}{@render named(_('{name} está escribiendo…'))}{/if}
   </p>
@@ -296,12 +313,16 @@
       <details class="picker" bind:open={emoticonsOpen}>
         <summary title={_('Emoticonos')} aria-label={_('Emoticonos')}><Smile size={18} /></summary>
         <ul class="emoticons">
-          {#each EMOTICONS as { codes, emoji, name } (codes[0])}
+          {#each EMOTICONS as { id, codes, name } (id)}
             <li>
+              <!-- Still until pointed at, so the open picker isn't 21 things moving at once. -->
               <button
                 onclick={() => insertEmoticon(codes[0])}
+                onpointerenter={() => (hovered = id)}
+                onpointerleave={() => (hovered = '')}
                 title="{_(name)} {codes[0]}"
-                aria-label="{_(name)} {codes[0]}">{emoji}</button
+                aria-label="{_(name)} {codes[0]}"
+                ><EmoticonCanvas {id} code={codes[0]} still={hovered !== id} /></button
               >
             </li>
           {/each}
@@ -364,14 +385,68 @@
       ></textarea>
       <button class="send primary" onclick={send} disabled={!draft.trim()}>{_('Enviar')}</button>
     </div>
+    {#if self}<span class="me"
+        ><Avatar
+          jid={self.jid}
+          name={self.name}
+          url={self.avatar}
+          show={self.show === 'invisible' ? 'offline' : self.show}
+          size={96}
+        /></span
+      >{/if}
   </div>
 </div>
 
 <style>
+  /* The conversation on the left, both pictures in a column on the right. */
   .chat {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     height: 100vh;
+  }
+
+  .chat > :not(.wink-layer, aside) {
+    grid-column: 1 / -1;
+  }
+
+  ol,
+  .typing {
+    grid-column: 1 !important;
+  }
+
+  aside {
+    grid-row: 2 / 4;
+    grid-column: 2;
+    padding: 10px 14px 0 0;
+    background: var(--window-bg);
+  }
+
+  .me {
+    grid-row: 1 / 3;
+    grid-column: 2;
+    align-self: end;
+  }
+
+  .narrow {
+    display: none;
+  }
+
+  /* Too narrow for the column: their picture goes back to the header, ours is left out. */
+  @media (max-width: 420px) {
+    aside,
+    .me {
+      display: none;
+    }
+
+    ol,
+    .typing {
+      grid-column: 1 / -1 !important;
+    }
+
+    .narrow {
+      display: contents;
+    }
   }
 
   header {
@@ -562,7 +637,8 @@
 
   .compose {
     display: grid;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 14px;
     padding: 10px 14px 14px;
     background: var(--bar-bg);
     border-top: 1px solid var(--line);
@@ -570,6 +646,7 @@
 
   /* The pickers open above it, as wide as it. */
   .toolbar {
+    grid-column: 1;
     position: relative;
     display: flex;
     gap: 6px;
@@ -728,6 +805,7 @@
     box-shadow: none;
     border-radius: var(--radius);
     font-size: 18px;
+    line-height: 1;
   }
 
   .emoticons button:hover:not(:disabled) {
@@ -736,6 +814,7 @@
   }
 
   .write {
+    grid-column: 1;
     display: flex;
     gap: 8px;
   }
