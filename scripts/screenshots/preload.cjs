@@ -105,6 +105,7 @@ const msg = (id, mine, body, time, extra = {}) => ({
   body,
   buzz: false,
   wink: '',
+  encrypted: true,
   at: time,
   ...extra
 })
@@ -128,7 +129,26 @@ const values = {
   currentAccount: account,
   getUnread: { 'nerea@localhost': 2 },
   getShownChat: arg('chats') === 'together' ? 'iker@localhost' : '',
-  getChatHistory: history,
+  getChatHistory: arg('notes')
+    ? [
+        ...history,
+        msg('9', false, 'te escribo desde otro programa :P', at(17, 7), { encrypted: false })
+      ]
+    : history,
+  getVerify: {
+    mine: 'a1b2c3d4 e5f60718 293a4b5c 6d7e8f90 0a1b2c3d 4e5f6071 8293a4b5 c6d7e8f9',
+    devices: [
+      {
+        deviceId: 1234,
+        fingerprint: '5f3e9a01 c27d84b6 0e1f2a3b 4c5d6e7f 8091a2b3 c4d5e6f7 08192a3b 4c5d6e7f',
+        verified: arg('verified') === '1',
+        blocked: false
+      }
+    ]
+  },
+  getTrustNotes: arg('notes')
+    ? [{ jid: 'iker@localhost', deviceId: 99, kind: 'new-device', at: at(17, 5) }]
+    : [],
   version: 'v0.15.0 (beta)',
   language: lang,
   getSettings: {

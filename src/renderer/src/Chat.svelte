@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
-  import { Smile, Star, Vibrate } from '@lucide/svelte'
-  import type { ChatMessage, Contact } from '../../main/xmpp'
+  import { Lock, LockOpen, ShieldCheck, Smile, Star, Vibrate } from '@lucide/svelte'
+  import type { ChatMessage, Contact, DeviceTrust, TrustNote } from '../../main/xmpp'
   import Avatar from './Avatar.svelte'
   import Emoticons from './Emoticons.svelte'
   import EmoticonCanvas from './EmoticonCanvas.svelte'
   import { EMOTICONS, emojify } from './emoticons'
   import { stripPlus } from './plus'
+  import { popup } from './menu'
   import { prefs } from './prefs.svelte'
   import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
@@ -34,6 +35,15 @@
       document.title = prefs.emoticons ? emojify(stripPlus(name)) : stripPlus(name)
   })
   let draft = $state('')
+  // Encryption: trust notices (not messages), their devices, and a send error line.
+  let notes: TrustNote[] = $state([])
+  let devices: DeviceTrust[] = $state([])
+  let sendError = $state('')
+  const verified = $derived(devices.length > 0 && devices.every((d) => d.verified))
+  const blocked = $derived(devices.filter((d) => d.blocked))
+  const loadDevices = async (): Promise<void> => {
+    devices = (await window.api.getVerify(jid)).devices
+  }
   let shaking = $state(false)
   let canBuzz = $state(true)
   let canWink = $state(true)
@@ -94,6 +104,22 @@
       if (m.with === jid) add(m, !quiet)
     })
     window.api.chatReady(jid)
+    const offTrust = window.api.onTrust(async (note) => {
+      if (note.jid !== jid) return
+      notes.push(note)
+      loadDevices()
+      await tick()
+      list.scrollTop = list.scrollHeight
+    })
+    window.api.getTrustNotes(jid).then((n) => {
+      // A note pushed live meanwhile is already in `notes`.
+      const key = (x: TrustNote): string => `${x.at}-${x.deviceId}-${x.kind}`
+      const seen = new Set(notes.map(key))
+      notes = [...n.filter((x) => !seen.has(key(x))), ...notes]
+    })
+    loadDevices()
+    // Verifying or accepting a key happens in other places: look again when we're back.
+    window.addEventListener('focus', loadDevices)
     const offTyping = window.api.onTyping((c, typing) => {
       if (c !== jid) return
       theyType = typing
@@ -126,6 +152,8 @@
       offTyping()
       offRoster()
       offWink()
+      offTrust()
+      window.removeEventListener('focus', loadDevices)
     }
   })
 
@@ -147,13 +175,33 @@
     idle = setTimeout(stopTyping, TYPING_IDLE)
   }
 
-  function send(): void {
-    if (!draft.trim()) return
-    window.api.sendMessage(jid, draft)
+  async function send(): Promise<void> {
+    const text = draft
+    if (!text.trim()) return
+    sendError = ''
     draft = ''
     // The message itself tells them we stopped typing.
     clearTimeout(idle)
     composing = false
+    try {
+      await window.api.sendMessage(jid, text)
+    } catch (error) {
+      // The draft stays where it was, unless they've already started another one.
+      if (!draft) draft = text
+      sendError = String(error).includes('no-devices')
+        ? 'no-devices'
+        : _('No se ha podido enviar el mensaje')
+    }
+  }
+
+  async function acceptKeys(): Promise<void> {
+    await Promise.all(blocked.map((d) => window.api.acceptKey(jid, d.deviceId)))
+    await loadDevices()
+  }
+
+  const menu = (event: MouseEvent): void => {
+    event.preventDefault()
+    popup(event, [{ label: _('Verificar cifrado…'), run: () => window.api.openVerify(jid) }])
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -234,6 +282,18 @@
     plus
   />{after}{/snippet}
 
+{#snippet noted(from: number, to: number)}
+  {#each notes.filter((n) => n.at > from && n.at <= to) as note (`${note.at}-${note.deviceId}-${note.kind}`)}
+    <li class="event notice">
+      {@render named(
+        note.kind === 'new-device'
+          ? _('{name} ha empezado a usar Palique en otro dispositivo')
+          : _('La clave de cifrado de {name} ha cambiado')
+      )}
+    </li>
+  {/each}
+{/snippet}
+
 <div class="chat" class:embedded class:shaking onanimationend={() => (shaking = false)}>
   {#if playing}
     <!-- A click closes it. -->
@@ -244,7 +304,9 @@
       {/key}
     </div>
   {/if}
-  <header>
+  <!-- Only here: the rest keeps the native copy and paste menu. -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <header oncontextmenu={menu}>
     <Avatar {jid} {name} url={contact?.avatar} show={contact?.show ?? 'offline'} size={60} />
     <div class="to">
       <span class="name">{_('Para:')} <strong><Emoticons text={name} plus /></strong></span>
@@ -255,11 +317,21 @@
       >
       {#if contact?.email}<small class="email">{contact.email}</small>{/if}
     </div>
+    <button
+      class="lock"
+      onclick={() => window.api.openVerify(jid)}
+      title={verified
+        ? _('Conversación cifrada y verificada')
+        : _('Conversación cifrada. Pulsa para verificarla.')}
+      aria-label={_('Verificar cifrado…')}
+    >
+      {#if verified}<ShieldCheck size={14} />{:else}<Lock size={14} />{/if}
+    </button>
   </header>
 
   <ol bind:this={list} aria-live="polite">
-    <li class="notice">{_('Esta conversación solo se guarda en este ordenador.')}</li>
     {#each messages as message, i (message.id)}
+      {@render noted(i === 0 ? 0 : messages[i - 1].at, message.at)}
       {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
       {#if message.buzz}
         <li class="event buzz">
@@ -288,15 +360,39 @@
               <time>{time(message.at)}</time></span
             >
           {/if}
-          <p title={time(message.at)}><Emoticons text={message.body} /></p>
+          {#if message.undecryptable}
+            <p class="event warn">{_('No se ha podido descifrar este mensaje')}</p>
+          {:else}
+            <p title={time(message.at)}><Emoticons text={message.body} /></p>
+            {#if !message.encrypted}
+              <small class="plain"><LockOpen size={11} /> {_('Este mensaje no está cifrado')}</small
+              >
+            {/if}
+          {/if}
         </li>
       {/if}
     {/each}
+    {@render noted(messages.at(-1)?.at ?? 0, Infinity)}
   </ol>
 
   <p class="typing" aria-live="polite">
     {#if theyType && prefs.typing}{@render named(_('{name} está escribiendo…'))}{/if}
   </p>
+
+  {#if sendError}
+    <p class="send-error event warn" role="alert">
+      {#if sendError === 'no-devices'}{@render named(
+          _('{name} tiene que actualizar Palique para recibir mensajes cifrados')
+        )}{:else}{sendError}{/if}
+    </p>
+  {/if}
+
+  {#if blocked.length}
+    <div class="blocked" role="alert">
+      <span>{@render named(_('La clave de cifrado de {name} ha cambiado'))}</span>
+      <button onclick={acceptKeys}>{_('Aceptar la clave nueva')}</button>
+    </div>
+  {/if}
 
   <div class="compose">
     <div class="toolbar">
@@ -468,14 +564,6 @@
     margin-top: -6px;
   }
 
-  .notice {
-    align-self: center;
-    max-width: none;
-    color: var(--text-muted);
-    font-size: 12px;
-    text-align: center;
-  }
-
   .meta {
     color: var(--text-muted);
     font-size: 12px;
@@ -540,6 +628,54 @@
     border-color: var(--buzz-border);
     background: var(--buzz-bg);
     color: var(--buzz-text);
+  }
+
+  .notice {
+    border-color: var(--line);
+    background: var(--bar-bg);
+    color: var(--text-muted);
+  }
+
+  /* Problems: they look like the buzz lines, which are the app's warm alert colors. */
+  .warn {
+    border-color: var(--buzz-border);
+    background: var(--buzz-bg);
+    color: var(--buzz-text);
+  }
+
+  .send-error {
+    align-self: center;
+    margin: 0 16px 6px;
+  }
+
+  .plain {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .lock {
+    margin-left: auto;
+    padding: 4px 6px;
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--text-muted);
+  }
+
+  .blocked {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-top: 1px solid var(--buzz-border);
+    background: var(--buzz-bg);
+    color: var(--buzz-text);
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .wink-line {

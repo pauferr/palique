@@ -32,7 +32,7 @@ Llegabas a casa, encendías el ordenador y mirabas quién estaba conectado. Pali
 
 - Solo tus amigos: se entra por invitación y nadie te escribe si no le has agregado.
 - Nada que deslizar: ni feeds, ni algoritmos, ni anuncios.
-- Tus conversaciones se guardan localmente, no en un servidor.
+- Tus mensajes van cifrados de extremo a extremo y no se guardan en ningún sitio: solo existen mientras Palique está abierto.
 - Es software libre: puedes leer el código y [montar tu propio servidor](docs/deployment.md).
 
 ## Lo que trae

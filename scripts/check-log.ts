@@ -12,7 +12,7 @@ const log = openLog(file, 200)
 log.write('info', 'started', { version: '0.0.0-dev' })
 log.write('error', 'lookup failed:', new Error('boom'))
 const text = readFileSync(file, 'utf8')
-assert.match(text, /^\d{4}-\d\d-\d\dT[\d:.]+Z info started \{ version: '0\.0\.0-dev' \}\n/)
+assert.match(text, /^\d{4}-\d\d-\d\dT[\d:.]+Z info started \[Object\]\n/)
 assert.match(text, /Z error lookup failed: Error: boom\n\s+at /, 'errors keep their stack')
 
 // Past the limit: the current file becomes palique.old.log and a new one starts.
@@ -41,6 +41,16 @@ for (const leak of ['tere', 'k3f9x2ab7q', 'SECRET', homedir()]) {
 }
 assert.match(written, /Error: item-not-found\n[\s\S]* \[item-not-found\]/)
 assert.match(written, /<dirección> <dirección> palique:\/\/reset\?e=…&t=… ~\/palique\/x\.ts\n$/)
+
+// Objects only by their type: libsignal's warning carries a whole session with its keys.
+const keys = join(dir, 'keys.log')
+openLog(keys).write('warn', 'no chain found for key', {
+  key: 'SECRET123',
+  session: { rootKey: new Uint8Array([1, 2, 3]) }
+})
+const warned = readFileSync(keys, 'utf8')
+assert.match(warned, / warn no chain found for key \[Object\]\n$/)
+assert.ok(!warned.includes('SECRET123') && !/1, 2, 3|rootKey/.test(warned), warned)
 
 // A log that can't be written doesn't throw.
 openLog(join(dir, 'missing', 'palique.log')).write('error', 'nowhere')

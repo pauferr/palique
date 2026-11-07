@@ -1,15 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { ExportResult } from '../main/export'
 import type { Settings } from '../main/settings'
 import type { UpdateStatus } from '../main/updates'
 import type {
   AuthResult,
   ChatMessage,
+  DeviceTrust,
   EmailStatus,
   InviteStatus,
   OwnShow,
-  Snapshot
+  Snapshot,
+  TrustNote
 } from '../main/xmpp'
 
 // Custom APIs for renderer
@@ -60,6 +61,11 @@ const api = {
     return () => ipcRenderer.off('update:changed', listener)
   },
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+  onOwnNewDevice: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('account:new-device', listener)
+    return () => ipcRenderer.off('account:new-device', listener)
+  },
   onContactOnline: (callback: (jid: string) => void): (() => void) => {
     const listener = (_: unknown, jid: string): void => callback(jid)
     ipcRenderer.on('contact:online', listener)
@@ -114,6 +120,21 @@ const api = {
   },
   sendMessage: (contact: string, body: string): Promise<void> =>
     ipcRenderer.invoke('chat:send', contact, body),
+  // Encryption: trust notices, the codes to compare, and what the user decides about them.
+  getTrustNotes: (contact: string): Promise<TrustNote[]> =>
+    ipcRenderer.invoke('chat:trust-list', contact),
+  onTrust: (callback: (note: TrustNote) => void): (() => void) => {
+    const listener = (_: unknown, note: TrustNote): void => callback(note)
+    ipcRenderer.on('chat:trust', listener)
+    return () => ipcRenderer.off('chat:trust', listener)
+  },
+  getVerify: (contact: string): Promise<{ mine: string; devices: DeviceTrust[] }> =>
+    ipcRenderer.invoke('chat:verify', contact),
+  setVerified: (contact: string, deviceId: number, verified: boolean): Promise<void> =>
+    ipcRenderer.invoke('chat:verify-set', contact, deviceId, verified),
+  acceptKey: (contact: string, deviceId: number): Promise<void> =>
+    ipcRenderer.invoke('chat:accept-key', contact, deviceId),
+  openVerify: (contact: string): Promise<void> => ipcRenderer.invoke('chat:verify-open', contact),
   // Resolve to the ms until the next one is allowed.
   sendBuzz: (contact: string): Promise<number> => ipcRenderer.invoke('chat:buzz', contact),
   setTyping: (contact: string, typing: boolean): Promise<void> =>
@@ -128,8 +149,6 @@ const api = {
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
   openNick: (): Promise<void> => ipcRenderer.invoke('nick:open'),
   openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),
-  // The format is chosen in the save dialog.
-  exportHistory: (): Promise<ExportResult> => ipcRenderer.invoke('history:export'),
   sendWink: (contact: string, wink: string): Promise<number> =>
     ipcRenderer.invoke('chat:wink', contact, wink),
   setAvatar: (png: Uint8Array): Promise<void> => ipcRenderer.invoke('avatar:set', png),

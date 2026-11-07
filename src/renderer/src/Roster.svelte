@@ -67,6 +67,8 @@
   // «Together» option: the conversation shown beside the list ('' = none). Main decides.
   let shown = $state('')
   const together = $derived(prefs.chats === 'together')
+  // Our account started using another device: shown until closed.
+  let ownNewDevice = $state(false)
 
   onMount(() => {
     window.api.getRoster().then((value) => (roster = value))
@@ -83,7 +85,9 @@
       playSound(prefs.soundPack, buzz ? 'buzz' : 'message')
     )
     const offOnline = window.api.onContactOnline(() => playSound(prefs.soundPack, 'online'))
+    const offNewDevice = window.api.onOwnNewDevice(() => (ownNewDevice = true))
     return () => {
+      offNewDevice()
       offRoster()
       offUnread()
       offIncoming()
@@ -333,6 +337,16 @@
     {/if}
     {#if !roster.connected}
       <p class="notice warning" role="status">{_('Reconectando…')}</p>
+    {/if}
+    {#if ownNewDevice}
+      <p class="notice warning dismissable" role="alert">
+        {_(
+          'Tu cuenta ha empezado a usar Palique en otro dispositivo. Si no has sido tú, cambia tu contraseña.'
+        )}
+        <button class="close" onclick={() => (ownNewDevice = false)} aria-label={_('Cerrar')}
+          >×</button
+        >
+      </p>
     {/if}
 
     <div class="list">
@@ -598,6 +612,16 @@
 
   .notice.warning {
     background: var(--warning-bg);
+  }
+
+  .notice.dismissable {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .notice.dismissable .close {
+    margin-left: auto;
   }
 
   .list {

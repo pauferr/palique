@@ -3,6 +3,15 @@ import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import { _, lang } from '../renderer/src/i18n.ts'
+import {
+  OmemoError,
+  type Bundle,
+  type Device,
+  type DeviceTrust,
+  type Encrypted,
+  type Omemo,
+  type TrustChange
+} from './omemo.ts'
 
 // Which server: fixed at build time for releases (MAIN_VITE_* variables, see the release
 // workflow), overridable with PALIQUE_* at run time, localhost in development.
@@ -28,6 +37,11 @@ const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 export const AVATAR_MAX_BYTES = 100_000
 const NICK = 'http://jabber.org/protocol/nick' // display names (XEP-0172): PEP and presence
 export const NICK_MAX = 128 // room for formatting codes
+const OMEMO = 'eu.siacs.conversations.axolotl' // end-to-end encryption, OMEMO 0.3
+const DEVICELIST = `${OMEMO}.devicelist`
+const BUNDLES = `${OMEMO}.bundles:`
+const HINTS = 'urn:xmpp:hints'
+const DISCO_INFO = 'http://jabber.org/protocol/disco#info'
 
 // Wink ids come from the network and end up in a URL: keep them boring.
 export const isWinkId = (id: unknown): id is string =>
@@ -76,6 +90,8 @@ export type ChatMessage = {
   wink: string // catalog id, '' when not a wink
   at: number // ms timestamp
   delayed?: boolean // stored by the server while we were offline (saved, but no effects)
+  encrypted: boolean // came (or went) with OMEMO
+  undecryptable?: boolean // encrypted, but not for us or broken: no text to show
 }
 
 type Presence = { show: Show; status: string }
@@ -96,6 +112,14 @@ let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
 let emailListener: (email: EmailStatus) => void = () => {}
+export type { DeviceTrust }
+export type TrustNote = TrustChange & { at: number }
+let trustListener: (changes: TrustChange[]) => void = () => {}
+let omemo: Omemo | null = null
+let omemoOpener: ((account: string) => Promise<Omemo>) | null = null
+let devices = new Map<string, number[]>() // OMEMO device ids by bare JID, ours included
+let stale = new Set<string>() // `jid/deviceId` whose session broke: start a new one
+let bundleTimer: ReturnType<typeof setTimeout> | undefined
 
 // JIDs are random ids: never show them. Other XMPP clients may not send a name.
 const nameOf = (bare: string): string => nicks.get(bare) || _('Sin nombre')
@@ -166,7 +190,11 @@ function withNick(presence: Element): Element {
 }
 
 function presenceStanza(): Element {
-  const presence = xml('presence')
+  const presence = xml(
+    'presence',
+    {},
+    xml('c', { xmlns: CAPS, hash: 'sha-1', node: CAPS_NODE, ver: CAPS_VER })
+  )
   if (own.show === 'away' || own.show === 'dnd') presence.c('show').t(own.show)
   if (own.status) presence.c('status').t(own.status)
   return withNick(presence)
@@ -242,11 +270,20 @@ function handlePresence(stanza: Element): void {
   emit()
 }
 
-function handleMessage(stanza: Element): void {
+async function handleMessage(stanza: Element): Promise<void> {
   // The account service tells us when the email gets verified. Only it, exactly.
   const email = stanza.getChild('email', ACCOUNTS)
   if (email) {
     if (stanza.attrs.from === ACCOUNTS_JID) emailListener(parseEmail(email))
+    return
+  }
+  // PEP notifications: someone's OMEMO devices changed (ours or a contact's).
+  const event = stanza.getChild('event', `${PUBSUB}#event`)?.getChild('items')
+  if (event) {
+    const owner = stanza.attrs.from ? jid(stanza.attrs.from).bare().toString() : me
+    if (event.attrs.node === DEVICELIST && (owner === me || roster.has(owner))) {
+      await devicesChanged(owner, readDeviceList(event.getChild('item')))
+    }
     return
   }
   let message = stanza
@@ -272,12 +309,24 @@ function handleMessage(stanza: Element): void {
   const buzz = Boolean(message.getChild('attention', ATTENTION))
   const received = message.getChild('wink', WINK)?.attrs.id
   const wink = isWinkId(received) ? received : ''
-  // A wink's body is only the fallback text for other XMPP clients.
-  const body = wink ? '' : (message.getChildText('body') ?? '')
+  // A wink's body is only the fallback text for other XMPP clients, and so is an
+  // encrypted message's.
+  let body = wink ? '' : (message.getChildText('body') ?? '')
+  const sealed = wink ? undefined : message.getChild('encrypted', OMEMO)
+  let undecryptable = false
+  if (sealed) {
+    // ponytail: key-only messages (no payload, from other clients) are dropped unread;
+    // decrypt them too if sessions with those clients go wrong.
+    if (!sealed.getChild('payload')) return
+    const opened = await decryptBody(sealed, mine ? me : bare, mine)
+    if (!opened) return
+    body = opened.body
+    undecryptable = opened.undecryptable
+  }
   // Our own typing on other devices doesn't matter. Any other chat state, or the
   // message itself, means they stopped typing.
   const state = message.getChildElements().find((el) => el.attrs.xmlns === CHATSTATES)?.name
-  const content = Boolean(body || buzz || wink)
+  const content = Boolean(body || buzz || wink || undecryptable)
   if (!mine && (state || content)) typingListener(bare, state === 'composing' && !content)
   if (!content) return
   // Offline messages carry the time they were sent.
@@ -290,7 +339,9 @@ function handleMessage(stanza: Element): void {
     buzz,
     wink,
     at: stamp ? Date.parse(stamp) : Date.now(),
-    ...(stamp ? { delayed: true } : {})
+    ...(stamp ? { delayed: true } : {}),
+    encrypted: Boolean(sealed),
+    ...(undecryptable ? { undecryptable } : {})
   })
 }
 
@@ -382,10 +433,23 @@ export async function login(
   })
   // Without a listener, connection errors would crash the main process.
   entity.on('error', () => {})
+  // Messages one at a time and in order: decrypting is async, and each one moves the
+  // OMEMO session on.
+  let incoming = Promise.resolve()
   entity.on('stanza', (stanza) => {
     if (stanza.is('presence')) handlePresence(stanza)
-    else if (stanza.is('message')) handleMessage(stanza)
+    else if (stanza.is('message')) {
+      incoming = incoming
+        .then(() => handleMessage(stanza))
+        .catch((e) => {
+          unexpected('message', e)
+        })
+    }
   })
+  // What we support, for the server's PEP: `+notify` gets us contacts' device lists.
+  entity.iqCallee.get(DISCO_INFO, 'query', (ctx) =>
+    discoInfo(ctx.stanza.getChild('query')?.attrs.node)
+  )
   // Roster pushes: the server tells us about changes to our contact list.
   entity.iqCallee.set(ROSTER, 'query', (ctx) => {
     // Only trust pushes from our own server (no `from`, or our bare JID). ctx.from can't tell:
@@ -424,6 +488,8 @@ export async function login(
       )
       // Our name first, so the first presence already carries it.
       .then(() => loadNick(me).catch(() => {}))
+      // Before presence, so contacts can write to us encrypted as soon as they see us.
+      .then(startOmemo)
       .then(() => send(presenceStanza()))
       .then(emit)
       .then(loadEmails)
@@ -461,6 +527,11 @@ export async function logout(): Promise<void> {
   avatars = new Map()
   nicks = new Map()
   emails = new Map()
+  clearTimeout(bundleTimer)
+  omemo?.close()
+  omemo = null
+  devices = new Map()
+  stale = new Set()
   if (!entity) return
   entity.reconnect.stop()
   await entity.stop().catch(() => {})
@@ -525,7 +596,7 @@ export async function setPresence(show: OwnShow, status: string): Promise<void> 
 async function sendStanza(
   to: string,
   stanza: Element,
-  content: Pick<ChatMessage, 'body' | 'buzz' | 'wink'>
+  content: Pick<ChatMessage, 'body' | 'buzz' | 'wink' | 'encrypted'>
 ): Promise<ChatMessage> {
   const id = randomUUID()
   stanza.attrs.to = to
@@ -534,19 +605,33 @@ async function sendStanza(
   return { id, with: to, mine: true, ...content, at: Date.now() }
 }
 
-export function sendMessage(to: string, body: string): Promise<ChatMessage> {
+// Always encrypted, for every device of the contact and our other ones. Rejects with
+// 'no-devices' when the contact has no OMEMO device we can reach, 'offline' if signed out.
+export async function sendMessage(to: string, body: string): Promise<ChatMessage> {
+  const store = omemo
+  if (!xmpp || !store) throw new Error('offline')
+  const theirs = await reachable(to)
+  if (!theirs.length) throw new Error('no-devices')
+  const encrypted = await store.encrypt(body, [...theirs, ...(await reachable(me))])
+  trust(store.takeChanges())
+  // Blocked devices are skipped: if that was all of theirs, it would reach only us.
+  if (!encrypted.keys.some((k) => theirs.some((d) => d.deviceId === k.rid))) {
+    throw new Error('no-devices')
+  }
   const stanza = xml(
     'message',
     { type: 'chat' },
-    xml('body', {}, body),
+    encryptedElement(encrypted),
+    xml('body', {}, _('Mensaje cifrado con OMEMO')),
+    xml('store', { xmlns: HINTS }),
     xml('active', { xmlns: CHATSTATES })
   )
-  return sendStanza(to, stanza, { body, buzz: false, wink: '' })
+  return sendStanza(to, stanza, { body, buzz: false, wink: '', encrypted: true })
 }
 
 export function sendBuzz(to: string): Promise<ChatMessage> {
   const stanza = xml('message', { type: 'headline' }, xml('attention', { xmlns: ATTENTION }))
-  return sendStanza(to, stanza, { body: '', buzz: true, wink: '' })
+  return sendStanza(to, stanza, { body: '', buzz: true, wink: '', encrypted: false })
 }
 
 export function sendWink(to: string, wink: string): Promise<ChatMessage> {
@@ -557,7 +642,7 @@ export function sendWink(to: string, wink: string): Promise<ChatMessage> {
     xml('wink', { xmlns: WINK, id: wink }),
     xml('active', { xmlns: CHATSTATES })
   )
-  return sendStanza(to, stanza, { body: '', buzz: false, wink })
+  return sendStanza(to, stanza, { body: '', buzz: false, wink, encrypted: false })
 }
 
 export function sendTyping(to: string, typing: boolean): Promise<void> {
@@ -624,6 +709,321 @@ export async function setNick(value: string): Promise<void> {
   await publishNick(name)
   await send(presenceStanza())
   emit()
+}
+
+// --- OMEMO: end-to-end encryption (keys and sessions in omemo.ts) ----------------------
+
+// Entity capabilities (XEP-0115): the server asks once per `ver` what we support.
+const CAPS = 'http://jabber.org/protocol/caps'
+const CAPS_NODE = 'https://github.com/pauferr/palique'
+const FEATURES = [DISCO_INFO, `${DEVICELIST}+notify`].sort()
+const CAPS_VER = createHash('sha1')
+  .update(`client/pc//Palique<${FEATURES.join('<')}<`)
+  .digest('base64')
+
+const discoInfo = (node?: string): Element =>
+  xml(
+    'query',
+    { xmlns: DISCO_INFO, ...(node ? { node } : {}) },
+    xml('identity', { category: 'client', type: 'pc', name: 'Palique' }),
+    ...FEATURES.map((v) => xml('feature', { var: v }))
+  )
+
+// The store is opened per account on signing in (index.ts says where, and how it's sealed).
+export function setOmemoOpener(open: ((account: string) => Promise<Omemo>) | null): void {
+  omemoOpener = open
+}
+
+export function onTrust(callback: (changes: TrustChange[]) => void): void {
+  trustListener = callback
+}
+
+const trust = (changes: TrustChange[]): void => {
+  if (changes.length) trustListener(changes)
+}
+
+export const deviceTrust = (contact: string): DeviceTrust[] => omemo?.devices(contact) ?? []
+export const ownFingerprint = (): string => omemo?.fingerprint() ?? ''
+
+export function setVerified(contact: string, deviceId: number, verified: boolean): void {
+  omemo?.setVerified({ jid: contact, deviceId }, verified)
+}
+
+// The user accepts a verified device's new key: a new session with it, from its bundle.
+export async function acceptKey(contact: string, deviceId: number): Promise<void> {
+  const store = omemo
+  if (!xmpp || !store) return
+  const device = { jid: contact, deviceId }
+  store.acceptKey(device)
+  await store.startSession(device, await fetchBundle(device))
+  trust(store.takeChanges())
+}
+
+const base64 = (b: Uint8Array): string => Buffer.from(b).toString('base64')
+const fromBase64 = (text: string | null | undefined): Uint8Array | null => {
+  const b = Buffer.from(text ?? '', 'base64')
+  return b.length ? new Uint8Array(b) : null
+}
+// Ids from the network: plain decimal numbers. Device ids are 31 bits, never 0.
+const keyId = (v: unknown): number | null =>
+  typeof v === 'string' && /^\d{1,10}$/.test(v) && Number(v) < 2 ** 32 ? Number(v) : null
+const deviceId = (v: unknown): number | null => {
+  const id = keyId(v)
+  return id && id < 2 ** 31 ? id : null
+}
+
+export function encryptedElement(e: Encrypted): Element {
+  return xml(
+    'encrypted',
+    { xmlns: OMEMO },
+    xml(
+      'header',
+      { sid: String(e.sid) },
+      ...e.keys.map((k) =>
+        xml(
+          'key',
+          k.prekey ? { rid: String(k.rid), prekey: 'true' } : { rid: String(k.rid) },
+          base64(k.data)
+        )
+      ),
+      xml('iv', {}, base64(e.iv))
+    ),
+    xml('payload', {}, base64(e.payload))
+  )
+}
+
+// null when it can't be an OMEMO message; keys that make no sense are left out.
+export function readEncrypted(el: Element): Encrypted | null {
+  const header = el.getChild('header')
+  const sid = deviceId(header?.attrs.sid)
+  const iv = fromBase64(header?.getChildText('iv'))
+  const payload = fromBase64(el.getChildText('payload'))
+  if (!header || !sid || !iv || (iv.length !== 12 && iv.length !== 16) || !payload) return null
+  const keys: Encrypted['keys'] = []
+  for (const k of header.getChildren('key')) {
+    const rid = deviceId(k.attrs.rid)
+    const data = fromBase64(k.text())
+    if (rid && data)
+      keys.push({ rid, prekey: k.attrs.prekey === 'true' || k.attrs.prekey === '1', data })
+  }
+  return { sid, iv, keys, payload }
+}
+
+export function bundleElement(b: Bundle): Element {
+  return xml(
+    'bundle',
+    { xmlns: OMEMO },
+    xml(
+      'signedPreKeyPublic',
+      { signedPreKeyId: String(b.signedPreKey.id) },
+      base64(b.signedPreKey.publicKey)
+    ),
+    xml('signedPreKeySignature', {}, base64(b.signedPreKey.signature)),
+    xml('identityKey', {}, base64(b.identityKey)),
+    xml(
+      'prekeys',
+      {},
+      ...b.preKeys.map((k) => xml('preKeyPublic', { preKeyId: String(k.id) }, base64(k.publicKey)))
+    )
+  )
+}
+
+// The bundle element doesn't say whose device it is: the node name does. Throws when
+// it isn't usable (keys are 33 bytes: type byte + 32, signatures 64).
+export function readBundle(el: Element, device: number): Bundle {
+  const key = (child: Element | undefined): Uint8Array | null => {
+    const b = fromBase64(child?.text())
+    return b?.length === 33 ? b : null
+  }
+  const signed = el.getChild('signedPreKeyPublic')
+  const signedId = keyId(signed?.attrs.signedPreKeyId)
+  const signedKey = key(signed)
+  const signature = fromBase64(el.getChildText('signedPreKeySignature'))
+  const identityKey = key(el.getChild('identityKey'))
+  const preKeys: Bundle['preKeys'] = []
+  for (const k of el.getChild('prekeys')?.getChildren('preKeyPublic') ?? []) {
+    const id = keyId(k.attrs.preKeyId)
+    const publicKey = key(k)
+    if (id !== null && publicKey) preKeys.push({ id, publicKey })
+  }
+  if (signedId === null || !signedKey || signature?.length !== 64 || !identityKey) {
+    throw new Error('bad-bundle')
+  }
+  return {
+    deviceId: device,
+    identityKey,
+    signedPreKey: { id: signedId, publicKey: signedKey, signature },
+    preKeys
+  }
+}
+
+export const deviceListElement = (ids: number[]): Element =>
+  xml('list', { xmlns: OMEMO }, ...ids.map((id) => xml('device', { id: String(id) })))
+
+// ponytail: 32 devices at most, so a list can't make us fetch bundles forever.
+const readDeviceList = (item: Element | undefined): number[] => {
+  const ids = (item?.getChild('list', OMEMO)?.getChildren('device') ?? []).map((d) =>
+    deviceId(d.attrs.id)
+  )
+  return [...new Set(ids.filter((id) => id !== null))].slice(0, 32)
+}
+
+// Device lists and bundles are readable by anyone (not only contacts), so someone who
+// just added us can write to us encrypted.
+function publishOpen(node: string, payload: Element): Promise<Element> {
+  const field = (name: string, value: string, type?: string): Element =>
+    xml('field', type ? { var: name, type } : { var: name }, xml('value', {}, value))
+  return xmpp!.iqCaller.request(
+    xml(
+      'iq',
+      { type: 'set' },
+      xml(
+        'pubsub',
+        { xmlns: PUBSUB },
+        xml('publish', { node }, xml('item', { id: 'current' }, payload)),
+        xml(
+          'publish-options',
+          {},
+          xml(
+            'x',
+            { xmlns: 'jabber:x:data', type: 'submit' },
+            field('FORM_TYPE', `${PUBSUB}#publish-options`, 'hidden'),
+            field('pubsub#access_model', 'open')
+          )
+        )
+      )
+    )
+  )
+}
+
+async function publishBundle(): Promise<void> {
+  const store = omemo
+  if (!xmpp || !store) return
+  if (store.needsRefill()) await store.refill()
+  await publishOpen(`${BUNDLES}${store.deviceId}`, bundleElement(await store.bundle()))
+}
+
+// After one-time keys get used, the bundle goes out again without them: once, after
+// a batch (e.g. the messages kept while we were offline), not once per message.
+function publishBundleSoon(): void {
+  clearTimeout(bundleTimer)
+  bundleTimer = setTimeout(() => publishBundle().catch((e) => unexpected('omemo bundle', e)), 2000)
+}
+
+async function devicesChanged(bare: string, ids: number[]): Promise<void> {
+  const store = omemo
+  devices.set(bare, ids)
+  if (!store) return
+  // Before any session or message to them, so a new device of a contact gets noticed.
+  // Our own list always counts this device: with it known, any other one is news, even
+  // the first extra device of a one-computer account (someone else signing in).
+  trust(store.seen(bare, bare === me ? [...new Set([store.deviceId, ...ids])] : ids))
+  // Another client may have dropped this device from our list: contacts couldn't reach it.
+  // First, so the 32-device cut (readDeviceList) never drops it and we republish forever.
+  if (bare === me && !ids.includes(store.deviceId)) {
+    const all = [store.deviceId, ...ids]
+    await publishOpen(DEVICELIST, deviceListElement(all))
+    devices.set(me, all)
+  }
+}
+
+async function loadDevices(bare: string): Promise<number[]> {
+  let ids: number[] = []
+  try {
+    ids = readDeviceList(
+      (await pubsubItems(bare, DEVICELIST)).getChild('pubsub')?.getChild('items')?.getChild('item')
+    )
+  } catch (e) {
+    if (condition(e) !== 'item-not-found') throw e // never used OMEMO: no devices
+  }
+  await devicesChanged(bare, ids)
+  return devices.get(bare) ?? ids
+}
+
+async function fetchBundle(d: Device): Promise<Bundle> {
+  const res = await pubsubItems(d.jid, `${BUNDLES}${d.deviceId}`)
+  const bundle = res
+    .getChild('pubsub')
+    ?.getChild('items')
+    ?.getChild('item')
+    ?.getChild('bundle', OMEMO)
+  if (!bundle) throw new Error('bad-bundle')
+  return readBundle(bundle, d.deviceId)
+}
+
+// The devices of `bare` (but this one) we can encrypt for, starting sessions where
+// there are none. One that fails (no bundle, blocked) is left out.
+async function reachable(bare: string): Promise<Device[]> {
+  const store = omemo!
+  const ids = devices.get(bare) ?? (await loadDevices(bare))
+  const ready: Device[] = []
+  for (const id of ids.filter((id) => id !== store.deviceId)) {
+    const device = { jid: bare, deviceId: id }
+    const name = `${bare}/${id}`
+    try {
+      if (stale.has(name) || !(await store.hasSession(device))) {
+        await store.startSession(device, await fetchBundle(device))
+        stale.delete(name)
+      }
+      ready.push(device)
+    } catch (e) {
+      console.warn('omemo session:', e instanceof OmemoError ? e.code : (condition(e) ?? 'failed'))
+    }
+  }
+  trust(store.takeChanges())
+  return ready
+}
+
+// The text of an OMEMO message from `from`'s device. null: our own copy, sent from
+// another device of ours before this one existed (nothing to show).
+async function decryptBody(
+  el: Element,
+  from: string,
+  mine: boolean
+): Promise<{ body: string; undecryptable: boolean } | null> {
+  const store = omemo
+  const message = readEncrypted(el)
+  const key = message?.keys.find((k) => k.rid === store?.deviceId)
+  if (!store || !message || !key)
+    return mine && store && message ? null : { body: '', undecryptable: true }
+  // Before decrypting, which trusts an unknown device on first use: a new device of a
+  // contact that writes before its list reaches us still gets noticed.
+  trust(store.seen(from, [message.sid]))
+  try {
+    const body = await store.decrypt(from, message)
+    if (key.prekey) publishBundleSoon()
+    return { body, undecryptable: false }
+  } catch (e) {
+    // Only the code: never the message or keys in the log.
+    console.warn('omemo decrypt:', e instanceof OmemoError ? e.code : 'failed')
+    // Their session and ours no longer match (e.g. they lost it): our next message starts
+    // a new one.
+    if (e instanceof OmemoError && e.code === 'bad-message') stale.add(`${from}/${message.sid}`)
+    return { body: '', undecryptable: true }
+  } finally {
+    trust(store.takeChanges())
+  }
+}
+
+// On signing in: our store, our bundle, and this device in our list.
+async function startOmemo(): Promise<void> {
+  if (!omemoOpener) return
+  try {
+    if (!omemo) {
+      // Signed out (or in again) while opening: that store isn't this session's.
+      const entity = xmpp
+      const opened = await omemoOpener(me)
+      if (xmpp !== entity || omemo) {
+        opened.close()
+        return
+      }
+      omemo = opened
+    }
+    await publishBundle()
+    await loadDevices(me)
+  } catch (e) {
+    unexpected('omemo start', e)
+  }
 }
 
 // --- account service (email, invites, contacts by email) -------------------------------

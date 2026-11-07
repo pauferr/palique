@@ -52,7 +52,7 @@ Cliente de mensajería de escritorio inspirado en los chats de escritorio de pri
 **Decidido: XMPP**
 
 - Servidor: **Prosody** (libre, en Lua, ligero, configuración en un único archivo). Sin desarrollo propio de backend, solo configuración. Descartado ejabberd: pensado para millones de usuarios, más pesado y complejo de administrar. Si algún día Prosody se queda corto, se puede migrar sin tocar el cliente.
-- Cubre de serie: cuentas, lista de contactos (roster), presencia, mensajes offline, historial.
+- Cubre de serie: cuentas, lista de contactos (roster), presencia, mensajes offline.
 - Zumbido: XEP-0224 *Attention*.
 - Animaciones a pantalla completa y demás funciones exclusivas: extensiones propias de Palique, que solo interpretarán clientes Palique.
 - Interoperabilidad: los usuarios pueden hablar con otros clientes XMPP (sin funciones exclusivas).
@@ -65,7 +65,7 @@ Cliente de mensajería de escritorio inspirado en los chats de escritorio de pri
 **Seguridad**
 
 - TLS obligatorio cliente-servidor y servidor-servidor.
-- Cifrado de extremo a extremo opcional mediante OMEMO (XEP-0384, basado en el algoritmo Double Ratchet).
+- Cifrado de extremo a extremo mediante OMEMO, siempre activo (XEP-0384, basado en el algoritmo Double Ratchet).
 - Limitaciones: metadatos visibles para el servidor; las extensiones propias van sin cifrar salvo que se encapsulen en el contenido OMEMO.
 
 **Costes**
@@ -154,7 +154,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 **Decidido: la cuenta es el correo electrónico. Registro solo con invitación por correo.**
 
 - Se entra con **correo y contraseña**. Cada cuenta tiene un **nombre visible** (lo elige al registrarse y lo cambia cuando quiera) que es lo que ve todo el mundo. El correo solo lo ven los contactos mutuos (los dos os habéis agregado), para saber quién es quién aunque cambie de nombre; quien no te tiene agregado nunca lo ve.
-- Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID, y solo se lo da a los contactos mutuos: pregunta a Prosody quiénes son (el roster está allí) antes de responder. Así el correo se puede cambiar sin tocar contactos, historial ni avatar, y no se filtra a nadie más. El JID no se muestra nunca.
+- Por dentro, cada cuenta tiene un JID aleatorio y fijo (`k3f9x2ab7q@dominio`). Solo el servicio de cuentas sabe qué correo va con qué JID, y solo se lo da a los contactos mutuos: pregunta a Prosody quiénes son (el roster está allí) antes de responder. Así el correo se puede cambiar sin tocar contactos ni avatar, y no se filtra a nadie más. El JID no se muestra nunca.
 - El nombre visible es XEP-0172: se publica en PEP (lo leen los contactos, como el avatar) y viaja en cada presencia y en las solicitudes de amistad, para que se vea antes de aceptar.
 - Iniciar sesión: la app pregunta al servicio de cuentas (HTTP) qué JID corresponde al correo y entra con él (SASL normal). A un correo sin cuenta le responde un JID inventado y siempre el mismo, así que falla igual que una contraseña mal escrita y no se sabe si la cuenta existe. Limitado por IP.
 - La app solo inicia sesión. Crear la cuenta y recuperar la contraseña se hace en la web (páginas del servicio de cuentas en el mismo dominio): un clic desde el correo, también desde el móvil, sin códigos que pegar ni enlaces `palique://` que algunos programas de correo bloquean.
@@ -194,17 +194,14 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 
 ### Almacenamiento de datos
 
-**Decidido: historial de chat solo en local.**
+**Decidido: sin historial de chat; conversaciones cifradas de extremo a extremo.**
 
 - En el servidor (lo que XMPP ya guarda por defecto): cuenta, lista de contactos, perfil (avatar, nombre, mensaje personal) y mensajes offline hasta que se entregan.
 - En el servicio de cuentas: correo (y a qué JID corresponde), si acepta el boletín, e invitaciones enviadas.
 - En el servidor NO se archivan conversaciones: `mod_mam` desactivado en Prosody. Argumento de privacidad comunicable al usuario.
-- En local: historial de chats (SQLite con el módulo `node:sqlite` que trae Electron, sin módulos nativos que recompilar; archivo `history.sqlite` en la carpeta de datos de la app) y preferencias de la app (sonidos, tema, opciones de guiños).
-- Cada conversación carga sus últimos 200 mensajes. Si varias personas usan Palique en el mismo equipo, cada cuenta tiene su propio historial.
-- Asumido: si el usuario formatea o cambia de equipo, pierde el historial. Son conversaciones casuales.
-- Aviso al usuario: en primer arranque o en la sección de historial de Opciones, indicar que el historial solo vive en este equipo.
-  - Nota: en Linux, desinstalar un paquete normalmente no borra los datos de usuario (`~/.local/share`), así que el riesgo real es formatear o cambiar de equipo, no desinstalar.
-- Exportación de chats desde Opciones. Formatos propuestos: HTML (legible, con estilo Palique), texto plano y JSON (para reimportar en el futuro).
+- En el equipo no se guarda ninguna conversación: viven en memoria mientras la app está abierta. Se guardan solo las preferencias de la app (sonidos, tema, opciones de guiños) y las claves de cifrado (`omemo.sqlite`, selladas con el almacén de claves del sistema cuando existe).
+- El texto de los mensajes de los chats uno a uno va cifrado de extremo a extremo con OMEMO (XEP-0384). Los guiños, zumbidos y avisos de «está escribiendo» van como señales sin cifrar, y el servidor sigue viendo quién habla con quién y cuándo, nombres y avatares. Cada contacto puede verificarse comparando el código de su clave.
+- Asumido: no hay historial ni exportación. Son conversaciones casuales y lo que no se guarda no se puede filtrar.
 
 ## 4. Alcance del MVP
 
@@ -220,7 +217,7 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Guiños: catálogo inicial de 3 a 5 animaciones.
 - Emoticonos básicos.
 - Notificaciones de escritorio.
-- Historial local con exportación (HTML, texto, JSON).
+- Chats cifrados de extremo a extremo (OMEMO), sin historial en el equipo.
 
 **Excluido del MVP** → ver hoja de ruta (sección 5).
 
@@ -231,7 +228,6 @@ Criterio: el MVP debe transmitir la sensación buscada (sonidos, zumbidos, guiñ
 Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es definitivo.
 
 **Siguientes versiones**
-- Cifrado de extremo a extremo (OMEMO, XEP-0384).
 - Conversaciones en grupo.
 - Envío de archivos.
 - Historial sincronizado entre dispositivos (XEP-0313).
@@ -271,7 +267,7 @@ Ideas aprobadas para versiones posteriores. El orden dentro de cada bloque no es
 - [x] **Formato de los guiños** → WebM VP9 con alfa y sonido incluido (ver sección 3).
 - [x] **Sonidos** → provisionales libres (CC0 / generados) hasta tener los definitivos (ver sección 3).
 - [x] **Alcance del MVP** → ver sección 4.
-- [x] **Historial de chat** → solo local, con aviso y exportación (ver sección 3).
+- [x] **Historial de chat** → ninguno: conversaciones solo en memoria y cifradas de extremo a extremo (ver sección 3).
 - [x] **Registro y autenticación** → usuario y contraseña desde la app (XEP-0077); proveedores externos en la hoja de ruta (ver sección 3).
 - [~] **Nombre "Palique"** → búsqueda web (oct. 2026) sin coincidencias de apps o proyectos de mensajería con ese nombre. Pendiente: consulta formal en EUIPO y OEPM (clases 9 y 38) y disponibilidad de dominio/usuario en GitHub. Posible debilidad: "palique" significa "charla" en español, lo que podría considerarse descriptivo para una app de chat a efectos de registro de marca.
 

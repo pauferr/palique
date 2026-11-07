@@ -115,6 +115,8 @@ cd ~/palique/deploy && docker compose logs -f
 
 (o solo uno: `docker compose logs -f prosody`, `accounts` o `caddy`).
 
+**Al salir el cifrado de extremo a extremo.** Las apps anteriores no pueden leer ni enviar mensajes cifrados. Sube `MIN_APP_VERSION` en `deploy/.env` a la versión que lo incluye y ejecuta `deploy/setup.sh`: las apps viejas piden descargar la nueva.
+
 **Copia de seguridad.** Las cuentas y listas de contactos están en el volumen `palique_prosody-data`; los correos y preferencias, en `palique_accounts-data`:
 
 ```bash

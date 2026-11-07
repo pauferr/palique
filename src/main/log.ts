@@ -6,7 +6,6 @@
 // masked, like the home folder. Callers never pass passwords or message bodies.
 import { appendFileSync, renameSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { inspect } from 'node:util'
 
 export type Log = { write(level: 'error' | 'warn' | 'info', ...parts: unknown[]): void }
 
@@ -24,7 +23,10 @@ function describe(part: unknown): string {
     const stack = part.stack ?? `${part.name}: ${part.message}`
     return typeof condition === 'string' ? `${stack} [${condition}]` : stack
   }
-  return typeof part === 'string' ? part : inspect(part, { depth: 2, breakLength: Infinity })
+  if (typeof part !== 'object' && typeof part !== 'function') return String(part)
+  // Objects only by their type: a library's object may hold keys (libsignal logs whole
+  // sessions with console.warn).
+  return part === null ? 'null' : `[${part.constructor?.name ?? 'Object'}]`
 }
 
 // One older copy (`palique.old.log`), so the log never grows past twice `maxBytes`.

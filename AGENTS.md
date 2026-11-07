@@ -18,15 +18,14 @@ A desktop instant messaging app in the style of the early 2000s chat apps: Elect
 src/main/          Electron main process
   index.ts         windows, tray, notifications, IPC handlers, anti-spam
   xmpp.ts          the only module that touches XMPP; one connection; account service calls
-  history.ts       local chat history (node:sqlite, history.sqlite in userData)
+  omemo.ts         OMEMO end-to-end encryption: keys, sessions, encrypt/decrypt (omemo.sqlite in userData)
   settings.ts      app preferences (settings.json in userData)
-  export.ts        history export: html / txt / json
   presence.ts      "came online" detection
   cooldown.ts      per-contact rate limits (buzz, winks, toasts, arrivals)
   log.ts           error log (palique.log), with nothing personal in it
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
-                   '' → App (Login / Roster), #chat=<jid>, #options, #nick, #about, #wink=<id>
+                   '' → App (Login / Roster), #chat=<jid>, #verify=<jid>, #options, #nick, #about, #wink=<id>
   themes/          light, warm, dark: «Claro», «Cálido», «Oscuro» (CSS variables; light.css defines them all)
 server/
   prosody.cfg.lua  development Prosody config
@@ -50,12 +49,12 @@ compose.yaml       local server stack
 - **Windows:** contact list (main), one window per conversation (as chat apps used to), Options, and a transparent click-through overlay for winks (on Wayland, where a window can't force itself on top everywhere, or with «Mostrar los guiños a pantalla completa» off, winks play inside the conversation window instead). Closing the contact list hides it (tray keeps the app running). With «Conversaciones: En la ventana de contactos» (`chats: 'together'`), the conversation chosen shows beside the list instead (`<Chat embedded>` in `Roster.svelte`); `shown` and `hostOf()` in `index.ts` decide which window each message, wink and typing notice goes to.
 - **IPC:** `ipcMain.handle('area:action')` in `index.ts`, wrapped one-to-one in `src/preload/index.ts`. Validate everything that comes from the renderer in main (types, sizes, ids).
 - **Single instance** per data folder (`app.requestSingleInstanceLock`). To run a second copy for testing, give it its own folder (see Development).
-- **Local data:** chat history is only on the computer (server archive is off). `history.sqlite` and `settings.json` live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
+- **Local data:** there is no chat history: nothing said is written to disk (server archive is off too). `settings.json` and `omemo.sqlite` (the encryption keys, sealed with `safeStorage` when the system has it) live in Electron's `userData`, plus `password.bin` when "Iniciar sesión automáticamente" is on (encrypted with `safeStorage`; never offered without system encryption).
 - **Error log:** `console.error`/`console.warn` in main, uncaught errors and the renderer's console errors go to `palique.log` in the OS's logs folder (one older copy, ~1 MB each). Nothing is sent: Ayuda → «Registro de errores…» in the menu bar (signed in or not) opens its folder for the user to send it. `log.ts` writes errors as name, message and stack only and masks addresses, JIDs, link codes and the home folder; never log passwords or message bodies. Where xmpp.ts can only tell the UI 'unknown', `unexpected()` logs the real cause first.
 - **Icons:** [Lucide](https://lucide.dev) through `@lucide/svelte`, imported one by one (`import { Bell } from '@lucide/svelte'`, `size={16}`), so only those end up in the app. Line icons in `currentColor`, so they follow every theme.
 - **Design "Cielo":** a 2005 chat app made today: sky headers (`--sky`, `--header-bg`), glossy pill buttons, rounded fields, Nunito. A window's main action is `<button class="primary">`. Components use theme variables only, never colors of their own, so every theme works.
 - **Theme and font:** chosen in Options, applied as `data-theme` / `data-font` on every window's root. A font overrides the theme's `--font` (`themes/fonts.css`) and is scaled to the theme font's x-height (`--x-height`, `font-size-adjust` in `base.css`), so every font looks the same size. All bundled fonts are free (OFL), Comic Relief among them for a comic-style option.
-- **Messages:** contacts only; strangers can't message you. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
+- **Messages:** contacts only; strangers can't message you. The text of 1:1 messages is end-to-end encrypted with OMEMO (XEP-0384); winks, buzzes and typing notices are unencrypted signals. Fallback `<body>` («Mensaje cifrado con OMEMO») for clients that can't read it. Conversations and unread messages live in memory for the session only. Contacts' keys are verified in `#verify`. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).
 
 ### Accounts and identity
@@ -115,6 +114,7 @@ compose.yaml       local server stack
 |---|---|
 | XEP-0077, XEP-0401 | registration with invite, only for apps from before the website |
 | XEP-0280 | carbons |
+| XEP-0384 | OMEMO 0.3 (`eu.siacs.conversations.axolotl`), PEP nodes open |
 | XEP-0085 | typing |
 | XEP-0224 | buzz (attention) |
 | XEP-0084 + presence hash | avatars in PEP |
@@ -196,7 +196,8 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `reset` | password recovery on the website, by email, in the page's language |
 | `newsletter` | newsletter choice, language kept with the account |
 | `invisible` | invisible status (needs the server module) |
-| `history`, `export`, `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
+| `omemo` | OMEMO encryption: sessions, key changes, verification |
+| `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `log` | error log: format, size limit, nothing personal written |
 | `version` | next release version from the commits |
 | `i18n` | every translated string is in the catalogs, none left over, placeholders match |
@@ -216,7 +217,7 @@ CI ([.github/workflows/checks.yml](.github/workflows/checks.yml)) runs typecheck
   - Prettier settings: single quotes, no semicolons, width 100, no trailing commas. The Svelte plugin is on.
   - Format only code: `npx prettier --write src scripts server/accounts/src`. Running it on `.` rewrites Markdown and YAML that aren't kept in Prettier style.
 - **Comments:** short and about *why*, in the existing tone. Keep them current when the code changes.
-- **License:** AGPL-3.0-or-later ([LICENSE](LICENSE)). Anything added (dependencies, fonts, sounds, images) must be compatible: permissive (MIT, BSD, ISC, Apache-2.0), OFL for fonts, or your own work.
+- **License:** AGPL-3.0-or-later ([LICENSE](LICENSE)). Anything added (dependencies, fonts, sounds, images) must be compatible: permissive (MIT, BSD, ISC, Apache-2.0), OFL for fonts, GPL-3.0 or AGPL-3.0 when there's no permissive option (the OMEMO library: Palique as a whole is then AGPL-3.0 only), or your own work.
 - **Simplicity:**
   - Prefer the standard library and platform features. Avoid new dependencies.
   - One module owns each concern: XMPP only in `xmpp.ts`, IPC only in `index.ts` and the preload.

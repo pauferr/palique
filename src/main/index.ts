@@ -5,7 +5,6 @@ import {
   Menu,
   Notification,
   Tray,
-  dialog,
   ipcMain,
   nativeImage,
   powerMonitor,
@@ -27,21 +26,21 @@ import {
   WINK_INTERVAL,
   cooldown
 } from './cooldown'
-import { FORMATS, exportHistory, type ExportFormat, type ExportResult } from './export'
-import { openHistory, type History } from './history'
 import { openLog } from './log'
+import { openOmemo, type Seal } from './omemo'
 import { installNow, startUpdates, type UpdateStatus } from './updates'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
 import { versionLabel } from '../renderer/src/version'
-import { winkLabel } from '../renderer/src/wink-labels'
 import { _, lang, setLanguage } from '../renderer/src/i18n'
 import { openSettings, validPatch, type SettingsStore } from './settings'
 import {
   AVATAR_MAX_BYTES,
   DOMAIN,
+  acceptKey,
   acceptRequest,
+  deviceTrust,
   accountFor,
   addContact,
   changeEmail,
@@ -59,7 +58,9 @@ import {
   recoverUrl,
   onChange,
   onMessage,
+  onTrust,
   onTyping,
+  ownFingerprint,
   isWinkId,
   ownShow,
   ownStatus,
@@ -71,12 +72,15 @@ import {
   sendWink,
   setAppVersion,
   setAvatar,
+  setOmemoOpener,
   setPresence,
+  setVerified,
   snapshot,
   type AuthResult,
   type ChatMessage,
   type OwnShow,
-  type Snapshot
+  type Snapshot,
+  type TrustNote
 } from './xmpp'
 
 // One Palique per user: opening it again (e.g. from the app menu) shows the existing
@@ -104,10 +108,13 @@ log.write(
 )
 process.on('uncaughtException', (e) => log.write('error', 'uncaught:', e))
 process.on('unhandledRejection', (e) => log.write('error', 'unhandled rejection:', e))
-app.on('render-process-gone', (_event, __, details) =>
-  log.write('error', 'renderer gone:', details)
+// Objects are logged by type only, so the useful fields go as text.
+app.on('render-process-gone', (_event, __, d) =>
+  log.write('error', `renderer gone: ${d.reason} ${d.exitCode}`)
 )
-app.on('child-process-gone', (_event, details) => log.write('error', 'process gone:', details))
+app.on('child-process-gone', (_event, d) =>
+  log.write('error', `process gone: ${d.type} ${d.reason} ${d.exitCode}`)
+)
 
 // On Wayland a window can't force itself above the rest in every compositor (GNOME
 // refuses), so winks play inside the conversation instead of full screen. (Forcing
@@ -298,12 +305,13 @@ function announceArrivals(state: Snapshot): void {
 // One window per conversation.
 const chats = new Map<string, BrowserWindow>()
 const pending = new Map<string, [ChatMessage, boolean][]>()
-let history: History
+// Conversations live in memory only: nothing said is written to disk.
+const session = new Map<string, ChatMessage[]>()
+// Trust notices («started using Palique on another device», «key changed»), kept like the
+// session so a conversation opened later still shows them. Not messages: nothing is stored.
+const trustNotes = new Map<string, TrustNote[]>()
 let settings: SettingsStore
 let account = '' // bare JID of the signed-in user
-// Offline messages arrive while login() is still finishing, before `account` is set:
-// xmpp already knows who we are by then, so they're saved too.
-const signedInAs = (): string => account || snapshot().jid
 
 // «Together» option: the conversation shown beside the contact list ('' = none).
 let shown = ''
@@ -460,6 +468,29 @@ function openNick(): void {
   loadRenderer(nickWindow, 'nick')
 }
 
+// Comparing encryption codes with a contact: one small window per contact.
+const verifyWindows = new Map<string, BrowserWindow>()
+
+function openVerify(contact: string): void {
+  const open = verifyWindows.get(contact)
+  if (open) {
+    open.focus()
+    return
+  }
+  const win = new BrowserWindow({
+    ...centered(420, 480),
+    show: false,
+    autoHideMenuBar: true,
+    title: _('Verificar cifrado…'),
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: { preload, sandbox: false }
+  })
+  verifyWindows.set(contact, win)
+  win.on('closed', () => verifyWindows.delete(contact))
+  win.once('ready-to-show', () => win.show())
+  loadRenderer(win, `verify=${encodeURIComponent(contact)}`)
+}
+
 let aboutWindow: BrowserWindow | null = null
 
 function openAbout(): void {
@@ -483,31 +514,6 @@ function openAbout(): void {
   loadRenderer(aboutWindow, 'about')
 }
 
-// The format is picked in the save dialog, by file type (HTML unless another one).
-const exportTypes = (): Electron.FileFilter[] => [
-  { name: _('Página web'), extensions: ['html'] },
-  { name: _('Texto'), extensions: ['txt'] },
-  { name: _('Datos (JSON)'), extensions: ['json'] }
-]
-
-async function exportChats(win: BrowserWindow | null): Promise<ExportResult> {
-  const messages = account ? history.all(account) : []
-  if (!messages.length) return 'empty'
-  const day = new Date().toISOString().slice(0, 10)
-  const save = { defaultPath: `${_('palique-conversaciones')}-${day}.html`, filters: exportTypes() }
-  const { canceled, filePath } = win
-    ? await dialog.showSaveDialog(win, save)
-    : await dialog.showSaveDialog(save)
-  if (canceled || !filePath) return 'canceled'
-  const extension = filePath.split('.').pop()?.toLowerCase() as ExportFormat
-  const format = FORMATS.includes(extension) ? extension : 'html'
-  const state = snapshot()
-  const name = (jid: string): string =>
-    jid === account ? state.name : (state.contacts.find((c) => c.jid === jid)?.name ?? jid)
-  await writeFile(filePath, exportHistory(format, account, messages, name, winkLabel), 'utf8')
-  return 'saved'
-}
-
 // "Sign in automatically": the password is kept apart from the settings, encrypted by
 // the system (Keychain on macOS, DPAPI on Windows, the keyring on Linux). Without system
 // encryption the option isn't offered.
@@ -528,6 +534,12 @@ async function savedPassword(): Promise<string> {
 
 function forgetPassword(): void {
   rm(passwordFile(), { force: true }).catch(() => {})
+}
+
+// OMEMO's private keys and sessions, sealed by the system too when it can.
+const seal: Seal = {
+  seal: (data) => safeStorage.encryptString(Buffer.from(data).toString('base64')),
+  open: (data) => Buffer.from(safeStorage.decryptString(Buffer.from(data)), 'base64')
 }
 
 // Away after a while without using the computer, and back when you return.
@@ -567,13 +579,13 @@ function setUnread(contact: string, count: number): void {
 // `quiet`: no shaking, sounds, flashing or toasts (old messages, e.g. while offline).
 // Busy (dnd): no sounds, shaking or toasts, but windows still flash.
 function deliver(message: ChatMessage, quiet = false): void {
-  const owner = signedInAs()
-  if (owner) history.save(owner, message)
+  const kept = session.get(message.with) ?? []
+  if (!kept.some((m) => m.id === message.id)) session.set(message.with, [...kept, message])
   const dnd = !message.mine && ownShow() === 'dnd'
   const silent = quiet || dnd
   const win = hostOf(message.with)
   if (!win) {
-    // Ours from another device are only history.
+    // Ours from another device are only kept in the session.
     if (message.mine) return
     setUnread(message.with, (unread.get(message.with) ?? 0) + 1)
     if (message.wink && !quiet) {
@@ -661,6 +673,13 @@ function showWink(id: string, chat: BrowserWindow | null): void {
 
 app.whenReady().then(() => {
   setAppVersion(app.getVersion())
+  setOmemoOpener((account) =>
+    openOmemo(
+      join(app.getPath('userData'), 'omemo.sqlite'),
+      account,
+      canRemember() ? seal : undefined
+    )
+  )
   electronApp.setAppUserModelId('com.palique.app')
   // Packaged apps get theirs from the bundle; in development the dock shows Electron's.
   if (is.dev) app.dock?.setIcon(icon)
@@ -676,7 +695,8 @@ app.whenReady().then(() => {
     })
   })
 
-  history = openHistory(join(app.getPath('userData'), 'history.sqlite'))
+  // The old chat history must not stay on disk.
+  void rm(join(app.getPath('userData'), 'history.sqlite'), { force: true })
   settings = openSettings(join(app.getPath('userData'), 'settings.json'))
   applyLanguage()
   setInterval(checkIdle, 15_000)
@@ -765,6 +785,9 @@ app.whenReady().then(() => {
     fitMainWindow()
     for (const contact of [...unread.keys()]) setUnread(contact, 0)
     unseenWinks.clear()
+    session.clear()
+    trustNotes.clear()
+    verifyWindows.forEach((win) => win.close())
     chats.forEach((win) => win.close())
     options?.close()
     nickWindow?.close()
@@ -907,14 +930,45 @@ app.whenReady().then(() => {
   ipcMain.on('chat:replay-wink', (event, wink: string) => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })
-  ipcMain.handle('chat:history', (_event, contact: string) => {
-    const owner = signedInAs()
-    return owner ? history.load(owner, String(contact)) : []
-  })
+  ipcMain.handle('chat:history', (_event, contact: string) => session.get(String(contact)) ?? [])
   ipcMain.handle('chat:send', async (_event, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)
     if (text) deliver(await sendMessage(String(contact), text))
   })
+  ipcMain.handle(
+    'chat:trust-list',
+    (_event, contact: string) => trustNotes.get(String(contact)) ?? []
+  )
+  onTrust((changes) =>
+    changes.forEach((change) => {
+      const note: TrustNote = { ...change, at: Date.now() }
+      trustNotes.set(change.jid, [...(trustNotes.get(change.jid) ?? []), note])
+      hostOf(change.jid)?.webContents.send('chat:trust', note)
+      // A device added to our own list gets a copy of everything we send: the user must know.
+      if (change.jid === account && change.kind === 'new-device') {
+        const text = _(
+          'Tu cuenta ha empezado a usar Palique en otro dispositivo. Si no has sido tú, cambia tu contraseña.'
+        )
+        mainWindow?.webContents.send('account:new-device')
+        notify('Palique', text, showMain)
+      }
+    })
+  )
+  ipcMain.handle('chat:verify', (_event, contact: string) => ({
+    mine: ownFingerprint(),
+    devices: deviceTrust(String(contact))
+  }))
+  ipcMain.handle(
+    'chat:verify-set',
+    (_event, contact: string, deviceId: number, verified: boolean) => {
+      if (Number.isInteger(deviceId) && typeof verified === 'boolean')
+        setVerified(String(contact), deviceId, verified)
+    }
+  )
+  ipcMain.handle('chat:accept-key', async (_event, contact: string, deviceId: number) => {
+    if (Number.isInteger(deviceId)) await acceptKey(String(contact), deviceId)
+  })
+  ipcMain.handle('chat:verify-open', (_event, contact: string) => openVerify(String(contact)))
   ipcMain.handle('chat:buzz', async (_event, contact: string) => {
     const wait = sentBuzzes.take(String(contact))
     if (wait) return wait
@@ -925,9 +979,6 @@ app.whenReady().then(() => {
   ipcMain.handle('app:quit', () => app.quit())
   ipcMain.handle('nick:open', () => openNick())
   ipcMain.handle('about:open', () => openAbout())
-  ipcMain.handle('history:export', (event) =>
-    exportChats(BrowserWindow.fromWebContents(event.sender))
-  )
   // A buzz shakes the whole conversation window. Not on Wayland, where windows can't move
   // themselves: the conversation shakes its contents instead (false).
   ipcMain.handle('chat:shake', async (event) => {

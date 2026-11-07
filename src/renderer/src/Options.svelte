@@ -102,26 +102,6 @@
     }
   }
 
-  // Messages: a copy of the history, format picked in the save dialog.
-  const exportResults = {
-    saved: _('Copia guardada.'),
-    canceled: '',
-    empty: _('Todavía no hay conversaciones que guardar.')
-  }
-  let exportNote = $state('')
-  let exporting = $state(false)
-
-  async function exportHistory(): Promise<void> {
-    exporting = true
-    exportNote = ''
-    try {
-      exportNote = exportResults[await window.api.exportHistory()]
-    } catch {
-      exportNote = _('No se ha podido guardar el archivo.')
-    }
-    exporting = false
-  }
-
   // Account: changing the email needs a link from the new inbox; until then the old one
   // still works.
   let changing = $state(false)
@@ -356,18 +336,6 @@
           />
           {_('Mostrar cuando alguien está escribiendo')}
         </label>
-      </section>
-      <section>
-        <h2>{_('Historial de conversaciones')}</h2>
-        <p>
-          {_(
-            'Tus conversaciones se guardan solo en este ordenador. Si lo cambias o lo formateas, se pierden.'
-          )}
-        </p>
-        <div class="row">
-          <button onclick={exportHistory} disabled={exporting}>{_('Guardar una copia…')}</button>
-          {#if exportNote}<span class="hint" role="status">{exportNote}</span>{/if}
-        </div>
       </section>
     {:else if section === 'alerts'}
       <h1>{_('Alertas')}</h1>

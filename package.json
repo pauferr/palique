@@ -30,9 +30,7 @@
     "build:linux": "npm run build && electron-builder --linux",
     "check:auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-auth.ts",
     "check:roster": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-roster.ts",
-    "check:chat": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-chat.ts",
-    "check:history": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-history.ts",
-    "check:export": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-export.ts",
+    "check:chat": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-chat.ts",
     "check:settings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-settings.ts",
     "check:presence": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-presence.ts",
     "check:avatar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-avatar.ts",
@@ -46,6 +44,7 @@
     "check:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-reset.ts",
     "check:newsletter": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-newsletter.ts",
     "check:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-version.ts",
+    "check:omemo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning scripts/check-omemo.ts",
     "check:i18n": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-i18n.ts",
     "screenshots": "electron-vite build && electron scripts/screenshots/main.cjs"
   },
@@ -61,6 +60,7 @@
     "@fontsource/nunito": "^5.3.0",
     "@fontsource/patrick-hand": "^5.3.0",
     "@lucide/svelte": "^1.61.0",
+    "@privacyresearch/libsignal-protocol-typescript": "0.0.16",
     "@xmpp/client": "^0.14.0",
     "electron-updater": "^6.8.9"
   },

@@ -25,6 +25,14 @@ const SHOTS = {
     h: 760,
     run: "document.querySelectorAll('details.picker')[1].open = true"
   },
+  verificar: { hash: 'verify=iker@localhost', w: 420, h: 480 },
+  'conversacion-cifrada': {
+    hash: 'chat=iker@localhost',
+    w: 460,
+    h: 820,
+    args: ['--verified=1', '--notes=1'],
+    run: BOTTOM
+  },
   nombre: { hash: 'nick', w: 480, h: 640, args: ['--nick=1'] },
   integrada: { hash: '', w: 900, h: 620, args: ['--chats=together'], run: BOTTOM },
   'tema-claro': { hash: '', w: 360, h: 640, theme: 'light' },
