@@ -75,7 +75,7 @@ export type ChatMessage = {
   buzz: boolean
   wink: string // catalog id, '' when not a wink
   at: number // ms timestamp
-  delayed?: boolean // stored by the server while we were offline (not saved in history)
+  delayed?: boolean // stored by the server while we were offline (saved, but no effects)
 }
 
 type Presence = { show: Show; status: string }

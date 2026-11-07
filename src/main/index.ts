@@ -298,6 +298,9 @@ const pending = new Map<string, [ChatMessage, boolean][]>()
 let history: History
 let settings: SettingsStore
 let account = '' // bare JID of the signed-in user
+// Offline messages arrive while login() is still finishing, before `account` is set:
+// xmpp already knows who we are by then, so they're saved too.
+const signedInAs = (): string => account || snapshot().jid
 
 function openChat(contact: string, focus: boolean): BrowserWindow {
   setUnread(contact, 0)
@@ -502,7 +505,8 @@ function setUnread(contact: string, count: number): void {
 // `quiet`: no shaking, sounds, flashing or toasts (old messages, e.g. while offline).
 // Busy (dnd): no sounds, shaking or toasts, but windows still flash.
 function deliver(message: ChatMessage, quiet = false): void {
-  if (account) history.save(account, message)
+  const owner = signedInAs()
+  if (owner) history.save(owner, message)
   const dnd = !message.mine && ownShow() === 'dnd'
   const silent = quiet || dnd
   if (!chats.has(message.with)) {
@@ -828,9 +832,10 @@ app.whenReady().then(() => {
   ipcMain.on('chat:replay-wink', (event, wink: string) => {
     if (isWinkId(wink)) showWink(wink, BrowserWindow.fromWebContents(event.sender))
   })
-  ipcMain.handle('chat:history', (_event, contact: string) =>
-    account ? history.load(account, String(contact)) : []
-  )
+  ipcMain.handle('chat:history', (_event, contact: string) => {
+    const owner = signedInAs()
+    return owner ? history.load(owner, String(contact)) : []
+  })
   ipcMain.handle('chat:send', async (_event, contact: string, body: string) => {
     const text = String(body).trim().slice(0, 4000)
     if (text) deliver(await sendMessage(String(contact), text))
