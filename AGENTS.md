@@ -19,6 +19,7 @@ src/main/          Electron main process
   index.ts         windows, tray, notifications, IPC handlers, anti-spam
   xmpp.ts          with groups.ts, the only code that touches XMPP; one connection; account service calls; exports an internal API for groups.ts
   groups.ts        group chats: rooms (XEP-0045), bookmarks, member list, group OMEMO, archive catch-up
+  bytecache.ts     small LRU byte cache (GIFs fetched for `palique-gif://`)
   session.ts       ordering of a conversation's messages in memory (live and archived)
   omemo.ts         OMEMO end-to-end encryption: keys, sessions, encrypt/decrypt (omemo.sqlite in userData)
   settings.ts      app preferences (settings.json in userData)
@@ -28,6 +29,8 @@ src/main/          Electron main process
 src/preload/       contextBridge API (window.api); the renderer's only door to main
 src/renderer/src/  Svelte UI. One renderer for every window, the URL hash picks the view:
                    '' → App (Login / Roster), #chat=<jid>, #newgroup, #verify=<jid>, #options, #nick, #about, #wink=<id>
+  gif.ts           `isGifUrl`/`gifSrc`, shared by main and renderer
+  GifPicker / GifImage .svelte  GIF search window and the image in a bubble
   GroupAvatar / NewGroup / GroupMembers .svelte  group photo (or face mosaic), creation window, member list
   themes/          light, warm, dark: «Claro», «Cálido», «Oscuro» (CSS variables; light.css defines them all)
 server/
@@ -58,6 +61,7 @@ compose.yaml       local server stack
 - **Design "Cielo":** a 2005 chat app made today: sky headers (`--sky`, `--header-bg`), glossy pill buttons, rounded fields, Nunito. A window's main action is `<button class="primary">`. Components use theme variables only, never colors of their own, so every theme works.
 - **Theme and font:** chosen in Options, applied as `data-theme` / `data-font` on every window's root. A font overrides the theme's `--font` (`themes/fonts.css`) and is scaled to the theme font's x-height (`--x-height`, `font-size-adjust` in `base.css`), so every font looks the same size. All bundled fonts are free (OFL), Comic Relief among them for a comic-style option.
 - **Messages:** contacts only; strangers can't message you (in a group, members who aren't your contacts can write too, but only inside the group). The text of 1:1 messages is end-to-end encrypted with OMEMO (XEP-0384); winks, buzzes and typing notices are unencrypted signals. Fallback `<body>` («Mensaje cifrado con OMEMO») for clients that can't read it. Conversations and unread messages live in memory for the session only. Contacts' keys are verified in `#verify`. Carbons (XEP-0280) for other devices. Offline messages arrive with `delay` and play no effects. With no conversation open, incoming messages, buzzes and winks don't open it: the contact blinks orange in the list with an unread count (total on the dock icon) until it's opened, and winks that came meanwhile play then. Clicking a wink in a conversation replays it.
+- **GIFs:** a GIF is a normal OMEMO-encrypted message whose body is exactly a `https://static.klipy.com/…` URL (`isGifUrl` in `gif.ts`); the bubble shows it as an image. Images load through the `palique-gif://` protocol (`index.ts`): only `static.klipy.com` paths that pass `isGifUrl`, max 5 MB, `image/webp|gif|jpeg`, 50 MB LRU in memory (`bytecache.ts`); the CSP's `img-src` adds only `palique-gif:`. Search goes through the account service (`searchGifs` in `xmpp.ts`, `Snapshot.gifs` says if the button shows). Privacy: viewers' computers fetch from Klipy, so Klipy sees their IPs; the search term goes via the account service with a per-user HMAC id, never the JID.
 - **Anti-spam:** buzz and wink limits per contact in both directions, notification cooldowns (`cooldown.ts`).
 
 ### Accounts and identity
@@ -85,6 +89,8 @@ compose.yaml       local server stack
   - `lookup`
   - `contacts`: the emails of your mutual contacts
   - `invites` get, `invite-email` set
+  - `gifs` get: GIF search through Klipy (`klipy.ts`), 24 per page; empty `q` is trending. Errors: `feature-not-implemented` (no key), `service-unavailable` (Klipy failed or slower than 8 s), `resource-constraint` (60 a minute per user). Advertised as disco feature `urn:palique:accounts:0#gifs` only when there is a key. Redirects are refused; `customer_id` is an HMAC of the JID
+  - env: `KLIPY_API_KEY` (empty: no GIFs), `KLIPY_BASE_URL` (default `https://api.klipy.com/api/v1`)
 - **HTTP**, for the app and the website:
   - `POST /account` (the app's sign-in), `/signup` and `/recover` (JSON, apps from before the website)
   - `GET`/`POST /join`, `/reset`, `/recover`: the website's forms (create the account, set a new password, ask for the link)
@@ -224,6 +230,8 @@ No test framework. Each `scripts/check-*.ts` is a plain Node script with `assert
 | `groups-server` | group rooms: defaults, members and names, member invites, owners only for name and photo, leaving and succession, events, archive, strangers out, 50-person limit |
 | `groups` | group logic in main (no server) |
 | `session` | message ordering (no server) |
+| `gif` | `isGifUrl` and `gifSrc` (no server) |
+| `gifs` | GIF search against a fake Klipy: results, errors, limits, disco feature |
 | `omemo` | OMEMO encryption: sessions, key changes, verification |
 | `settings`, `presence`, `emoticons`, `plus`, `cooldown` | local logic, no server |
 | `log` | error log: format, size limit, nothing personal written |

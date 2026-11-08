@@ -11,6 +11,7 @@ import tls from 'node:tls'
 import { client, xml } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import * as A from '../src/main/xmpp.ts'
+import { isGifUrl } from '../src/renderer/src/gif.ts'
 import { openOmemo, type Omemo, type TrustChange } from '../src/main/omemo.ts'
 import { register } from './invite.ts'
 
@@ -184,6 +185,15 @@ assert.ok(toB.getChild('store', 'urn:xmpp:hints'), 'kept for offline delivery')
 assert.ok(toB.getChild('active', CHATSTATES), 'messages carry the active chat state')
 assert.equal(await decrypt(B.xmpp, bStore, at(a), toB), 'hola')
 
+// A GIF is just its Klipy link, encrypted like any message (the server can't tell which).
+const gif = 'https://static.klipy.com/ii/abc/de/fg.webp'
+await A.sendMessage(at(b), gif)
+const gifToB = await encryptedIn(B.inbox, 'B gets the GIF', 1)
+assert.equal(gifToB.getChildText('body'), 'Mensaje cifrado con OMEMO')
+const gifText = await decrypt(B.xmpp, bStore, at(a), gifToB)
+assert.equal(gifText, gif)
+assert.ok(isGifUrl(gifText), 'shown as a GIF')
+
 // Typing, both ways. B: composing → paused, then composing → message.
 const state = (name: string): Element =>
   xml('message', { to: at(a), type: 'chat' }, xml(name, { xmlns: CHATSTATES }))
@@ -316,7 +326,7 @@ const sentCopy = await until(
   'phone gets the copy'
 )
 assert.equal(await decrypt(phone.xmpp, phoneStore, at(a), sentCopy), 'también al móvil')
-await encryptedIn(B.inbox, 'B gets it too', 1)
+await encryptedIn(B.inbox, 'B gets it too', 2)
 // The phone writes to B only (as if before this device existed): no key for the app, and
 // it's our own copy, so nothing to show.
 await phone.xmpp.send(

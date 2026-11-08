@@ -7,6 +7,7 @@ import type {
   ChatMessage,
   DeviceTrust,
   EmailStatus,
+  Gif,
   InviteStatus,
   OwnShow,
   Snapshot,
@@ -42,6 +43,10 @@ const api = {
   inviteStatus: (): Promise<InviteStatus> => ipcRenderer.invoke('invites:status'),
   inviteByEmail: (address: string): Promise<InviteStatus> =>
     ipcRenderer.invoke('invites:email', address),
+  // GIFs from Klipy (empty q: trending); the button shows only when the server has them
+  // (Snapshot.gifs).
+  searchGifs: (q: string, page: number): Promise<{ gifs: Gif[]; more: boolean }> =>
+    ipcRenderer.invoke('gifs:search', q, page),
   logout: (): Promise<void> => ipcRenderer.invoke('auth:logout'),
   getRoster: (): Promise<Snapshot> => ipcRenderer.invoke('roster:snapshot'),
   currentAccount: (): Promise<string> => ipcRenderer.invoke('auth:current'),

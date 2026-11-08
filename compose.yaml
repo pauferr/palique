@@ -31,7 +31,11 @@ services:
       DATA_DIR: /data
       SIGNIN_LIMIT: "1000" # sign-in lookups per IP a minute (production: 30)
       MIN_APP_VERSION: ${MIN_APP_VERSION:-} # oldest app that may sign in; empty: any
+      KLIPY_API_KEY: ${KLIPY_API_KEY:-} # GIF search; put it in .env (ignored by git), empty: no GIFs
+      KLIPY_BASE_URL: ${KLIPY_BASE_URL:-} # empty: KLIPY's own
       # Keep real keys out of git (.env file).
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # lets check:gifs run a fake KLIPY on this machine
     volumes:
       - accounts-data:/data
 

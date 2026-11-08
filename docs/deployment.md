@@ -72,6 +72,8 @@ nano .env
 
 Rellena `PALIQUE_DOMAIN` (tu dominio), `ACME_EMAIL` (tu correo), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `MAIL_FROM`. `ACCOUNTS_SECRET` se genera solo.
 
+**GIFs (opcional).** Pide una clave de API gratuita en [Klipy](https://klipy.com/developers), ponla en `KLIPY_API_KEY` de `deploy/.env` y ejecuta `./setup.sh` (o `docker compose up -d` en `deploy/`). Sin clave, la app no muestra el botón GIF. Los GIFs los cargan los ordenadores de quienes los ven directamente desde Klipy, así que Klipy ve sus IP.
+
 Arranca:
 
 ```bash

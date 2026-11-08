@@ -7,7 +7,9 @@ import {
   Tray,
   ipcMain,
   nativeImage,
+  net,
   powerMonitor,
+  protocol,
   safeStorage,
   screen
 } from 'electron'
@@ -28,6 +30,7 @@ import {
 } from './cooldown'
 import { openLog } from './log'
 import { insertSorted } from './session'
+import { ByteCache } from './bytecache'
 import {
   addMembers,
   createGroup,
@@ -45,6 +48,7 @@ import { installNow, startUpdates, type UpdateStatus } from './updates'
 import { cameOnline } from './presence'
 import { emojify } from '../renderer/src/emoticons'
 import { stripPlus } from '../renderer/src/plus'
+import { isGifUrl } from '../renderer/src/gif'
 import { versionLabel } from '../renderer/src/version'
 import { _, lang, setLanguage } from '../renderer/src/i18n'
 import { openSettings, validPatch, type SettingsStore } from './settings'
@@ -64,6 +68,7 @@ import {
   lookupContact,
   onEmail,
   resendVerification,
+  searchGifs,
   setNewsletter,
   setAccountLanguage,
   setNick,
@@ -318,9 +323,11 @@ function notifyMessage(message: ChatMessage): void {
     ? _('¡Te ha enviado un zumbido!')
     : message.wink
       ? _('Te ha enviado un guiño')
-      : message.body.length > 120
-        ? `${message.body.slice(0, 120)}…`
-        : message.body
+      : isGifUrl(message.body)
+        ? _('Te ha enviado un GIF')
+        : message.body.length > 120
+          ? `${message.body.slice(0, 120)}…`
+          : message.body
   const group = isRoom(message.with)
     ? plain(groups().find((g) => g.jid === message.with)?.name ?? '')
     : ''
@@ -340,7 +347,8 @@ let previous: Snapshot = {
   avatar: '',
   show: 'online',
   status: '',
-  groups: []
+  groups: [],
+  gifs: false
 }
 let connectedAt = 0
 const arrivals = cooldown(ARRIVAL_INTERVAL)
@@ -763,8 +771,73 @@ function showWink(id: string, chat: BrowserWindow | null): void {
   loadRenderer(win, `wink=${encodeURIComponent(id)}`)
 }
 
+// GIFs: the renderer loads palique-gif://static.klipy.com/<path> (gif.ts), and only Klipy's
+// images come through: checked path, size and type, so a message can't make us fetch
+// anything else. Kept in memory (never on disk, like the rest of the conversation).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'palique-gif', privileges: { standard: true, secure: true } }
+])
+const GIF_MAX_BYTES = 5_000_000
+const GIF_CACHE_BYTES = 50_000_000
+const GIF_TYPES = ['image/webp', 'image/gif', 'image/jpeg']
+const gifCache = new ByteCache(GIF_CACHE_BYTES)
+const gifFetches = new Map<string, Promise<{ type: string; body: Uint8Array }>>() // in flight
+
+async function fetchGif(path: string): Promise<{ type: string; body: Uint8Array }> {
+  const url = `https://static.klipy.com/${path}`
+  if (!isGifUrl(url)) throw new Error('not a Klipy image')
+  const res = await net.fetch(url, { redirect: 'error', signal: AbortSignal.timeout(20_000) })
+  const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+  if (!res.ok || !res.body || !GIF_TYPES.includes(type)) {
+    await res.body?.cancel()
+    throw new Error(`status ${res.status}, type ${type}`)
+  }
+  // Counted while reading: Content-Length may be missing or lie.
+  const chunks: Uint8Array[] = []
+  let bytes = 0
+  const reader = res.body.getReader()
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    bytes += value.byteLength
+    if (bytes > GIF_MAX_BYTES) {
+      await reader.cancel()
+      throw new Error('too big')
+    }
+    chunks.push(value)
+  }
+  return { type, body: Buffer.concat(chunks) }
+}
+
+async function gifResponse(request: Request): Promise<Response> {
+  const prefix = 'palique-gif://static.klipy.com/'
+  const path = request.url.startsWith(prefix) ? request.url.slice(prefix.length) : ''
+  try {
+    let gif = gifCache.get(path)
+    if (!gif) {
+      // The same GIF on screen twice asks for it once.
+      let fetching = gifFetches.get(path)
+      if (!fetching) {
+        fetching = fetchGif(path)
+          .then((fetched) => {
+            gifCache.set(path, fetched)
+            return fetched
+          })
+          .finally(() => gifFetches.delete(path))
+        gifFetches.set(path, fetching)
+      }
+      gif = await fetching
+    }
+    return new Response(new Uint8Array(gif.body), { headers: { 'content-type': gif.type } })
+  } catch (e) {
+    console.warn('GIF image not loaded:', (e as Error).message) // never the link
+    return new Response(null, { status: 404 })
+  }
+}
+
 app.whenReady().then(() => {
   setAppVersion(app.getVersion())
+  protocol.handle('palique-gif', gifResponse)
   setOmemoOpener((account) =>
     openOmemo(
       join(app.getPath('userData'), 'omemo.sqlite'),
@@ -922,6 +995,13 @@ app.whenReady().then(() => {
   )
   ipcMain.handle('account:nick', (_event, name: string) => setNick(String(name)))
   ipcMain.handle('invites:status', () => inviteStatus())
+  ipcMain.handle('gifs:search', (_event, q: unknown, page: unknown) => {
+    if (typeof q !== 'string' || q.length > 100) throw new Error('invalid')
+    if (!Number.isInteger(page) || (page as number) < 1 || (page as number) > 50) {
+      throw new Error('invalid')
+    }
+    return searchGifs(q.trim(), page as number, lang)
+  })
   ipcMain.handle('invites:email', (_event, address: string) => inviteByEmail(clean(address)))
   ipcMain.handle('roster:snapshot', () => snapshot())
   // By email. Inviting someone without an account is a separate, explicit step.

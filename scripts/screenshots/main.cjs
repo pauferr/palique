@@ -2,7 +2,7 @@
 // and no server: npm run screenshots. Off-screen, at double density.
 // Plain CommonJS that Electron runs as is: require, and no place for return types.
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type */
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, protocol } = require('electron')
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -58,6 +58,35 @@ const SHOTS = {
   'tema-claro': { hash: '', w: 360, h: 640, theme: 'light' },
   'tema-calido': { hash: '', w: 360, h: 640, theme: 'warm' },
   'tema-oscuro': { hash: '', w: 360, h: 640, theme: 'dark' },
+  // GIFs: the picker open (trending), and a conversation with one received and one sent.
+  'gifs-buscador': {
+    hash: 'chat=iker@localhost',
+    w: 460,
+    h: 760,
+    run: "document.querySelector('.gif-button').click()"
+  },
+  'gifs-buscador-oscuro': {
+    hash: 'chat=iker@localhost',
+    w: 460,
+    h: 760,
+    theme: 'dark',
+    run: "document.querySelector('.gif-button').click()"
+  },
+  'gifs-conversacion': {
+    hash: 'chat=iker@localhost',
+    w: 460,
+    h: 820,
+    args: ['--gifs=1'],
+    run: BOTTOM
+  },
+  'gifs-conversacion-oscuro': {
+    hash: 'chat=iker@localhost',
+    w: 460,
+    h: 820,
+    theme: 'dark',
+    args: ['--gifs=1'],
+    run: BOTTOM
+  },
   'opciones-general': { hash: 'options', w: 600, h: 500, section: 'General' },
   'opciones-sonidos': { hash: 'options', w: 600, h: 500, section: 'Alertas' },
   // palique.io's contact list, in each language and theme (saved without the web- prefix).
@@ -78,6 +107,11 @@ const wanted = (name) =>
   process.env.ONLY ? name.startsWith(`${process.env.ONLY}-`) : !name.startsWith('web-')
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2')
+// GIF bubbles and the picker load palique-gif://static.klipy.com/…: here, the mock's own
+// drawings (gifs/) instead of the app's handler, which fetches from Klipy.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'palique-gif', privileges: { standard: true, secure: true } }
+])
 
 async function shoot(name) {
   const shot = SHOTS[name]
@@ -113,6 +147,10 @@ async function shoot(name) {
 }
 
 app.whenReady().then(async () => {
+  protocol.handle('palique-gif', (request) => {
+    const file = path.join(__dirname, 'gifs', path.basename(new URL(request.url).pathname))
+    return new Response(fs.readFileSync(file), { headers: { 'content-type': 'image/webp' } })
+  })
   if (process.env.SHOT) {
     await shoot(process.env.SHOT)
     return app.exit(0)

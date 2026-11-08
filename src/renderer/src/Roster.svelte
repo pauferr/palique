@@ -35,7 +35,8 @@
     avatar: '',
     show: 'online',
     status: '',
-    groups: []
+    groups: [],
+    gifs: false
   })
   let picker: HTMLInputElement
   let avatarError = $state('')

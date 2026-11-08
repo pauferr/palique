@@ -142,6 +142,11 @@ Límites por contacto, aplicados en el proceso principal (no se saltan cerrando 
 - Selector en la ventana de chat que inserta el atajo donde está el cursor.
 - Provisional: emoji del sistema. Cada tema podrá sustituirlos por sus propias imágenes.
 
+### GIFs
+- Decidido: búsqueda de GIFs con Klipy desde la ventana de chat. La clave de API vive solo en el servidor de cuentas (`KLIPY_API_KEY`); sin clave no hay botón.
+- Un GIF es un mensaje normal, cifrado con OMEMO, cuyo cuerpo es el enlace de `static.klipy.com`; la app lo pinta como imagen.
+- Las imágenes se cargan por un protocolo propio que solo admite Klipy, con límite de tamaño y tipo. Coste de privacidad: Klipy ve la IP de quien ve el GIF.
+
 ### Avatares
 - XEP-0084: la imagen se publica en el PEP del usuario (solo la ven sus contactos). Al cambiarla se reenvía la presencia, y Prosody (`mod_vcard_legacy`) añade el hash para que los contactos la descarguen al momento.
 - Se elige pulsando tu avatar en la lista de contactos; la app la recorta al centro y la reduce a 96×96 PNG.

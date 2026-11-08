@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { client, jid, xml, type Client } from '@xmpp/client'
 import type { Element } from '@xmpp/xml'
 import { _, lang } from '../renderer/src/i18n.ts'
+import { isGifUrl } from '../renderer/src/gif.ts'
 import {
   OmemoError,
   type Bundle,
@@ -83,6 +84,7 @@ export type Snapshot = {
   show: OwnShow // our own status
   status: string // our own personal message
   groups: Group[]
+  gifs: boolean // the server has GIF search (Klipy)
 }
 
 export type ChatMessage = {
@@ -115,6 +117,8 @@ let own: { show: OwnShow; status: string } = { show: 'online', status: '' }
 let avatars = new Map<string, Avatar>() // by bare JID, ours included
 let nicks = new Map<string, string>() // display names by bare JID, ours included
 let emails = new Map<string, string>() // mutual contacts' emails, from the account service
+// GIFs (Klipy, through the account service): only when the server has a key for them.
+let gifs = false
 let listener: (snapshot: Snapshot) => void = () => {}
 let messageListener: (message: ChatMessage) => void = () => {}
 let typingListener: (contact: string, typing: boolean) => void = () => {}
@@ -155,7 +159,8 @@ export function snapshot(): Snapshot {
     avatar: avatars.get(me)?.url ?? '',
     show: own.show,
     status: own.status,
-    groups: groupList()
+    groups: groupList(),
+    gifs
   }
 }
 
@@ -509,6 +514,7 @@ export async function login(
       .then(emit)
       .catch(() => {})
     loadAvatar(me).then(emit, () => {})
+    loadGifsFeature().then(emit, () => {})
   })
   // Contacts' presence is only valid while connected.
   entity.on('status', (status) => {
@@ -540,6 +546,7 @@ export async function logout(): Promise<void> {
   avatars = new Map()
   nicks = new Map()
   emails = new Map()
+  gifs = false
   clearTimeout(bundleTimer)
   omemo?.close()
   omemo = null
@@ -1083,6 +1090,74 @@ async function loadEmails(): Promise<void> {
   } catch (e) {
     unexpected('contact emails', e)
   }
+}
+
+async function loadGifsFeature(): Promise<void> {
+  try {
+    const res = await accountsIq('get', xml('query', { xmlns: DISCO_INFO }))
+    gifs = res
+      .getChild('query', DISCO_INFO)!
+      .getChildren('feature')
+      .some((f) => f.attrs.var === `${ACCOUNTS}#gifs`)
+  } catch {
+    gifs = false // no account service, no GIFs: nothing worth logging
+  }
+}
+
+export type Gif = {
+  id: string
+  title: string
+  preview: string
+  url: string
+  width: number
+  height: number
+}
+
+const size = (value: unknown): number =>
+  typeof value === 'string' && /^[1-9]\d{0,4}$/.test(value) ? Number(value) : 0
+
+// Up to 24 GIFs per page (empty q: trending). Links that aren't Klipy's are dropped, they'd
+// never load anyway. Rejects with 'offline' or 'unavailable' (no key, Klipy down, too many).
+export async function searchGifs(
+  q: string,
+  page: number,
+  locale: string
+): Promise<{ gifs: Gif[]; more: boolean }> {
+  if (!xmpp) throw new Error('offline')
+  let res: Element
+  try {
+    res = await accountsIq('get', xml('gifs', { xmlns: ACCOUNTS, q, page: String(page), locale }))
+  } catch (e) {
+    const known = ['feature-not-implemented', 'service-unavailable', 'resource-constraint']
+    throw new Error(known.includes(condition(e) ?? '') ? 'unavailable' : unexpected('gifs', e))
+  }
+  const el = res.getChild('gifs', ACCOUNTS)
+  const found: Gif[] = []
+  for (const g of el?.getChildren('gif').slice(0, 24) ?? []) {
+    const { id, title, preview, url } = g.attrs
+    const width = size(g.attrs.width)
+    const height = size(g.attrs.height)
+    if (
+      typeof id === 'string' &&
+      id.length <= 64 &&
+      typeof preview === 'string' &&
+      typeof url === 'string' &&
+      isGifUrl(preview) &&
+      isGifUrl(url) &&
+      width &&
+      height
+    ) {
+      found.push({
+        id,
+        title: typeof title === 'string' ? title.slice(0, 100) : '',
+        preview,
+        url,
+        width,
+        height
+      })
+    }
+  }
+  return { gifs: found, more: el?.attrs.more === 'true' }
 }
 
 export type InviteStatus = { max: number; used: number }

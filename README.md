@@ -45,6 +45,10 @@ Quién está conectado, quién se ha ido a merendar y quién está de exámenes.
 
 Zumbidos que hacen temblar la ventana, los emoticonos de siempre y el mítico «está escribiendo…» 🤪
 
+### GIFs
+
+Busca un GIF y mándalo en la conversación, cifrado como el resto de mensajes.
+
 ### Grupos
 
 Crea un grupo con tus amigos, cada uno puede añadir a los suyos. Con nombre, foto y mensajes cifrados de extremo a extremo.

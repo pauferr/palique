@@ -10,6 +10,7 @@ import { component, xml } from '@xmpp/component'
 import { openDb, WEEK, type Account } from './db.ts'
 import { outdated } from './version.ts'
 import { escape, mailer } from './mail.ts'
+import { gifs, klipyEnabled } from './klipy.ts'
 import { language, requested, translator, type Language } from './i18n.ts'
 
 const env = (name: string, fallback?: string): string => {
@@ -229,6 +230,50 @@ xmpp.iqCallee.get(NS, 'contacts', async (ctx) => {
     if (email) reply.c('contact', { jid: other, email })
   }
   return reply
+})
+
+// <gifs q page locale/>: GIF search (empty q: trending), through KLIPY. The disco feature
+// tells the app whether this server has a key. 60 requests per user a minute.
+const DISCO = 'http://jabber.org/protocol/disco#info'
+xmpp.iqCallee.get(DISCO, 'query', () => {
+  const features = [DISCO, ...(klipyEnabled ? [`${NS}#gifs`] : [])]
+  return xml('query', { xmlns: DISCO }, ...features.map((v) => xml('feature', { var: v })))
+})
+
+const GIF_MAX = 60
+const gifRequests = new Map<string, { since: number; count: number }>()
+
+xmpp.iqCallee.get(NS, 'gifs', async (ctx) => {
+  const jid = user(ctx.from)
+  if (!jid || !db.account(jid)) return stanzaError('forbidden')
+  if (!klipyEnabled) return stanzaError('feature-not-implemented')
+  const now = Date.now()
+  const seen = gifRequests.get(jid)
+  const window = seen && now - seen.since < 60_000 ? seen : { since: now, count: 0 }
+  gifRequests.set(jid, window)
+  if (++window.count > GIF_MAX) return stanzaError('resource-constraint')
+  const el = ctx.stanza.getChild('gifs', NS)!
+  const q = String(el.attrs.q ?? '')
+    .trim()
+    .slice(0, 100)
+  const page = Math.min(Math.max(Math.floor(Number(el.attrs.page)) || 1, 1), 100)
+  const locale = /^[a-z]{2}(-[A-Za-z]{2})?$/.test(el.attrs.locale ?? '') ? el.attrs.locale : 'en'
+  try {
+    const found = await gifs(
+      q,
+      page,
+      locale,
+      createHmac('sha256', SECRET).update(jid).digest('hex')
+    )
+    const reply = xml('gifs', { xmlns: NS, more: String(found.more) })
+    for (const g of found.gifs) {
+      reply.c('gif', { ...g, id: g.id, width: String(g.width), height: String(g.height) })
+    }
+    return reply
+  } catch (e) {
+    console.error('gifs failed:', (e as Error).message) // no key or search in it
+    return stanzaError('service-unavailable')
+  }
 })
 
 // --- invites (by email only) ------------------------------------------------------------

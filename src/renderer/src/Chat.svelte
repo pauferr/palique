@@ -14,6 +14,9 @@
   import { prefs } from './prefs.svelte'
   import { playSound, type SoundEvent } from './sounds'
   import WinkPlayer from './WinkPlayer.svelte'
+  import GifImage from './GifImage.svelte'
+  import GifPicker from './GifPicker.svelte'
+  import { isGifUrl } from './gif'
   import { findWink, winkLabel, winks } from './winks'
   import { _, _n, lang } from './i18n'
 
@@ -61,6 +64,10 @@
   let canWink = $state(true)
   let pickerOpen = $state(false)
   let emoticonsOpen = $state(false)
+  let gifsOpen = $state(false)
+  let gifButton: HTMLButtonElement | undefined = $state()
+  // GIF bubbles that have loaded or failed (none yet: a gap the size of a small GIF).
+  let gifLoads: Record<string, 'loaded' | 'failed'> = $state({})
   let hovered = $state('')
   let input: HTMLTextAreaElement
   let theyType = $state(false)
@@ -93,6 +100,12 @@
     if (await window.api.shakeWindow()) return
     shaking = false
     requestAnimationFrame(() => (shaking = true))
+  }
+
+  // Near the bottom as of the last scroll: a GIF that grows when it loads keeps it there.
+  let stuck = true
+  const onScroll = (): void => {
+    stuck = list.scrollHeight - list.scrollTop - list.clientHeight < 40
   }
 
   const byTime = (a: ChatMessage, b: ChatMessage): number => a.at - b.at
@@ -204,10 +217,28 @@
     } catch (error) {
       // The draft stays where it was, unless they've already started another one.
       if (!draft) draft = text
-      sendError = String(error).includes('no-devices')
-        ? 'no-devices'
-        : _('No se ha podido enviar el mensaje')
+      sendError = failure(error)
     }
+  }
+
+  const failure = (error: unknown): string =>
+    String(error).includes('no-devices') ? 'no-devices' : _('No se ha podido enviar el mensaje')
+
+  // A GIF goes as a message whose whole text is its link (gif.ts).
+  async function sendGif(url: string): Promise<void> {
+    closeGifs(true)
+    sendError = ''
+    try {
+      await window.api.sendMessage(jid, url)
+    } catch (error) {
+      sendError = failure(error)
+    }
+  }
+
+  // Back to its button, unless closed by a click somewhere else.
+  function closeGifs(refocus: boolean): void {
+    gifsOpen = false
+    if (refocus) gifButton?.focus()
   }
 
   async function acceptKeys(): Promise<void> {
@@ -391,7 +422,7 @@
       </header>
     {/if}
 
-    <ol bind:this={list} aria-live="polite">
+    <ol bind:this={list} onscroll={onScroll} aria-live="polite">
       {#each messages as message, i (message.id)}
         {@render noted(i === 0 ? 0 : messages[i - 1].at, message.at)}
         {#if newDay(i)}<li class="day"><span>{day(message.at)}</span></li>{/if}
@@ -440,7 +471,33 @@
             {#if message.undecryptable}
               <p class="event warn">{_('No se ha podido descifrar este mensaje')}</p>
             {:else}
-              <p title={time(message.at)}><Emoticons text={message.body} /></p>
+              {#if isGifUrl(message.body)}
+                <div
+                  class="gif"
+                  class:loading={!gifLoads[message.id]}
+                  class:failed={gifLoads[message.id] === 'failed'}
+                  title={time(message.at)}
+                >
+                  {#if gifLoads[message.id] === 'failed'}
+                    {_('No se ha podido cargar el GIF')}
+                  {:else}
+                    <GifImage
+                      url={message.body}
+                      alt={_('GIF')}
+                      onload={() => {
+                        gifLoads[message.id] = 'loaded'
+                        tick().then(() => {
+                          if (stuck) list.scrollTop = list.scrollHeight
+                        })
+                      }}
+                      onerror={() => (gifLoads[message.id] = 'failed')}
+                    />
+                    <span class="tag" aria-hidden="true">{_('GIF')}</span>
+                  {/if}
+                </div>
+              {:else}
+                <p title={time(message.at)}><Emoticons text={message.body} /></p>
+              {/if}
               {#if !message.encrypted}
                 <small class="plain"
                   ><LockOpen size={11} /> {_('Este mensaje no está cifrado')}</small
@@ -528,6 +585,18 @@
             {#if !canWink}<p class="wait">{_('Espera un poco para enviar otro guiño.')}</p>{/if}
           </div>
         </details>
+        {#if roster?.gifs}
+          <button
+            bind:this={gifButton}
+            class="gif-button"
+            aria-expanded={gifsOpen}
+            title={_('Buscar GIFs en KLIPY')}
+            onclick={() => (gifsOpen = !gifsOpen)}><span class="mark">{_('GIF')}</span></button
+          >
+          {#if gifsOpen}
+            <GifPicker onpick={sendGif} onclose={closeGifs} toggle={gifButton} />
+          {/if}
+        {/if}
         {#if !room}
           <button
             onclick={buzz}
@@ -758,8 +827,60 @@
   }
 
   /* Only a group's first bubble points at who's talking. */
-  .continues p {
+  .continues p,
+  .continues .gif {
     border-radius: var(--radius-large);
+  }
+
+  /* A GIF is its own bubble: the picture in the bubble's frame, no padding. */
+  .gif {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--bubble-border);
+    border-radius: 4px var(--radius-large) var(--radius-large) var(--radius-large);
+    background: var(--bar-bg);
+  }
+
+  .mine .gif {
+    border-color: var(--bubble-mine-border);
+    border-radius: var(--radius-large) 4px var(--radius-large) var(--radius-large);
+  }
+
+  .gif :global(img),
+  .gif :global(canvas) {
+    max-width: 220px;
+  }
+
+  /* Its size isn't known until it loads: a gap meanwhile. */
+  .gif.loading {
+    width: 160px;
+    height: 120px;
+  }
+
+  .loading > :global(.gif-image),
+  .loading .tag {
+    visibility: hidden;
+  }
+
+  .gif.failed {
+    padding: 7px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* On the picture itself, so the same in every theme. */
+  .tag {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 55%);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
   }
 
   /* Day separator and buzz/wink lines: centered pills, not messages. */
@@ -938,6 +1059,23 @@
 
   summary.disabled {
     opacity: 0.5;
+  }
+
+  .gif-button[aria-expanded='true'] {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    box-shadow: var(--accent-shadow);
+    color: var(--accent-text);
+  }
+
+  /* «GIF» in a little frame, a mark rather than a word. */
+  .mark {
+    padding: 1px 3px;
+    border: 2px solid currentColor;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
   }
 
   .picker > ul,

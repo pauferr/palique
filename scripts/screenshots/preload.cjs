@@ -128,6 +128,7 @@ const snapshot = {
   ),
   requests: [{ jid: 'sara@localhost', name: '[c=#ff4fa3]Sara[/c=#ffb300] (F)' }],
   contacts,
+  gifs: true,
   groups
 }
 
@@ -197,6 +198,25 @@ const groupHistory = [
   )
 ]
 
+// GIFs: our own little drawings (gifs/), never Klipy's. Their links pass isGifUrl, and
+// main.cjs serves palique-gif://static.klipy.com/shots/<n>.webp from that folder.
+const gifSizes = [150, 260, 200, 120, 230, 170, 210, 140, 250]
+const gif = (n) => `https://static.klipy.com/shots/${n}.webp`
+const gifs = gifSizes.map((height, i) => ({
+  id: String(i + 1),
+  title: 'Smiley',
+  preview: gif(i + 1),
+  url: gif(i + 1),
+  width: 200,
+  height
+}))
+const gifChat = [
+  ...history,
+  msg('9', false, gif(2), at(17, 7)),
+  msg('10', true, 'JAJAJAJA (H)', at(17, 7)),
+  msg('11', true, gif(6), at(17, 8))
+]
+
 const values = {
   remembered: { available: true, saved: false },
   lastEmail: 'andrea@palique.com',
@@ -209,12 +229,14 @@ const values = {
   getChatHistory: (jid) =>
     jid === 'insti@groups.localhost'
       ? groupHistory
-      : arg('notes')
-        ? [
-            ...history,
-            msg('9', false, 'te escribo desde otro programa :P', at(17, 7), { encrypted: false })
-          ]
-        : history,
+      : arg('gifs')
+        ? gifChat
+        : arg('notes')
+          ? [
+              ...history,
+              msg('9', false, 'te escribo desde otro programa :P', at(17, 7), { encrypted: false })
+            ]
+          : history,
   getVerify: {
     mine: 'a1b2c3d4 e5f60718 293a4b5c 6d7e8f90 0a1b2c3d 4e5f6071 8293a4b5 c6d7e8f9',
     devices: [
@@ -251,7 +273,8 @@ const values = {
     typing: true,
     chats: arg('chats') || 'windows'
   },
-  update: null
+  update: null,
+  searchGifs: { gifs, more: false }
 }
 
 // Every method of the real preload (read from its source, so this never falls behind):
